@@ -24,10 +24,10 @@ That makes the private key the thing worth attacking. If it is ever exposed, an
 already-installed copy cannot be rescued by a new release, because it will only
 accept builds signed by the key it was compiled with. The recovery is a new key,
 a new build carrying it, and a notice here, on the releases page, and at
-[fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/), where
-a hand-installable build is kept for exactly this case. That site is the fallback
-channel: if the in-app updater is the thing that is broken or untrusted, it is
-where to go instead. If you believe the key has leaked, report it
+[fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/). That
+site is the out-of-band channel: if the in-app updater is the thing that is broken
+or untrusted, it is where the notice will say so, and the replacement is installed
+by hand from the releases page. If you believe the key has leaked, report it
 through the form above and say so plainly, since it is the highest severity
 report this project can receive.
 

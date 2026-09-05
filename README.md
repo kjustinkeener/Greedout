@@ -56,10 +56,10 @@ Per-user, so there is no administrator prompt, and nothing is written outside th
 folder and `~/.claude/greedout`. Uninstalling removes both the folder and the
 shortcuts; your settings sidecar is left alone.
 
-Downloads are on the [releases page](https://github.com/kjustinkeener/Greedout/releases),
-and at [fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/), which is
-my own site and the address the install card links to. If there is no release yet, build
-from source, below.
+Downloads are on the [releases page](https://github.com/kjustinkeener/Greedout/releases).
+[fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/) is the project
+page on my own site, and the address the install card links to. If there is no release
+yet, build from source, below.
 
 ## Build from source
 

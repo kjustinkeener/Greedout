@@ -15,7 +15,7 @@
 //!     drills into a project, or eagerly for every session in the optional "deep"
 //!     scan. A row is re-enriched only when its mtime/size changed since last time.
 //!
-//! The top level is the *harness* (just the one coding harness today; the DB carries a `harness`
+//! The top level is the *harness* (Claude Code today; the DB carries a `harness`
 //! column so other providers -- Ollama, Cline, Codex -- slot in later without a
 //! schema change).
 
@@ -65,7 +65,7 @@ fn cancel_flag() -> &'static AtomicBool {
 
 // --- Frontend-facing payloads (camelCase to match the rest of the app). ---
 
-/// One harness (provider) aggregate. Only the coding harness is populated now.
+/// One harness (provider) aggregate. Only Claude Code is populated now.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HarnessAgg {

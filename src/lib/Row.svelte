@@ -150,7 +150,7 @@
     align-items: flex-start;
     border-bottom: 1px solid var(--edge-soft);
   }
-  /* Focused = open in the desktop app: bold + a subtle highlight + left accent. */
+  /* Focused = open in the Claude app: bold + a subtle highlight + left accent. */
   .row.focused {
     background: var(--panel);
     box-shadow: inset 2px 0 0 var(--fg);

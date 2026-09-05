@@ -27,7 +27,7 @@ pub struct Config {
     pub poll_seconds: f64,
     /// Denominator for the gauge (context budget).
     pub target_tokens: u64,
-    /// Sort the session focused in the desktop app to the top (reads the app's
+    /// Sort the session focused in the Claude app to the top (reads the app's
     /// `main.log`). Best-effort; ignored if the log/marker isn't found.
     pub follow_focus: bool,
     /// Show a system-tray icon.

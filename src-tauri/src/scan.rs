@@ -33,10 +33,10 @@ struct ModelInfo {
 
 /// Look up a model by (case-insensitive substring of) its id. Central table --
 /// add rows here as we bring in other clouds (GPT, Gemini, etc.). Unknown models
-/// fall back to the most expensive row (a safe high estimate) with a "?" label.
+/// fall back to the Opus row (a safe high estimate) with a "?" label.
 fn model_info(model: &str) -> ModelInfo {
     let m = model.to_ascii_lowercase();
-    // --- Cloud models ---
+    // --- Anthropic Claude ---
     // Sweet spot 200k, hard window 1M (per our own findings).
     if m.contains("opus") {
         return ModelInfo { label: "Opus", price_in: 15.0, price_out: 75.0,
@@ -78,7 +78,7 @@ pub struct Session {
     pub target: u64,
     /// The model's hard enforced context window.
     pub limit: u64,
-    /// Short model family name (the tier word pulled out of the model id).
+    /// Short model name (Opus / Sonnet / Haiku / …).
     pub model: String,
     /// Version pulled from the raw model id (e.g. "4.8", "5"); empty if unknown.
     pub model_version: String,
@@ -89,7 +89,7 @@ pub struct Session {
     pub size_bytes: u64,
     /// Cumulative estimated spend (USD) over the whole session so far.
     pub cost_usd: f64,
-    /// Currently open in the desktop app: pinned to top and shown bold. Transient
+    /// Currently open in the Claude app: pinned to top and shown bold. Transient
     /// (re-read each poll); not persisted, so it reverts on switching away.
     pub focused: bool,
 }
@@ -133,9 +133,9 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
         .to_string_lossy()
         .replace('\\', "/");
 
-    // The session currently open in the desktop app, if we can tell. It's forced
+    // The session currently open in the Claude app, if we can tell. It's forced
     // to the top so switching to a session shows its gauge immediately, without
-    // waiting for the harness to write to the transcript.
+    // waiting for Claude to write to the transcript.
     let focused = if cfg.follow_focus {
         focused_session_id()
     } else {
@@ -183,7 +183,7 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     sessions
 }
 
-/// Every project folder the harness has written, decoded to a working directory. Only
+/// Every project folder Claude has written, decoded to a working directory. Only
 /// the `n` newest sessions get built, but grouping needs to see all of them: which
 /// parents hold several projects is what says where the projects are.
 pub(crate) fn known_project_dirs() -> Vec<PathBuf> {
@@ -579,7 +579,7 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
     out
 }
 
-/// The transcript session id currently focused in the desktop app.
+/// The transcript session id currently focused in the Claude desktop app.
 ///
 /// The app tracks focus by its OWN session id (`local_<uuid>`), which is NOT the
 /// transcript filename. The two are linked by per-session sidecars the app writes
@@ -594,7 +594,7 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
 /// a freshly-opened session on the next poll -- before it has written any turn to
 /// its transcript (the old symptom: a session stayed invisible until you sent a
 /// prompt and its mtime moved).
-/// The folder holding the desktop app's per-session sidecar files.
+/// The folder holding the Claude desktop app's per-session sidecar files.
 ///
 /// The desktop app is packaged (MSIX), so it writes under its package's private
 /// store, NOT the plain `%APPDATA%\Claude` (which a non-packaged reader like us

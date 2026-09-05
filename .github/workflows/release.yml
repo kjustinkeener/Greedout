@@ -22,7 +22,7 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # One name for the version, whether it came from a tag push or from a
       # hand-run dry run. Everything downstream reads this instead of asking
@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: echo "TAG=${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           # 24, not 20: the translation gate imports the catalogs as TypeScript
           # and relies on Node stripping the types, which older Node cannot do.

@@ -2,7 +2,7 @@
   "name": "greedout",
   "version": "0.1.0",
   "private": true,
-  "description": "Always-on-top gauges for your live Claude Code sessions: context fill, spend, and history.",
+  "description": "Always-on-top gauges for your live AI coding sessions: context fill, spend, and history. Supports Claude Code.",
   "license": "MIT",
   "author": "Justin Keener",
   "repository": {

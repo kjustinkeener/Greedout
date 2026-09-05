@@ -42,7 +42,7 @@
     "copyright": "Copyright (c) 2026 Justin Keener",
     "licenseFile": "../LICENSE",
     "category": "DeveloperTool",
-    "shortDescription": "Live context gauges for Claude Code sessions.",
-    "longDescription": "Greedout reads Claude Code session transcripts from disk and shows the most recently active sessions as always-on-top gauges: context fill against the model's window, estimated spend, and a per-session history graph."
+    "shortDescription": "Live context and spend gauges for AI coding sessions.",
+    "longDescription": "Greedout reads AI coding session transcripts from disk and shows the most recently active sessions as always-on-top gauges: context fill against the model's window, estimated spend, and a per-session history graph. Claude Code is the harness supported today; the design is harness-agnostic."
   }
 }

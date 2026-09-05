@@ -1,7 +1,7 @@
 [package]
 name = "greedout"
 version = "0.1.0"
-description = "Multi-session Claude Code context gauge"
+description = "Multi-session context and spend gauges for AI coding harnesses (supports Claude Code)"
 authors = ["Justin Keener <308936412+kjustinkeener@users.noreply.github.com>"]
 edition = "2021"
 rust-version = "1.77"
@@ -9,7 +9,7 @@ license = "MIT"
 repository = "https://github.com/kjustinkeener/Greedout"
 homepage = "https://github.com/kjustinkeener/Greedout"
 readme = "../README.md"
-keywords = ["tauri", "claude", "context", "gauge", "desktop"]
+keywords = ["tauri", "llm", "context", "gauge", "claude"]
 categories = ["gui", "visualization"]
 # This is an application, not a library. Never publish it to crates.io.
 publish = false

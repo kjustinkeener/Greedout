@@ -2,20 +2,24 @@
 
 [![CI](https://github.com/kjustinkeener/Greedout/actions/workflows/ci.yml/badge.svg)](https://github.com/kjustinkeener/Greedout/actions/workflows/ci.yml)
 
-An always-on-top dashboard showing your most recently active **Claude Code** sessions
-as live gauges: how full each one's context window is, what it has cost so far, and how
-that has moved over the session.
+An always-on-top dashboard showing your most recently active AI coding sessions as live
+gauges: how full each one's context window is, what it has cost so far, and how that has
+moved over the session. **Claude Code** is the harness it supports today.
 
-It reads Claude Code's own transcript files from disk. Nothing is injected into Claude,
-no proxy sits in front of it, and the app never needs an API key.
+It works by reading the harness's own transcript files from disk (for Claude Code, the
+JSONL under `~/.claude/projects`). Nothing is injected into the harness, no proxy sits in
+front of it, and the app never needs an API key. Nothing in the gauges, the history graph
+or the cost model is specific to one vendor: a harness qualifies once it writes per-turn
+token counts somewhere on disk.
 
-> **Why it exists:** Claude Code's `statusLine` never fires in the Windows MSIX desktop
-> app, so the usual in-terminal context readout simply isn't available there. Greedout
-> reconstructs it from the outside, and along the way gets to show several sessions at
-> once rather than only the one in front of you.
+> **Why it exists:** context and spend readouts usually live inside the harness, one
+> session at a time, and go missing entirely when the harness has no terminal to print
+> them in. Claude Code's `statusLine`, for instance, never fires in the Windows MSIX
+> desktop app. Greedout reconstructs the readout from the outside, and along the way gets
+> to show several sessions at once rather than only the one in front of you.
 
 <p align="center">
-  <img src="docs/img/main-window.png" alt="Greedout showing three Claude Code sessions, the focused one with a speedometer at 68% of its context target and a running spend total." width="420">
+  <img src="docs/img/main-window.png" alt="Greedout showing three sessions, the focused one with a speedometer at 68% of its context target and a running spend total." width="420">
 </p>
 
 ## Features
@@ -144,8 +148,8 @@ rename it. Window position, size and zoom are remembered between runs.
 
 ## Privacy and network access
 
-Greedout reads Claude Code transcripts, which contain your prompts and the model's
-replies, so it is worth being precise about where that data goes: **nowhere.** Everything
+Greedout reads session transcripts (today, Claude Code's), which contain your prompts and
+the model's replies, so it is worth being precise about where that data goes: **nowhere.** Everything
 stays on the machine. There is no telemetry, no analytics, and no account.
 
 The frontend is granted no filesystem, shell or HTTP permissions at all (see
@@ -169,7 +173,7 @@ copy is untouched.
 Costs are **estimates, not bills**. Each turn is priced from its own token counts at its
 model's published per-token rate, so a session on a flat-rate plan still shows a figure:
 what the same work would have cost through the API. Published prices are compiled into
-the app and go stale when Anthropic changes them.
+the app and go stale when a vendor changes its rates.
 
 ## Licence
 

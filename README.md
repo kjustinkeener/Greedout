@@ -36,6 +36,22 @@ token counts somewhere on disk.
 - **68 themes**, a **font picker** with roughly 50 bundled faces across three slots,
   Ctrl+wheel zoom, an optional CPU/memory status bar, and a system tray icon.
 
+<p align="center">
+  <img src="docs/img/context-explorer.png" alt="The Context Explorer showing a project's sessions as a treemap, tiles sized by transcript size and colored from green to red, each labelled with context, turns, model and estimated spend." width="760">
+</p>
+
+<p align="center">
+  <em>The Context Explorer, sizing every session in a project by what it occupies on disk.</em>
+</p>
+
+<p align="center">
+  <img src="docs/img/themes.png" alt="The theme browser, showing dozens of themes as live preview cards grouped into families such as neon, warm, cool, greens and neutral." width="560">
+</p>
+
+<p align="center">
+  <em>Each theme card is a live preview, not a swatch.</em>
+</p>
+
 ## Platform support
 
 **Windows 10 and 11.** The app builds on other platforms, but two features are

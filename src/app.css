@@ -1,0 +1,1709 @@
+/* Bundled interface faces (offline, no CDN). Imported here rather than from
+   main.ts so every window entry - settings, about, explorer, themes, fonts -
+   gets the @font-face rules; Vite splits CSS per entry, so an import that
+   lives in one entry is missing from the others. See src/lib/fonts.ts for the
+   catalog and which slot each face is offered in. */
+@import "@fontsource-variable/inter/index.css";
+@import "@fontsource-variable/ibm-plex-sans/index.css";
+@import "@fontsource-variable/archivo/index.css";
+@import "@fontsource-variable/roboto-condensed/index.css";
+@import "@fontsource-variable/space-grotesk/index.css";
+@import "@fontsource-variable/figtree/index.css";
+@import "@fontsource-variable/manrope/index.css";
+@import "@fontsource-variable/oxanium/index.css";
+@import "@fontsource-variable/orbitron/index.css";
+@import "@fontsource-variable/teko/index.css";
+@import "@fontsource-variable/jetbrains-mono/index.css";
+@import "@fontsource-variable/roboto-mono/index.css";
+@import "@fontsource-variable/geist-mono/index.css";
+@import "@fontsource-variable/martian-mono/index.css";
+@import "@fontsource/chakra-petch/latin-300.css";
+@import "@fontsource/chakra-petch/latin-ext-300.css";
+@import "@fontsource/chakra-petch/latin-400.css";
+@import "@fontsource/chakra-petch/latin-ext-400.css";
+@import "@fontsource/chakra-petch/latin-500.css";
+@import "@fontsource/chakra-petch/latin-ext-500.css";
+@import "@fontsource/chakra-petch/latin-600.css";
+@import "@fontsource/chakra-petch/latin-ext-600.css";
+@import "@fontsource/chakra-petch/latin-700.css";
+@import "@fontsource/chakra-petch/latin-ext-700.css";
+@import "@fontsource/rajdhani/latin-300.css";
+@import "@fontsource/rajdhani/latin-ext-300.css";
+@import "@fontsource/rajdhani/latin-400.css";
+@import "@fontsource/rajdhani/latin-ext-400.css";
+@import "@fontsource/rajdhani/latin-500.css";
+@import "@fontsource/rajdhani/latin-ext-500.css";
+@import "@fontsource/rajdhani/latin-600.css";
+@import "@fontsource/rajdhani/latin-ext-600.css";
+@import "@fontsource/rajdhani/latin-700.css";
+@import "@fontsource/rajdhani/latin-ext-700.css";
+@import "@fontsource/ibm-plex-mono/latin-300.css";
+@import "@fontsource/ibm-plex-mono/latin-ext-300.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-ext-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/ibm-plex-mono/latin-ext-500.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
+@import "@fontsource/ibm-plex-mono/latin-ext-600.css";
+@import "@fontsource/ibm-plex-mono/latin-700.css";
+@import "@fontsource/ibm-plex-mono/latin-ext-700.css";
+@import "@fontsource/b612-mono/latin-400.css";
+@import "@fontsource/b612-mono/latin-700.css";
+@import "@fontsource/michroma/latin-400.css";
+@import "@fontsource/michroma/latin-ext-400.css";
+@import "@fontsource/share-tech-mono/latin-400.css";
+@import "@fontsource/vt323/latin-400.css";
+@import "@fontsource/vt323/latin-ext-400.css";
+@import "@fontsource/silkscreen/latin-400.css";
+@import "@fontsource/silkscreen/latin-ext-400.css";
+@import "@fontsource/silkscreen/latin-700.css";
+@import "@fontsource/silkscreen/latin-ext-700.css";
+@import "@fontsource/doto/latin-300.css";
+@import "@fontsource/doto/latin-ext-300.css";
+@import "@fontsource/doto/latin-400.css";
+@import "@fontsource/doto/latin-ext-400.css";
+@import "@fontsource/doto/latin-500.css";
+@import "@fontsource/doto/latin-ext-500.css";
+@import "@fontsource/doto/latin-600.css";
+@import "@fontsource/doto/latin-ext-600.css";
+@import "@fontsource/doto/latin-700.css";
+@import "@fontsource/doto/latin-ext-700.css";
+@import "@fontsource/doto/latin-800.css";
+@import "@fontsource/doto/latin-ext-800.css";
+@import "@fontsource/doto/latin-900.css";
+@import "@fontsource/doto/latin-ext-900.css";
+@import "@fontsource-variable/exo-2/index.css";
+@import "@fontsource-variable/saira/index.css";
+@import "@fontsource-variable/tektur/index.css";
+@import "@fontsource-variable/jura/index.css";
+/* This one package predates the ./*.css export map the others ship, so the
+   subpath form fails to resolve; the bare specifier maps to its index.css. */
+@import "@fontsource-variable/big-shoulders-display";
+@import "@fontsource-variable/source-code-pro/index.css";
+@import "@fontsource-variable/fira-code/index.css";
+@import "@fontsource-variable/red-hat-mono/index.css";
+@import "@fontsource-variable/kode-mono/index.css";
+@import "@fontsource-variable/handjet/index.css";
+@import "@fontsource-variable/workbench/index.css";
+@import "@fontsource-variable/pixelify-sans/index.css";
+@import "@fontsource/barlow-semi-condensed/latin-300.css";
+@import "@fontsource/barlow-semi-condensed/latin-ext-300.css";
+@import "@fontsource/barlow-semi-condensed/latin-400.css";
+@import "@fontsource/barlow-semi-condensed/latin-ext-400.css";
+@import "@fontsource/barlow-semi-condensed/latin-500.css";
+@import "@fontsource/barlow-semi-condensed/latin-ext-500.css";
+@import "@fontsource/barlow-semi-condensed/latin-600.css";
+@import "@fontsource/barlow-semi-condensed/latin-ext-600.css";
+@import "@fontsource/barlow-semi-condensed/latin-700.css";
+@import "@fontsource/barlow-semi-condensed/latin-ext-700.css";
+@import "@fontsource/titillium-web/latin-300.css";
+@import "@fontsource/titillium-web/latin-ext-300.css";
+@import "@fontsource/titillium-web/latin-400.css";
+@import "@fontsource/titillium-web/latin-ext-400.css";
+@import "@fontsource/titillium-web/latin-600.css";
+@import "@fontsource/titillium-web/latin-ext-600.css";
+@import "@fontsource/titillium-web/latin-700.css";
+@import "@fontsource/titillium-web/latin-ext-700.css";
+@import "@fontsource/space-mono/latin-400.css";
+@import "@fontsource/space-mono/latin-ext-400.css";
+@import "@fontsource/space-mono/latin-700.css";
+@import "@fontsource/space-mono/latin-ext-700.css";
+@import "@fontsource/nova-mono/latin-400.css";
+@import "@fontsource/nova-mono/latin-ext-400.css";
+@import "@fontsource-variable/sora";
+@import "@fontsource-variable/azeret-mono";
+/* Sono ships two cuts under one family name; the mono cut is the one worth
+   having here, so only that stylesheet is pulled in. */
+@import "@fontsource-variable/sono/mono.css";
+@import "@fontsource/b612/latin-400.css";
+@import "@fontsource/b612/latin-700.css";
+@import "@fontsource/audiowide/latin-400.css";
+@import "@fontsource/audiowide/latin-ext-400.css";
+@import "@fontsource/bebas-neue/latin-400.css";
+@import "@fontsource/bebas-neue/latin-ext-400.css";
+@import "@fontsource/dm-mono/latin-300.css";
+@import "@fontsource/dm-mono/latin-ext-300.css";
+@import "@fontsource/dm-mono/latin-400.css";
+@import "@fontsource/dm-mono/latin-ext-400.css";
+@import "@fontsource/dm-mono/latin-500.css";
+@import "@fontsource/dm-mono/latin-ext-500.css";
+@import "@fontsource/syne-mono/latin-400.css";
+@import "@fontsource/syne-mono/latin-ext-400.css";
+@import "@fontsource/major-mono-display/latin-400.css";
+@import "@fontsource/major-mono-display/latin-ext-400.css";
+
+/* Jura Light is its own face in the picker rather than a boldness shift: pinning
+   the wght axis in the @font-face descriptor restricts the variable file to 300,
+   so the face stays light whatever weight rung an element asks for. */
+@font-face {
+  font-family: "Jura Light";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300;
+  src: url("@fontsource-variable/jura/files/jura-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF,
+    U+FFFD;
+}
+@font-face {
+  font-family: "Jura Light";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300;
+  src: url("@fontsource-variable/jura/files/jura-latin-ext-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* Window background: base RGB (per theme) + alpha (opacity slider) composed
+     together so the opacity control only touches the alpha channel. */
+  --bg-rgb: 20, 22, 26;
+  --bg-alpha: 0.92;
+  --bg: rgba(var(--bg-rgb), var(--bg-alpha));
+  --fg: #e6e8eb;
+  --muted: #8b9199;
+  --track: #2a2e35;
+  --green: #3fb950;
+  --yellow: #d29922;
+  --red: #f85149;
+  --live: #3fb950;
+  /* Semantic overlays (borders / hover / raised panels), themed below. */
+  --edge: rgba(255, 255, 255, 0.08);
+  --edge-soft: rgba(255, 255, 255, 0.05);
+  --hover: rgba(255, 255, 255, 0.08);
+  --panel: rgba(255, 255, 255, 0.04);
+  /* Gauge scale stops (speedo dial, progress bars, history fill). Darkened in
+     light mode so the bright cyan/yellow end stays legible. */
+  --g0: #00ffe8;
+  --g1: #fffe00;
+  --g2: #ff0000;
+  /* Narrow centered halo behind the spend amounts, for contrast. */
+  --spend-shadow: rgba(0, 0, 0, 0.65);
+  /* Font slots (src/lib/fonts.ts overwrites these on <html> when the user
+     picks a face). `--font-num` follows the interface font until it is set
+     on its own, so the numbers never look bolted on by default. */
+  --font-ui: "Jura Variable", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Jura Light", var(--font-ui);
+  --font-mono: "Syne Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* Pinned x-height for display faces that would otherwise render far bigger
+     or smaller than a text face at the same px size. `none` = leave alone. */
+  --font-ui-adj: none;
+  --font-num-adj: none;
+  --font-mono-adj: none;
+  /* Weight ladder. Nothing in the app hard-codes a numeric font-weight; it
+     names a rung, so the boldness preference can shift the whole interface. */
+  --w-light: 300;
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-semibold: 600;
+  --w-bold: 700;
+  /* Per-slot size trim (0.8..1.3). A face swapped into a slot can render
+     visibly smaller or larger than the one it replaced; this is the nudge that
+     fixes it without touching the window zoom. */
+  --size-ui: 1;
+  --size-num: 1;
+  --size-mono: 1;
+  font-family: var(--font-ui);
+  font-size-adjust: var(--font-ui-adj);
+  font-size: calc(12px * var(--size-ui));
+  color-scheme: dark;
+}
+
+/* Light palette. Applied when the user picks Light, or (Auto) when the OS
+   prefers light. `data-theme` on <html> is the explicit override; the media
+   query drives Auto. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="auto"] {
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="auto"] {
+    --spend-fg: #3a3f47;
+    --spend-shadow: transparent;
+    --bg-rgb: 245, 246, 248;
+    --fg: #1c2024;
+    --muted: #6a7178;
+    --track: #d8dce1;
+    --green: #2ea043;
+    --yellow: #bf8700;
+    --red: #d1242f;
+    --live: #2ea043;
+    --edge: rgba(0, 0, 0, 0.12);
+    --edge-soft: rgba(0, 0, 0, 0.07);
+    --hover: rgba(0, 0, 0, 0.06);
+    --panel: rgba(0, 0, 0, 0.03);
+    --g0: #00ffe8;
+    --g1: #fffe00;
+    --g2: #ff0000;
+  }
+}
+:root[data-theme="light"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  --bg-rgb: 245, 246, 248;
+  --fg: #1c2024;
+  --muted: #6a7178;
+  --track: #d8dce1;
+  --green: #2ea043;
+  --yellow: #bf8700;
+  --red: #d1242f;
+  --live: #2ea043;
+  --edge: rgba(0, 0, 0, 0.12);
+  --edge-soft: rgba(0, 0, 0, 0.07);
+  --hover: rgba(0, 0, 0, 0.06);
+  --panel: rgba(0, 0, 0, 0.03);
+  --g0: #00ffe8;
+  --g1: #fffe00;
+  --g2: #ff0000;
+}
+
+/* Midnight Purple: dark violet ground, lavender text, violet->pink gauge. */
+:root[data-theme="purple"] {
+  color-scheme: dark;
+  --bg-rgb: 20, 16, 33;
+  --fg: #e8e4f2;
+  --muted: #8b83a3;
+  --track: #2a2340;
+  --green: #3ee08f;
+  --yellow: #fac847;
+  --red: #ff5d8f;
+  --live: #3ee08f;
+  --edge: rgba(167, 139, 250, 0.16);
+  --edge-soft: rgba(167, 139, 250, 0.09);
+  --hover: rgba(167, 139, 250, 0.14);
+  --panel: rgba(167, 139, 250, 0.06);
+  --g0: #3ee08f;
+  --g1: #a78bfa;
+  --g2: #ff4d8d;
+}
+
+/* Ocean: deep navy, teal-blue gauge. */
+:root[data-theme="ocean"] {
+  color-scheme: dark;
+  --bg-rgb: 12, 22, 34;
+  --fg: #d6e6f2;
+  --muted: #6b8299;
+  --track: #1c2f42;
+  --green: #35d0a0;
+  --yellow: #e0b64a;
+  --red: #ff6b6b;
+  --live: #35d0a0;
+  --edge: rgba(90, 160, 220, 0.16);
+  --edge-soft: rgba(90, 160, 220, 0.09);
+  --hover: rgba(90, 160, 220, 0.13);
+  --panel: rgba(90, 160, 220, 0.06);
+  --g0: #2dd4bf;
+  --g1: #3b82f6;
+  --g2: #fb7185;
+}
+
+/* Matrix: near-black terminal, green->lime->red gauge. */
+:root[data-theme="matrix"] {
+  color-scheme: dark;
+  --bg-rgb: 6, 14, 9;
+  --fg: #b9f5c9;
+  --muted: #4e7a5c;
+  --track: #10321c;
+  --green: #22c55e;
+  --yellow: #a3e635;
+  --red: #ef4444;
+  --live: #22c55e;
+  --edge: rgba(80, 220, 120, 0.16);
+  --edge-soft: rgba(80, 220, 120, 0.09);
+  --hover: rgba(80, 220, 120, 0.13);
+  --panel: rgba(80, 220, 120, 0.06);
+  --g0: #16a34a;
+  --g1: #a3e635;
+  --g2: #ef4444;
+}
+
+/* Amber: warm CRT, yellow->orange->red gauge. */
+:root[data-theme="amber"] {
+  color-scheme: dark;
+  --bg-rgb: 22, 15, 6;
+  --fg: #ffd9a0;
+  --muted: #9c7a4e;
+  --track: #3a2a12;
+  --green: #b5c94a;
+  --yellow: #ffb300;
+  --red: #ff5722;
+  --live: #ffb300;
+  --edge: rgba(255, 180, 80, 0.16);
+  --edge-soft: rgba(255, 180, 80, 0.09);
+  --hover: rgba(255, 180, 80, 0.13);
+  --panel: rgba(255, 180, 80, 0.06);
+  --g0: #ffd54f;
+  --g1: #ff9800;
+  --g2: #ff3d00;
+}
+
+/* Rose: dark mauve, pink->magenta->crimson gauge. */
+:root[data-theme="rose"] {
+  color-scheme: dark;
+  --bg-rgb: 26, 14, 22;
+  --fg: #f3dce8;
+  --muted: #a37f95;
+  --track: #3a2030;
+  --green: #4ade80;
+  --yellow: #f5b942;
+  --red: #fb2c66;
+  --live: #4ade80;
+  --edge: rgba(244, 114, 182, 0.16);
+  --edge-soft: rgba(244, 114, 182, 0.09);
+  --hover: rgba(244, 114, 182, 0.13);
+  --panel: rgba(244, 114, 182, 0.06);
+  --g0: #f9a8d4;
+  --g1: #ec4899;
+  --g2: #be123c;
+}
+
+/* Nord: arctic blue-grey, frost gauge. */
+:root[data-theme="nord"] {
+  color-scheme: dark;
+  --bg-rgb: 46, 52, 64;
+  --fg: #d8dee9;
+  --muted: #6c7686;
+  --track: #3b4252;
+  --green: #a3be8c;
+  --yellow: #ebcb8b;
+  --red: #bf616a;
+  --live: #a3be8c;
+  --edge: rgba(136, 192, 208, 0.16);
+  --edge-soft: rgba(136, 192, 208, 0.09);
+  --hover: rgba(136, 192, 208, 0.13);
+  --panel: rgba(136, 192, 208, 0.06);
+  --g0: #8fbcbb;
+  --g1: #81a1c1;
+  --g2: #bf616a;
+}
+
+/* Dracula: dark slate, cyan->purple->red gauge. */
+:root[data-theme="dracula"] {
+  color-scheme: dark;
+  --bg-rgb: 40, 42, 54;
+  --fg: #f8f8f2;
+  --muted: #6272a4;
+  --track: #383a4a;
+  --green: #50fa7b;
+  --yellow: #f1fa8c;
+  --red: #ff5555;
+  --live: #50fa7b;
+  --edge: rgba(189, 147, 249, 0.18);
+  --edge-soft: rgba(189, 147, 249, 0.1);
+  --hover: rgba(189, 147, 249, 0.15);
+  --panel: rgba(189, 147, 249, 0.07);
+  --g0: #8be9fd;
+  --g1: #bd93f9;
+  --g2: #ff5555;
+}
+
+/* Gruvbox: retro warm, green->yellow->red gauge. */
+:root[data-theme="gruvbox"] {
+  color-scheme: dark;
+  --bg-rgb: 40, 40, 40;
+  --fg: #ebdbb2;
+  --muted: #a89984;
+  --track: #3c3836;
+  --green: #b8bb26;
+  --yellow: #fabd2f;
+  --red: #fb4934;
+  --live: #b8bb26;
+  --edge: rgba(254, 128, 25, 0.16);
+  --edge-soft: rgba(254, 128, 25, 0.09);
+  --hover: rgba(254, 128, 25, 0.13);
+  --panel: rgba(254, 128, 25, 0.06);
+  --g0: #b8bb26;
+  --g1: #fabd2f;
+  --g2: #fb4934;
+}
+
+/* Solarized: dark teal base, cyan->yellow->red gauge. */
+:root[data-theme="solarized"] {
+  color-scheme: dark;
+  --bg-rgb: 0, 43, 54;
+  --fg: #93a1a1;
+  --muted: #586e75;
+  --track: #073642;
+  --green: #859900;
+  --yellow: #b58900;
+  --red: #dc322f;
+  --live: #859900;
+  --edge: rgba(38, 139, 210, 0.18);
+  --edge-soft: rgba(38, 139, 210, 0.1);
+  --hover: rgba(38, 139, 210, 0.14);
+  --panel: rgba(38, 139, 210, 0.07);
+  --g0: #2aa198;
+  --g1: #b58900;
+  --g2: #dc322f;
+}
+
+/* Crimson: dark oxblood, all-red gauge. */
+:root[data-theme="crimson"] {
+  color-scheme: dark;
+  --bg-rgb: 26, 10, 13;
+  --fg: #f0d9dc;
+  --muted: #a06b74;
+  --track: #3a1620;
+  --green: #4ade80;
+  --yellow: #f5b942;
+  --red: #ff2d55;
+  --live: #4ade80;
+  --edge: rgba(255, 45, 85, 0.16);
+  --edge-soft: rgba(255, 45, 85, 0.09);
+  --hover: rgba(255, 45, 85, 0.13);
+  --panel: rgba(255, 45, 85, 0.06);
+  --g0: #fca5a5;
+  --g1: #ef4444;
+  --g2: #991b1b;
+}
+
+/* Mint: soft mint-green ground, teal-green text, teal->green->red gauge.
+   A light theme, so the spend text uses the dark-grey override below. */
+:root[data-theme="mint"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 214, 244, 228;
+  --fg: #123326;
+  --muted: #4e7a67;
+  --track: #b3e0c9;
+  --green: #0f9d58;
+  --yellow: #bf8700;
+  --red: #d1242f;
+  --live: #0f9d58;
+  --edge: rgba(16, 122, 88, 0.16);
+  --edge-soft: rgba(16, 122, 88, 0.09);
+  --hover: rgba(16, 122, 88, 0.1);
+  --panel: rgba(16, 122, 88, 0.05);
+  --g0: #00ffcc;
+  --g1: #00ff00;
+  --g2: #ff0000;
+}
+
+/* Paper: warm off-white, sepia text, amber->orange->red gauge. */
+:root[data-theme="paper"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 245, 240, 230;
+  --fg: #2b2620;
+  --muted: #7a6f5e;
+  --track: #ddd4c2;
+  --green: #2ea043;
+  --yellow: #bf8700;
+  --red: #d1242f;
+  --live: #2ea043;
+  --edge: rgba(120, 100, 60, 0.16);
+  --edge-soft: rgba(120, 100, 60, 0.09);
+  --hover: rgba(120, 100, 60, 0.08);
+  --panel: rgba(120, 100, 60, 0.04);
+  --g0: #d9a441;
+  --g1: #e8722d;
+  --g2: #d1242f;
+}
+
+/* Sky: pale blue, navy text, cyan->blue->red gauge. */
+:root[data-theme="sky"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 225, 238, 250;
+  --fg: #16324d;
+  --muted: #5a7794;
+  --track: #bcd4ea;
+  --green: #2ea043;
+  --yellow: #bf8700;
+  --red: #d1242f;
+  --live: #2ea043;
+  --edge: rgba(40, 110, 190, 0.16);
+  --edge-soft: rgba(40, 110, 190, 0.09);
+  --hover: rgba(40, 110, 190, 0.08);
+  --panel: rgba(40, 110, 190, 0.04);
+  --g0: #06b6d4;
+  --g1: #2563eb;
+  --g2: #dc2626;
+}
+
+/* Lavender: soft violet-white, plum text, violet->magenta->red gauge. */
+:root[data-theme="lavender"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 240, 234, 250;
+  --fg: #372952;
+  --muted: #7a6b96;
+  --track: #d6cbe8;
+  --green: #2ea043;
+  --yellow: #bf8700;
+  --red: #d1242f;
+  --live: #2ea043;
+  --edge: rgba(130, 90, 200, 0.16);
+  --edge-soft: rgba(130, 90, 200, 0.09);
+  --hover: rgba(130, 90, 200, 0.08);
+  --panel: rgba(130, 90, 200, 0.04);
+  --g0: #8b5cf6;
+  --g1: #d946ef;
+  --g2: #dc2626;
+}
+
+/* Sage: muted green-grey, forest text, green->olive->red gauge. */
+:root[data-theme="sage"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 232, 238, 230;
+  --fg: #263321;
+  --muted: #647059;
+  --track: #cbd6c2;
+  --green: #2ea043;
+  --yellow: #bf8700;
+  --red: #d1242f;
+  --live: #2ea043;
+  --edge: rgba(90, 120, 70, 0.16);
+  --edge-soft: rgba(90, 120, 70, 0.09);
+  --hover: rgba(90, 120, 70, 0.08);
+  --panel: rgba(90, 120, 70, 0.04);
+  --g0: #4d9e5a;
+  --g1: #a0a832;
+  --g2: #d1242f;
+}
+
+/* Bubblegum: the girly one; hot-pink on candy pink, magenta->fuchsia->red gauge. */
+:root[data-theme="bubblegum"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 255, 228, 242;
+  --fg: #6b1b47;
+  --muted: #c56596;
+  --track: #ffc2df;
+  --green: #d6259b;
+  --yellow: #e8659e;
+  --red: #e11d48;
+  --live: #ec4899;
+  --edge: rgba(236, 72, 153, 0.20);
+  --edge-soft: rgba(236, 72, 153, 0.10);
+  --hover: rgba(236, 72, 153, 0.10);
+  --panel: rgba(236, 72, 153, 0.05);
+  --g0: #ff4fb0;
+  --g1: #ff00aa;
+  --g2: #e11d48;
+}
+
+/* Cotton Candy: soft pastel pink+blue dream, pink->periwinkle->coral gauge. */
+:root[data-theme="cottoncandy"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 245, 236, 255;
+  --fg: #4a3a63;
+  --muted: #9b8bb8;
+  --track: #e2d4f2;
+  --green: #7c6bd6;
+  --yellow: #d178b8;
+  --red: #ef5a6f;
+  --live: #b39ddb;
+  --edge: rgba(160, 130, 220, 0.18);
+  --edge-soft: rgba(160, 130, 220, 0.09);
+  --hover: rgba(160, 130, 220, 0.08);
+  --panel: rgba(160, 130, 220, 0.04);
+  --g0: #7ec8ff;
+  --g1: #ff9ed8;
+  --g2: #ef5a6f;
+}
+
+/* Vaporwave: retro dusk; cyan->magenta->hot-red on deep indigo. */
+:root[data-theme="vaporwave"] {
+  color-scheme: dark;
+  --bg-rgb: 26, 15, 46;
+  --fg: #f5e9ff;
+  --muted: #a087c9;
+  --track: rgba(255, 255, 255, 0.10);
+  --green: #05d9e8;
+  --yellow: #ff6ac1;
+  --red: #ff2e63;
+  --live: #05d9e8;
+  --edge: rgba(255, 106, 193, 0.22);
+  --edge-soft: rgba(255, 106, 193, 0.10);
+  --hover: rgba(255, 106, 193, 0.10);
+  --panel: rgba(255, 106, 193, 0.05);
+  --g0: #05d9e8;
+  --g1: #ff6ac1;
+  --g2: #ff2e63;
+}
+
+/* Sunset: warm dusk; gold->orange->deep-red on charcoal plum. */
+:root[data-theme="sunset"] {
+  color-scheme: dark;
+  --bg-rgb: 32, 22, 30;
+  --fg: #ffe8d6;
+  --muted: #c99a86;
+  --track: rgba(255, 255, 255, 0.09);
+  --green: #ffd166;
+  --yellow: #f3722c;
+  --red: #d00000;
+  --live: #ffd166;
+  --edge: rgba(243, 114, 44, 0.20);
+  --edge-soft: rgba(243, 114, 44, 0.10);
+  --hover: rgba(243, 114, 44, 0.10);
+  --panel: rgba(243, 114, 44, 0.05);
+  --g0: #ffd166;
+  --g1: #f3722c;
+  --g2: #9d0208;
+}
+
+/* Cyberpunk: neon acid; lime->yellow->magenta on near-black. */
+:root[data-theme="cyberpunk"] {
+  color-scheme: dark;
+  --bg-rgb: 10, 10, 16;
+  --fg: #e7fbff;
+  --muted: #6d8ba0;
+  --track: rgba(0, 255, 200, 0.08);
+  --green: #00ff9f;
+  --yellow: #fcee09;
+  --red: #ff003c;
+  --live: #00ff9f;
+  --edge: rgba(252, 238, 9, 0.18);
+  --edge-soft: rgba(0, 255, 159, 0.10);
+  --hover: rgba(252, 238, 9, 0.08);
+  --panel: rgba(0, 255, 159, 0.04);
+  --g0: #00ff9f;
+  --g1: #fcee09;
+  --g2: #ff003c;
+}
+
+/* Lofi: dusty cozy dusk; muted mauve->peach->clay on warm charcoal. */
+:root[data-theme="lofi"] {
+  color-scheme: dark;
+  --bg-rgb: 30, 27, 34;
+  --fg: #e8ddd3;
+  --muted: #9a8f9c;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #b9a8c9;
+  --yellow: #d9a679;
+  --red: #cf7a72;
+  --live: #b9a8c9;
+  --edge: rgba(200, 170, 190, 0.16);
+  --edge-soft: rgba(200, 170, 190, 0.08);
+  --hover: rgba(200, 170, 190, 0.07);
+  --panel: rgba(200, 170, 190, 0.04);
+  --g0: #a7c4bc;
+  --g1: #d9a679;
+  --g2: #cf7a72;
+}
+
+/* Coffee: warm cafe; cream->caramel->terracotta on roasted brown. */
+:root[data-theme="coffee"] {
+  color-scheme: dark;
+  --bg-rgb: 33, 25, 20;
+  --fg: #f0e2d0;
+  --muted: #b09578;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #d9c7a3;
+  --yellow: #cf9b56;
+  --red: #c0553b;
+  --live: #d9c7a3;
+  --edge: rgba(210, 170, 120, 0.16);
+  --edge-soft: rgba(210, 170, 120, 0.08);
+  --hover: rgba(210, 170, 120, 0.07);
+  --panel: rgba(210, 170, 120, 0.04);
+  --g0: #e3d5b8;
+  --g1: #c98f43;
+  --g2: #c0553b;
+}
+
+/* Sakura: soft cherry-blossom light; pink->rose->crimson gauge. */
+:root[data-theme="sakura"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 255, 241, 245;
+  --fg: #5a3a48;
+  --muted: #b08a97;
+  --track: #f6d5df;
+  --green: #7fa86b;
+  --yellow: #d98aa8;
+  --red: #d1477a;
+  --live: #e8a0bb;
+  --edge: rgba(210, 130, 160, 0.16);
+  --edge-soft: rgba(210, 130, 160, 0.08);
+  --hover: rgba(210, 130, 160, 0.07);
+  --panel: rgba(210, 130, 160, 0.04);
+  --g0: #8fc99b;
+  --g1: #f2a5c4;
+  --g2: #d1477a;
+}
+
+/* Deep Sea: cool abyssal dark; teal->aqua->coral on midnight navy. */
+:root[data-theme="deepsea"] {
+  color-scheme: dark;
+  --bg-rgb: 12, 22, 33;
+  --fg: #d6ecf2;
+  --muted: #6f93a3;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #2dd4bf;
+  --yellow: #38bdf8;
+  --red: #fb7185;
+  --live: #2dd4bf;
+  --edge: rgba(56, 189, 248, 0.16);
+  --edge-soft: rgba(56, 189, 248, 0.08);
+  --hover: rgba(56, 189, 248, 0.08);
+  --panel: rgba(56, 189, 248, 0.04);
+  --g0: #2dd4bf;
+  --g1: #38bdf8;
+  --g2: #fb7185;
+}
+
+/* Monokai: classic editor dark; green->yellow->pink on olive charcoal. */
+:root[data-theme="monokai"] {
+  color-scheme: dark;
+  --bg-rgb: 39, 40, 34;
+  --fg: #f8f8f2;
+  --muted: #9a9a86;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #a6e22e;
+  --yellow: #e6db74;
+  --red: #f92672;
+  --live: #a6e22e;
+  --edge: rgba(230, 219, 116, 0.16);
+  --edge-soft: rgba(230, 219, 116, 0.08);
+  --hover: rgba(230, 219, 116, 0.07);
+  --panel: rgba(230, 219, 116, 0.04);
+  --g0: #a6e22e;
+  --g1: #e6db74;
+  --g2: #f92672;
+}
+
+/* Tokyo Night: popular dark; blue->purple->magenta on deep navy. */
+:root[data-theme="tokyonight"] {
+  color-scheme: dark;
+  --bg-rgb: 26, 27, 38;
+  --fg: #c0caf5;
+  --muted: #7a82ad;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #7aa2f7;
+  --yellow: #bb9af7;
+  --red: #f7768e;
+  --live: #7aa2f7;
+  --edge: rgba(122, 162, 247, 0.16);
+  --edge-soft: rgba(122, 162, 247, 0.08);
+  --hover: rgba(122, 162, 247, 0.08);
+  --panel: rgba(122, 162, 247, 0.04);
+  --g0: #7aa2f7;
+  --g1: #bb9af7;
+  --g2: #f7768e;
+}
+
+/* Forest: deep pine dark; green->moss->rust on forest black. */
+:root[data-theme="forest"] {
+  color-scheme: dark;
+  --bg-rgb: 18, 28, 22;
+  --fg: #dce8d8;
+  --muted: #7f9880;
+  --track: rgba(255, 255, 255, 0.07);
+  --green: #6fbf73;
+  --yellow: #b7c25a;
+  --red: #d47c4a;
+  --live: #6fbf73;
+  --edge: rgba(120, 190, 120, 0.15);
+  --edge-soft: rgba(120, 190, 120, 0.08);
+  --hover: rgba(120, 190, 120, 0.07);
+  --panel: rgba(120, 190, 120, 0.04);
+  --g0: #6fbf73;
+  --g1: #b7c25a;
+  --g2: #d4562a;
+}
+
+/* Slate: cool graphite dark; steel->sky->rose on gunmetal. */
+:root[data-theme="slate"] {
+  color-scheme: dark;
+  --bg-rgb: 24, 28, 34;
+  --fg: #dbe2ea;
+  --muted: #7d8794;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #7dd3fc;
+  --yellow: #93a3b5;
+  --red: #f472a0;
+  --live: #7dd3fc;
+  --edge: rgba(125, 211, 252, 0.14);
+  --edge-soft: rgba(125, 211, 252, 0.07);
+  --hover: rgba(125, 211, 252, 0.07);
+  --panel: rgba(125, 211, 252, 0.04);
+  --g0: #7dd3fc;
+  --g1: #a3b1c2;
+  --g2: #f472a0;
+}
+
+/* Sepia: warm old-paper light; olive->ochre->rust gauge. */
+:root[data-theme="sepia"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 244, 236, 220;
+  --fg: #4a3f2e;
+  --muted: #8c7c5e;
+  --track: #e3d8bf;
+  --green: #7a8b3a;
+  --yellow: #b98a2e;
+  --red: #b04a2a;
+  --live: #8a7a3a;
+  --edge: rgba(150, 120, 70, 0.18);
+  --edge-soft: rgba(150, 120, 70, 0.09);
+  --hover: rgba(150, 120, 70, 0.08);
+  --panel: rgba(150, 120, 70, 0.04);
+  --g0: #8a9a4a;
+  --g1: #c48a2e;
+  --g2: #b0402a;
+}
+
+/* Peach: warm pastel light; coral->apricot->rose gauge. */
+:root[data-theme="peach"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 255, 238, 228;
+  --fg: #6b4230;
+  --muted: #c08a72;
+  --track: #ffd6c2;
+  --green: #f0956b;
+  --yellow: #f4a259;
+  --red: #e5484d;
+  --live: #ffab76;
+  --edge: rgba(240, 140, 100, 0.18);
+  --edge-soft: rgba(240, 140, 100, 0.09);
+  --hover: rgba(240, 140, 100, 0.08);
+  --panel: rgba(240, 140, 100, 0.04);
+  --g0: #ffb27a;
+  --g1: #f4884f;
+  --g2: #e5484d;
+}
+
+/* Reef: aqua->seafoam->orange gauge on deep teal-black. */
+:root[data-theme="reef"] {
+  color-scheme: dark;
+  --bg-rgb: 12, 26, 28;
+  --fg: #d7f0ec;
+  --muted: #6f9a95;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #00e5d0;
+  --yellow: #7fd48c;
+  --red: #ff8c00;
+  --live: #00e5d0;
+  --edge: rgba(0, 229, 208, 0.15);
+  --edge-soft: rgba(0, 229, 208, 0.08);
+  --hover: rgba(0, 229, 208, 0.07);
+  --panel: rgba(0, 229, 208, 0.04);
+  --g0: #00e5d0;
+  --g1: #7fd46a;
+  --g2: #ff8c00;
+}
+
+/* Graphite: aqua->orange gauge (like Reef) on a neutral cool dark-grey base. */
+:root[data-theme="graphite"] {
+  color-scheme: dark;
+  --bg-rgb: 26, 29, 33;
+  --fg: #e2e6ea;
+  --muted: #8a929b;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #12ddc9;
+  --yellow: #8fc76a;
+  --red: #ff8c1a;
+  --live: #12ddc9;
+  --edge: rgba(150, 160, 172, 0.14);
+  --edge-soft: rgba(150, 160, 172, 0.08);
+  --hover: rgba(150, 160, 172, 0.07);
+  --panel: rgba(150, 160, 172, 0.04);
+  --g0: #12ddc9;
+  --g1: #8fc76a;
+  --g2: #ff8c1a;
+}
+
+/* Flux: aqua->orange->magenta gauge on a neutral cool dark-grey base. */
+:root[data-theme="flux"] {
+  color-scheme: dark;
+  --bg-rgb: 26, 29, 33;
+  --fg: #e2e6ea;
+  --muted: #8a929b;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #12ddc9;
+  --yellow: #ff9424;
+  --red: #ff2ea6;
+  --live: #12ddc9;
+  --edge: rgba(150, 160, 172, 0.14);
+  --edge-soft: rgba(150, 160, 172, 0.08);
+  --hover: rgba(150, 160, 172, 0.07);
+  --panel: rgba(150, 160, 172, 0.04);
+  --g0: #12ddc9;
+  --g1: #ff9424;
+  --g2: #ff2ea6;
+}
+
+/* Apricot: soft pastel orange; peach->coral->red gauge. */
+:root[data-theme="apricot"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 255, 237, 224;
+  --fg: #6e4a33;
+  --muted: #bb9077;
+  --track: #ffd9c2;
+  --green: #ff9e6b;
+  --yellow: #f4884f;
+  --red: #ef5a4c;
+  --live: #ffb488;
+  --edge: rgba(230, 150, 100, 0.16);
+  --edge-soft: rgba(230, 150, 100, 0.08);
+  --hover: rgba(230, 150, 100, 0.08);
+  --panel: rgba(230, 150, 100, 0.04);
+  --g0: #ffc196;
+  --g1: #ff9160;
+  --g2: #ef5a4c;
+}
+
+/* Butter: soft pastel yellow; cream->gold->amber gauge. */
+:root[data-theme="butter"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 255, 250, 224;
+  --fg: #6a5f2e;
+  --muted: #b3a86f;
+  --track: #f2ead0;
+  --green: #e6cf6a;
+  --yellow: #d9a94a;
+  --red: #d97a3a;
+  --live: #f0dd8a;
+  --edge: rgba(190, 160, 70, 0.16);
+  --edge-soft: rgba(190, 160, 70, 0.08);
+  --hover: rgba(190, 160, 70, 0.08);
+  --panel: rgba(190, 160, 70, 0.04);
+  --g0: #ffe9a0;
+  --g1: #f0c256;
+  --g2: #e0803a;
+}
+
+/* Pistachio: soft pastel green; mint->lime->clay gauge. */
+:root[data-theme="pistachio"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 234, 246, 224;
+  --fg: #46592f;
+  --muted: #8ba073;
+  --track: #d6e6c2;
+  --green: #9fd07a;
+  --yellow: #bcc95a;
+  --red: #d99a5a;
+  --live: #b6dd94;
+  --edge: rgba(140, 180, 100, 0.16);
+  --edge-soft: rgba(140, 180, 100, 0.08);
+  --hover: rgba(140, 180, 100, 0.08);
+  --panel: rgba(140, 180, 100, 0.04);
+  --g0: #bfe3a0;
+  --g1: #c9c95a;
+  --g2: #dd8a54;
+}
+
+/* Seafoam: soft pastel teal; aqua->green->coral gauge. */
+:root[data-theme="seafoam"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 224, 246, 242;
+  --fg: #2f5952;
+  --muted: #78a89f;
+  --track: #c2e6df;
+  --green: #7fd0c0;
+  --yellow: #a8cf88;
+  --red: #ef8a7a;
+  --live: #9fe0d2;
+  --edge: rgba(90, 180, 165, 0.16);
+  --edge-soft: rgba(90, 180, 165, 0.08);
+  --hover: rgba(90, 180, 165, 0.08);
+  --panel: rgba(90, 180, 165, 0.04);
+  --g0: #a0e6d8;
+  --g1: #9dd6a0;
+  --g2: #ef7a68;
+}
+
+/* Cornflower: soft pastel blue; periwinkle->lilac->rose gauge. */
+:root[data-theme="cornflower"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 230, 238, 255;
+  --fg: #3a4468;
+  --muted: #8a94bb;
+  --track: #d2ddf5;
+  --green: #9db5f0;
+  --yellow: #b0a0f0;
+  --red: #ef7ba0;
+  --live: #b0c4ff;
+  --edge: rgba(120, 140, 220, 0.16);
+  --edge-soft: rgba(120, 140, 220, 0.08);
+  --hover: rgba(120, 140, 220, 0.08);
+  --panel: rgba(120, 140, 220, 0.04);
+  --g0: #a8c4ff;
+  --g1: #b6a0f0;
+  --g2: #ef7ba0;
+}
+
+/* Linen: warm off-white; sage->ochre->clay earthy gauge. */
+:root[data-theme="linen"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 247, 242, 233;
+  --fg: #4a4438;
+  --muted: #9a9080;
+  --track: #e6ddcd;
+  --green: #8a9a6a;
+  --yellow: #c0a052;
+  --red: #b5714a;
+  --live: #a0ac7a;
+  --edge: rgba(150, 135, 100, 0.15);
+  --edge-soft: rgba(150, 135, 100, 0.08);
+  --hover: rgba(150, 135, 100, 0.07);
+  --panel: rgba(150, 135, 100, 0.04);
+  --g0: #9aa877;
+  --g1: #c4a256;
+  --g2: #b0603a;
+}
+
+/* Oat: soft beige; wheat->tan->terracotta gauge. */
+:root[data-theme="oat"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 240, 231, 216;
+  --fg: #52483a;
+  --muted: #a0947e;
+  --track: #ddd0ba;
+  --green: #b8a878;
+  --yellow: #c99a5a;
+  --red: #bd6a44;
+  --live: #cabd94;
+  --edge: rgba(160, 140, 105, 0.15);
+  --edge-soft: rgba(160, 140, 105, 0.08);
+  --hover: rgba(160, 140, 105, 0.07);
+  --panel: rgba(160, 140, 105, 0.04);
+  --g0: #cabd94;
+  --g1: #c8974f;
+  --g2: #b85e3a;
+}
+
+/* Greige: grey-beige neutral; taupe->tan->rust gauge. */
+:root[data-theme="greige"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 236, 232, 226;
+  --fg: #4c473f;
+  --muted: #988f83;
+  --track: #d8d1c7;
+  --green: #a49a86;
+  --yellow: #bb9a68;
+  --red: #b06a4e;
+  --live: #b6ac9a;
+  --edge: rgba(150, 140, 125, 0.15);
+  --edge-soft: rgba(150, 140, 125, 0.08);
+  --hover: rgba(150, 140, 125, 0.07);
+  --panel: rgba(150, 140, 125, 0.04);
+  --g0: #b8ad98;
+  --g1: #bd9a62;
+  --g2: #a85e42;
+}
+
+/* Stone: cool light grey-beige; slate->sand->brick gauge. */
+:root[data-theme="stone"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 234, 233, 230;
+  --fg: #45443f;
+  --muted: #918f88;
+  --track: #d6d4cf;
+  --green: #96988c;
+  --yellow: #b0a276;
+  --red: #a86a54;
+  --live: #a8a89c;
+  --edge: rgba(140, 138, 130, 0.15);
+  --edge-soft: rgba(140, 138, 130, 0.08);
+  --hover: rgba(140, 138, 130, 0.07);
+  --panel: rgba(140, 138, 130, 0.04);
+  --g0: #a6a89a;
+  --g1: #b2a06e;
+  --g2: #a05c46;
+}
+
+/* Taupe: warm dark neutral; mushroom->tan->rust on deep greige. */
+:root[data-theme="taupe"] {
+  color-scheme: dark;
+  --bg-rgb: 38, 35, 31;
+  --fg: #e6ded2;
+  --muted: #a1988a;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #c2b79e;
+  --yellow: #cfa96a;
+  --red: #c6714a;
+  --live: #c2b79e;
+  --edge: rgba(190, 175, 150, 0.14);
+  --edge-soft: rgba(190, 175, 150, 0.08);
+  --hover: rgba(190, 175, 150, 0.07);
+  --panel: rgba(190, 175, 150, 0.04);
+  --g0: #cdbf9f;
+  --g1: #cfa257;
+  --g2: #c05e3a;
+}
+
+/* --- Midtones: one medium-luminance base per category. --- */
+
+/* Ash (Core): neutral mid-grey, default cyan->yellow->red gauge. */
+:root[data-theme="ash"] {
+  color-scheme: dark;
+  --bg-rgb: 102, 106, 112;
+  --fg: #eef0f2;
+  --muted: #c3c9d0;
+  --track: rgba(255, 255, 255, 0.14);
+  --green: #00ffe8;
+  --yellow: #fffe00;
+  --red: #ff5a4d;
+  --live: #00ffe8;
+  --edge: rgba(255, 255, 255, 0.16);
+  --edge-soft: rgba(255, 255, 255, 0.09);
+  --hover: rgba(255, 255, 255, 0.08);
+  --panel: rgba(255, 255, 255, 0.05);
+  --g0: #00ffe8;
+  --g1: #fffe00;
+  --g2: #ff0000;
+}
+
+/* Dusk (Neon): mid violet, cyan->pink->red neon gauge. */
+:root[data-theme="dusk"] {
+  color-scheme: dark;
+  --bg-rgb: 74, 58, 102;
+  --fg: #f2ebff;
+  --muted: #c3b3de;
+  --track: rgba(255, 255, 255, 0.13);
+  --green: #22e0ff;
+  --yellow: #ff5ecb;
+  --red: #ff2e63;
+  --live: #22e0ff;
+  --edge: rgba(255, 255, 255, 0.15);
+  --edge-soft: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.08);
+  --panel: rgba(255, 255, 255, 0.05);
+  --g0: #22e0ff;
+  --g1: #ff5ecb;
+  --g2: #ff2e63;
+}
+
+/* Terracotta (Warm): mid clay, gold->orange->red gauge. */
+:root[data-theme="terracotta"] {
+  color-scheme: dark;
+  --bg-rgb: 122, 84, 68;
+  --fg: #ffece0;
+  --muted: #e0b09c;
+  --track: rgba(255, 255, 255, 0.13);
+  --green: #ffd28a;
+  --yellow: #ff9e5a;
+  --red: #e5473c;
+  --live: #ffd28a;
+  --edge: rgba(255, 255, 255, 0.15);
+  --edge-soft: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.08);
+  --panel: rgba(255, 255, 255, 0.05);
+  --g0: #ffd28a;
+  --g1: #ff9e5a;
+  --g2: #e5473c;
+}
+
+/* Steel Blue (Cool): mid blue-grey, aqua->green->coral gauge. */
+:root[data-theme="steelblue"] {
+  color-scheme: dark;
+  --bg-rgb: 74, 92, 112;
+  --fg: #eaf1f8;
+  --muted: #b7c7da;
+  --track: rgba(255, 255, 255, 0.13);
+  --green: #40e0d0;
+  --yellow: #9ec96a;
+  --red: #ff6b6b;
+  --live: #40e0d0;
+  --edge: rgba(255, 255, 255, 0.15);
+  --edge-soft: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.08);
+  --panel: rgba(255, 255, 255, 0.05);
+  --g0: #40e0d0;
+  --g1: #9ec96a;
+  --g2: #ff6b6b;
+}
+
+/* Moss (Greens): mid forest green, lime->olive->rust gauge. */
+:root[data-theme="moss"] {
+  color-scheme: dark;
+  --bg-rgb: 78, 96, 72;
+  --fg: #eef4e6;
+  --muted: #bccbac;
+  --track: rgba(255, 255, 255, 0.13);
+  --green: #8ee06a;
+  --yellow: #cdd45a;
+  --red: #e0824a;
+  --live: #8ee06a;
+  --edge: rgba(255, 255, 255, 0.15);
+  --edge-soft: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.08);
+  --panel: rgba(255, 255, 255, 0.05);
+  --g0: #8ee06a;
+  --g1: #cdd45a;
+  --g2: #e0824a;
+}
+
+/* Clay (Neutral): mid greige, sand->ochre->rust earthy gauge. */
+:root[data-theme="clay"] {
+  color-scheme: dark;
+  --bg-rgb: 124, 112, 100;
+  --fg: #f4ece2;
+  --muted: #d3c7b8;
+  --track: rgba(255, 255, 255, 0.13);
+  --green: #cdbf9f;
+  --yellow: #cfa257;
+  --red: #c05e3a;
+  --live: #cdbf9f;
+  --edge: rgba(255, 255, 255, 0.15);
+  --edge-soft: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.08);
+  --panel: rgba(255, 255, 255, 0.05);
+  --g0: #cdbf9f;
+  --g1: #cfa257;
+  --g2: #c05e3a;
+}
+
+/* Fog (Light): mid grey, deep teal->ochre->brick gauge, dark text. */
+:root[data-theme="fog"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 170, 174, 180;
+  --fg: #2c2f34;
+  --muted: #565b62;
+  --track: rgba(0, 0, 0, 0.15);
+  --green: #0f8a99;
+  --yellow: #b07d18;
+  --red: #c62828;
+  --live: #0f8a99;
+  --edge: rgba(0, 0, 0, 0.16);
+  --edge-soft: rgba(0, 0, 0, 0.09);
+  --hover: rgba(0, 0, 0, 0.07);
+  --panel: rgba(0, 0, 0, 0.04);
+  --g0: #0aa2b5;
+  --g1: #d08a1e;
+  --g2: #c62828;
+}
+
+/* Dusty Rose (Light Pastel): mid muted rose, teal->rose->crimson gauge. */
+:root[data-theme="dustyrose"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 190, 158, 166;
+  --fg: #3a2830;
+  --muted: #6f545e;
+  --track: rgba(0, 0, 0, 0.13);
+  --green: #4c9e97;
+  --yellow: #c56d8c;
+  --red: #b0405f;
+  --live: #6bb3b0;
+  --edge: rgba(0, 0, 0, 0.14);
+  --edge-soft: rgba(0, 0, 0, 0.08);
+  --hover: rgba(0, 0, 0, 0.07);
+  --panel: rgba(0, 0, 0, 0.04);
+  --g0: #6bb3b0;
+  --g1: #d98aa8;
+  --g2: #b0405f;
+}
+
+/* Mauve (Pastel): mid muted purple, periwinkle->lilac->rose gauge. */
+:root[data-theme="mauve"] {
+  color-scheme: dark;
+  --bg-rgb: 110, 98, 124;
+  --fg: #f2ecf6;
+  --muted: #cabbd6;
+  --track: rgba(255, 255, 255, 0.13);
+  --green: #9db5f0;
+  --yellow: #c39ae0;
+  --red: #ef7ba0;
+  --live: #9db5f0;
+  --edge: rgba(255, 255, 255, 0.15);
+  --edge-soft: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.08);
+  --panel: rgba(255, 255, 255, 0.05);
+  --g0: #9db5f0;
+  --g1: #c39ae0;
+  --g2: #ef7ba0;
+}
+
+/* --- Bright purple / violet forward. --- */
+
+/* Amethyst: deep violet-black; lilac->violet->magenta gauge. */
+:root[data-theme="amethyst"] {
+  color-scheme: dark;
+  --bg-rgb: 24, 16, 36;
+  --fg: #efe6ff;
+  --muted: #a892cc;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #c98bff;
+  --yellow: #a855f7;
+  --red: #e24dff;
+  --live: #c98bff;
+  --edge: rgba(180, 120, 255, 0.16);
+  --edge-soft: rgba(180, 120, 255, 0.08);
+  --hover: rgba(180, 120, 255, 0.08);
+  --panel: rgba(180, 120, 255, 0.04);
+  --g0: #c98bff;
+  --g1: #a04dff;
+  --g2: #e24dff;
+}
+
+/* Ultraviolet: near-black; indigo->violet->hot-magenta gauge. */
+:root[data-theme="ultraviolet"] {
+  color-scheme: dark;
+  --bg-rgb: 16, 12, 30;
+  --fg: #e8e2ff;
+  --muted: #9788c4;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #7c4dff;
+  --yellow: #b04dff;
+  --red: #ff4de0;
+  --live: #7c4dff;
+  --edge: rgba(150, 100, 255, 0.16);
+  --edge-soft: rgba(150, 100, 255, 0.08);
+  --hover: rgba(150, 100, 255, 0.08);
+  --panel: rgba(150, 100, 255, 0.04);
+  --g0: #7c6bff;
+  --g1: #b04dff;
+  --g2: #ff4de0;
+}
+
+/* Orchid: plum-black; orchid->violet->pink gauge. */
+:root[data-theme="orchid"] {
+  color-scheme: dark;
+  --bg-rgb: 28, 18, 34;
+  --fg: #f4e6f8;
+  --muted: #b592c0;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #e0a0ff;
+  --yellow: #c04dff;
+  --red: #ff4da8;
+  --live: #e0a0ff;
+  --edge: rgba(200, 120, 230, 0.16);
+  --edge-soft: rgba(200, 120, 230, 0.08);
+  --hover: rgba(200, 120, 230, 0.08);
+  --panel: rgba(200, 120, 230, 0.04);
+  --g0: #e0a0ff;
+  --g1: #c04dff;
+  --g2: #ff4da8;
+}
+
+/* --- Warm with a touch of pink/red at the top. --- */
+
+/* Rosewood: warm maroon-brown; honey->coral->rose gauge. */
+:root[data-theme="rosewood"] {
+  color-scheme: dark;
+  --bg-rgb: 40, 26, 26;
+  --fg: #f6e4dc;
+  --muted: #c39a90;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #ffcf8a;
+  --yellow: #ff9f72;
+  --red: #e5477a;
+  --live: #ffcf8a;
+  --edge: rgba(230, 140, 120, 0.15);
+  --edge-soft: rgba(230, 140, 120, 0.08);
+  --hover: rgba(230, 140, 120, 0.07);
+  --panel: rgba(230, 140, 120, 0.04);
+  --g0: #ffcf8a;
+  --g1: #ff8f6a;
+  --g2: #e5477a;
+}
+
+/* Ember: warm ember-black; amber->flame->hot-pink gauge. */
+:root[data-theme="ember"] {
+  color-scheme: dark;
+  --bg-rgb: 34, 22, 20;
+  --fg: #ffe6da;
+  --muted: #c9998a;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #ffb066;
+  --yellow: #ff7a4a;
+  --red: #ff3d7f;
+  --live: #ffb066;
+  --edge: rgba(255, 130, 90, 0.15);
+  --edge-soft: rgba(255, 130, 90, 0.08);
+  --hover: rgba(255, 130, 90, 0.07);
+  --panel: rgba(255, 130, 90, 0.04);
+  --g0: #ffb066;
+  --g1: #ff6b4a;
+  --g2: #ff3d7f;
+}
+
+/* Sienna: warm earthen; wheat->sienna->raspberry gauge. */
+:root[data-theme="sienna"] {
+  color-scheme: dark;
+  --bg-rgb: 38, 28, 22;
+  --fg: #f4e6d8;
+  --muted: #c2a084;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #f0b878;
+  --yellow: #e5845a;
+  --red: #d64d6a;
+  --live: #f0b878;
+  --edge: rgba(220, 150, 100, 0.15);
+  --edge-soft: rgba(220, 150, 100, 0.08);
+  --hover: rgba(220, 150, 100, 0.07);
+  --panel: rgba(220, 150, 100, 0.04);
+  --g0: #f0b878;
+  --g1: #e5845a;
+  --g2: #d64d6a;
+}
+
+/* --- Cool gradients: gauges that stay cool (cyan->blue->violet). --- */
+
+/* Glacier: icy dark; pale cyan->azure->indigo gauge. */
+:root[data-theme="glacier"] {
+  color-scheme: dark;
+  --bg-rgb: 14, 22, 34;
+  --fg: #dbe8f5;
+  --muted: #7f93ad;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #a8f0ff;
+  --yellow: #4aa8ff;
+  --red: #6a5cff;
+  --live: #a8f0ff;
+  --edge: rgba(120, 180, 255, 0.15);
+  --edge-soft: rgba(120, 180, 255, 0.08);
+  --hover: rgba(120, 180, 255, 0.07);
+  --panel: rgba(120, 180, 255, 0.04);
+  --g0: #a8f0ff;
+  --g1: #3d9bff;
+  --g2: #6a4aff;
+}
+
+/* Tide: teal-navy dark; aqua->blue->violet gauge. */
+:root[data-theme="tide"] {
+  color-scheme: dark;
+  --bg-rgb: 10, 26, 34;
+  --fg: #d6ecef;
+  --muted: #6f96a0;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #00e0d0;
+  --yellow: #1e90ff;
+  --red: #7a3cff;
+  --live: #00e0d0;
+  --edge: rgba(60, 200, 220, 0.15);
+  --edge-soft: rgba(60, 200, 220, 0.08);
+  --hover: rgba(60, 200, 220, 0.07);
+  --panel: rgba(60, 200, 220, 0.04);
+  --g0: #00e5d0;
+  --g1: #1e90ff;
+  --g2: #7a3cff;
+}
+
+/* Aurora: indigo-black dark; mint->cyan->blue->violet gauge. */
+:root[data-theme="aurora"] {
+  color-scheme: dark;
+  --bg-rgb: 16, 20, 36;
+  --fg: #e0e6f8;
+  --muted: #8088b0;
+  --track: rgba(255, 255, 255, 0.08);
+  --green: #4dffd0;
+  --yellow: #3aa8ff;
+  --red: #a04dff;
+  --live: #4dffd0;
+  --edge: rgba(120, 140, 255, 0.15);
+  --edge-soft: rgba(120, 140, 255, 0.08);
+  --hover: rgba(120, 140, 255, 0.07);
+  --panel: rgba(120, 140, 255, 0.04);
+  --g0: #4dffd0;
+  --g1: #3aa8ff;
+  --g2: #a04dff;
+}
+
+/* --- Bright: light backgrounds with vivid, saturated gauge colors. --- */
+
+/* Pop: white base, electric cyan->magenta->red gauge. */
+:root[data-theme="pop"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 252, 252, 255;
+  --fg: #1a1a24;
+  --muted: #6b6b7a;
+  --track: #e8e8ef;
+  --green: #00c2d6;
+  --yellow: #e000a8;
+  --red: #ff0033;
+  --live: #00c2d6;
+  --edge: rgba(0, 0, 0, 0.12);
+  --edge-soft: rgba(0, 0, 0, 0.06);
+  --hover: rgba(0, 0, 0, 0.05);
+  --panel: rgba(0, 0, 0, 0.03);
+  --g0: #00d9f0;
+  --g1: #ff00aa;
+  --g2: #ff0033;
+}
+
+/* Citrus: bright warm; lime->yellow->orange gauge on cream white. */
+:root[data-theme="citrus"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 255, 253, 245;
+  --fg: #2a2410;
+  --muted: #7a7150;
+  --track: #efe9d4;
+  --green: #4fc500;
+  --yellow: #f2b600;
+  --red: #ff5a00;
+  --live: #6fd41a;
+  --edge: rgba(0, 0, 0, 0.11);
+  --edge-soft: rgba(0, 0, 0, 0.06);
+  --hover: rgba(0, 0, 0, 0.05);
+  --panel: rgba(0, 0, 0, 0.03);
+  --g0: #7ad400;
+  --g1: #ffbe00;
+  --g2: #ff4b00;
+}
+
+/* Candy: bright pink base, magenta->violet->blue gauge. */
+:root[data-theme="candy"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 255, 248, 253;
+  --fg: #2a1030;
+  --muted: #8a5c86;
+  --track: #f3dcee;
+  --green: #ff2ea6;
+  --yellow: #b03cf0;
+  --red: #3a5cff;
+  --live: #ff5ec0;
+  --edge: rgba(120, 20, 120, 0.12);
+  --edge-soft: rgba(120, 20, 120, 0.06);
+  --hover: rgba(120, 20, 120, 0.05);
+  --panel: rgba(120, 20, 120, 0.03);
+  --g0: #ff2ea6;
+  --g1: #a83cf0;
+  --g2: #2f5cff;
+}
+
+/* Volt: bright white base, green->lime->hot-red gauge. */
+:root[data-theme="volt"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 250, 255, 250;
+  --fg: #0f2410;
+  --muted: #5a7a5c;
+  --track: #dcefdc;
+  --green: #00d43a;
+  --yellow: #b6e000;
+  --red: #ff1744;
+  --live: #00e044;
+  --edge: rgba(0, 80, 20, 0.12);
+  --edge-soft: rgba(0, 80, 20, 0.06);
+  --hover: rgba(0, 80, 20, 0.05);
+  --panel: rgba(0, 80, 20, 0.03);
+  --g0: #00e04a;
+  --g1: #bfe000;
+  --g2: #ff1744;
+}
+
+/* Azure: bright white-blue base, sky->violet->pink gauge. */
+:root[data-theme="azure"] {
+  --spend-fg: #3a3f47;
+  --spend-shadow: transparent;
+  color-scheme: light;
+  --bg-rgb: 246, 251, 255;
+  --fg: #10203a;
+  --muted: #5c7090;
+  --track: #d8e6f4;
+  --green: #00a2ff;
+  --yellow: #7c4dff;
+  --red: #ff2e88;
+  --live: #29b6ff;
+  --edge: rgba(0, 60, 120, 0.12);
+  --edge-soft: rgba(0, 60, 120, 0.06);
+  --hover: rgba(0, 60, 120, 0.05);
+  --panel: rgba(0, 60, 120, 0.03);
+  --g0: #00b0ff;
+  --g1: #7c4dff;
+  --g2: #ff2e88;
+}
+
+/* In light mode the spend amounts read as dark grey with no halo (the colored
+   scale is kept for the gauges). That used to be a hand-maintained list of
+   ~27 theme ids in an !important selector, plus a duplicate for "auto", which
+   every new light palette had to be added to by hand or its spend text came out
+   mistuned. The palette now carries the answer: a light theme sets --spend-fg
+   and --spend-shadow, spendColor() in theme.ts prefers --spend-fg over the
+   gauge scale, and the halo is a transparent shadow rather than a removed one. */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  /* Set explicitly rather than left at `normal`: `normal` comes from the face's
+     own metrics, which vary enormously between the bundled faces, so lines that
+     sat right in one face crowded in the next. A ratio also scales with the
+     size trim on its own, which a pixel value would not. */
+  line-height: 1.35;
+}
+
+/* Slim scrollbars that follow the theme, replacing the pale Chromium default
+   that reads as a bright seam against every dark palette. See
+   the shared scrollbar pattern. Deliberately no `-track`, `scrollbar-gutter`,
+   `scrollbar-color` or `scrollbar-width` rule here: declaring any
+   `::-webkit-scrollbar` rule flips Chromium into custom-scrollbar mode, where
+   the unstyled track paints transparent. Style the track and the opaque gutter
+   comes back. `--track` and `--muted` are solid hex in every palette; `--edge`
+   is not (it is an rgba overlay) so it is the wrong choice here.
+
+   The alpha-tracking half of the pattern is deliberately not wired: the scroll
+   panes all live in secondary windows, which are created opaque and never call
+   applyOpacity, so there would be nothing to track. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--track);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+#app {
+  /* Frameless transparent window: fill edge-to-edge and let Win11 (DWM) round the
+     window corners itself. A CSS border-radius here
+     fights the OS rounding and leaves a square transparent corner, so don't. */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  overflow: hidden;
+}

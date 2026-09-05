@@ -1,0 +1,45 @@
+[package]
+name = "greedout"
+version = "0.1.0"
+description = "Multi-session Claude Code context gauge"
+authors = ["Justin Keener <308936412+kjustinkeener@users.noreply.github.com>"]
+edition = "2021"
+rust-version = "1.77"
+license = "MIT"
+repository = "https://github.com/kjustinkeener/Greedout"
+homepage = "https://github.com/kjustinkeener/Greedout"
+readme = "../README.md"
+keywords = ["tauri", "claude", "context", "gauge", "desktop"]
+categories = ["gui", "visualization"]
+# This is an application, not a library. Never publish it to crates.io.
+publish = false
+
+[lib]
+name = "greedout_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+glob = "0.3"
+dirs = "5"
+rusqlite = { version = "0.31", features = ["bundled"] }
+sysinfo = { version = "0.32", default-features = false, features = ["system"] }
+base64 = "0.22"
+ureq = "2"
+minisign-verify = "0.2"
+semver = "1"
+
+[target.'cfg(windows)'.dependencies]
+# Installed-font enumeration reads the Fonts registry key (see sysfonts.rs).
+winreg = "0.52"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

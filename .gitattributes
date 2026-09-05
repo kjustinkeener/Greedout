@@ -1,0 +1,9 @@
+# The whole tree is authored LF. Without this, autocrlf rewrites every file on
+# checkout and the first diff after a fresh clone is the entire repo.
+* text=auto eol=lf
+
+# Binary assets, so git never tries to normalise or diff them as text.
+*.png binary
+*.ico binary
+*.icns binary
+*.woff2 binary

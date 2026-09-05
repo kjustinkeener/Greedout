@@ -1,0 +1,27 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+.DS_Store
+*.log
+
+# Vite / node scratch
+.vite/
+*.local
+
+# Editor and OS noise
+Thumbs.db
+.idea/
+.vscode/
+
+# Signing keys and secrets (updater private key must never be committed)
+*.key
+.env
+.env.*
+!.env.example
+tools/verify-release/target/
+
+# Release artifacts left behind by a local run of the release path
+update.json
+*.sig
+*.exe

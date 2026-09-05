@@ -1,0 +1,51 @@
+# Every check that can run without a person watching. The same three the repo is
+# expected to be clean on locally: the interface types, the translation catalogs,
+# and the Rust side.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Windows only, deliberately: the app reads a Windows-only transcript layout
+    # and installs itself through Windows APIs. A green Linux build would be
+    # telling us about code nobody runs.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 24, not 20: the translation gate imports the catalogs as TypeScript
+          # and relies on Node stripping the types, which older Node cannot do.
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Types and translations. `check` is svelte-check plus the catalog gate,
+      # which fails on a renamed key and warns on a missing one.
+      - run: npm run check
+
+      # The frontend is built before Rust is checked because the Tauri build
+      # script embeds the built interface: without dist/ the crate cannot compile.
+      - run: npm run build
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # --locked so a dependency that quietly floats to a new version fails here
+      # rather than on someone's machine.
+      - run: cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets

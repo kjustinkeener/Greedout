@@ -58,8 +58,9 @@ shortcuts; your settings sidecar is left alone.
 
 Downloads are on the [releases page](https://github.com/kjustinkeener/Greedout/releases).
 [fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/) is the project
-page on my own site, and the address the install card links to. If there is no release
-yet, build from source, below.
+page on my own site and the address the install card links to; its download links point
+back here, so the binary always comes from the releases page. If there is no release yet,
+build from source, below.
 
 ## Build from source
 

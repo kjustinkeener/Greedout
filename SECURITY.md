@@ -26,8 +26,8 @@ accept builds signed by the key it was compiled with. The recovery is a new key,
 a new build carrying it, and a notice here, on the releases page, and at
 [fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/). That
 site is the out-of-band channel: if the in-app updater is the thing that is broken
-or untrusted, it is where the notice will say so, and the replacement is installed
-by hand from the releases page. If you believe the key has leaked, report it
+or untrusted, it is where the notice will say so and where the replacement build
+will be linked, wherever that build is hosted at the time. If you believe the key has leaked, report it
 through the form above and say so plainly, since it is the highest severity
 report this project can receive.
 

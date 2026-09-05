@@ -70,7 +70,7 @@
 
   // --- Cross-session browse (zoom out: Harness > Project > Session) ---
   // The window OPENS at the harness level (the all-projects graph); the user
-  // drills project > session from there. Only Claude Code exists as a harness today.
+  // drills project > session from there. Only one coding harness exists today.
   type Zoom = "root" | "harness" | "project" | "session";
   let zoom = $state<Zoom>("root");
   let curHarness = $state("claude-code");
@@ -297,7 +297,7 @@
     invoke("browse_cancel").catch(() => {});
   }
 
-  // Top level: every harness as a tile (only Claude Code today).
+  // Top level: every harness as a tile (only one harness today).
   function openRoot() {
     zoom = "root";
     showEnable = false;

@@ -138,7 +138,7 @@
   }
 
   // Open the baseline-context analysis in its own window (2x the gauge window,
-  // separate from it) for the session open in the Claude app, or the most-recent
+  // separate from it) for the session open in the desktop app, or the most-recent
   // one if none is focused. Reuse the window if it's already open.
   async function openBaseline() {
     menuOpen = false;

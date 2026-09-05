@@ -10,14 +10,14 @@ export interface Session {
   ctx: number | null; // context tokens; null if no assistant usage yet
   target: number; // gauge budget: the model's sweet-spot token count
   limit: number; // the model's hard enforced context window
-  model: string; // short model name (Opus / Sonnet / Haiku / …)
+  model: string; // short model family name (tier word from the model id)
   modelVersion: string; // version from raw id (e.g. "4.8"); empty if unknown
   pct: number | null; // ctx / target, 0..1
   live: boolean; // mtime within ~2x poll = actively responding
   mtime: number; // unix seconds
   sizeBytes: number; // transcript .jsonl size on disk
   costUsd: number; // cumulative estimated spend so far, USD
-  focused: boolean; // open in the Claude app right now (transient; bold + pinned top)
+  focused: boolean; // open in the desktop app right now (transient; bold + pinned top)
 }
 
 // One time-sample of a session, accumulated client-side for the history graph.
@@ -82,7 +82,7 @@ export interface ContextSession {
 
 // --- Cross-session browse (opt-in index; mirrors browse.rs) ---
 
-// One harness/provider aggregate (Claude Code today).
+// One harness/provider aggregate (one coding harness today).
 export interface HarnessAgg {
   harness: string;
   label: string;
@@ -165,7 +165,7 @@ export interface Config {
   N: number; // max sessions shown (candidate-pool ceiling; window height decides shown count)
   poll_seconds: number; // refresh interval
   target_tokens: number; // fallback gauge budget when the model is unknown
-  follow_focus: boolean; // pin the session open in the Claude app to the top
+  follow_focus: boolean; // pin the session open in the desktop app to the top
   show_in_tray: boolean;
   show_in_taskbar: boolean;
   minimize_to_tray: boolean;

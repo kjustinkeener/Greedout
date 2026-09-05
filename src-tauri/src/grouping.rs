@@ -1,6 +1,6 @@
 //! Fold subdirectory sessions back into their project.
 //!
-//! Claude Code names a transcript folder after the working directory the session
+//! The coding harness names a transcript folder after the working directory the session
 //! started in, so running `claude` inside `Greedout\src-tauri` creates a folder
 //! that looks like a project of its own. Left alone, one project shows up as two
 //! (or five) unrelated entries in the list and the Explorer tree.

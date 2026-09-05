@@ -43,7 +43,7 @@ export const ja: PartialDict = {
   "status.memTip": "メモリ {used} / {total} GB",
 
   "settings.title": "設定",
-  "settings.followFocus": "Claudeで開いているセッションに追従",
+  "settings.followFocus": "フォーカス中のセッションに追従",
   "settings.alwaysOnTop": "常に最前面に表示",
   "settings.showInTray": "トレイに表示",
   "settings.showInTaskbar": "タスクバーに表示",
@@ -82,7 +82,7 @@ export const ja: PartialDict = {
   "about.built": "ビルド日 {date}",
   "about.tagline": "トークン消費量の表示とコンテキストの詳細表示。",
   "about.body":
-    "GreedoutはClaude Codeのトランスクリプトを直接読み取り、各セッションのコンテキスト使用量・支出・履歴を常に最前面のダッシュボードとして表示します。Windowsデスクトップアプリ単体では表示できないステータスラインです。",
+    "GreedoutはAIコーディングセッションのトランスクリプトを直接読み取り、コンテキスト使用量・支出・履歴を常に最前面のダッシュボードとして表示します。現在対応しているのはClaude Codeで、そのWindowsデスクトップアプリ単体では表示できないステータスラインです。",
   "about.madeBy": "制作",
   "about.builtWith": "使用技術",
   "about.license": "ライセンス",

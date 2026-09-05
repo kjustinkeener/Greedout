@@ -44,7 +44,7 @@ export const nl: PartialDict = {
   "status.memTip": "geheugen {used} / {total} GB",
 
   "settings.title": "Instellingen",
-  "settings.followFocus": "Volg de sessie die open is in Claude",
+  "settings.followFocus": "Volg de sessie met focus",
   "settings.alwaysOnTop": "Altijd op voorgrond",
   "settings.showInTray": "Weergeven in systeemvak",
   "settings.showInTaskbar": "Weergeven op taakbalk",
@@ -83,7 +83,7 @@ export const nl: PartialDict = {
   "about.built": "gebouwd op {date}",
   "about.tagline": "Uitlezing van tokenverbruik en contextverkenner.",
   "about.body":
-    "Greedout leest Claude Code-transcripten rechtstreeks en toont de contextvulling, uitgaven en geschiedenis van elke sessie als een altijd-op-voorgrond dashboard: de statusregel die de Windows-desktopapp niet zelf kan weergeven.",
+    "Greedout leest transcripten van AI-codeersessies rechtstreeks en toont contextvulling, uitgaven en geschiedenis als een altijd-op-voorgrond dashboard. Claude Code is de tool die vandaag wordt ondersteund: de statusregel die de Windows-desktopapp daarvan niet zelf kan weergeven.",
   "about.madeBy": "Gemaakt door",
   "about.builtWith": "Gebouwd met",
   "about.license": "Licentie",

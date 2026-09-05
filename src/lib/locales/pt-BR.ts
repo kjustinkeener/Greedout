@@ -44,7 +44,7 @@ export const ptBR: PartialDict = {
   "status.memTip": "memória {used} / {total} GB",
 
   "settings.title": "Configurações",
-  "settings.followFocus": "Seguir a sessão aberta no Claude",
+  "settings.followFocus": "Seguir a sessão em foco",
   "settings.alwaysOnTop": "Sempre visível",
   "settings.showInTray": "Mostrar na bandeja",
   "settings.showInTaskbar": "Mostrar na barra de tarefas",
@@ -83,7 +83,7 @@ export const ptBR: PartialDict = {
   "about.built": "compilado em {date}",
   "about.tagline": "Leitura do gasto de tokens e explorador de contexto.",
   "about.body":
-    "O Greedout lê diretamente as transcrições do Claude Code e mostra o preenchimento de contexto, o gasto e o histórico de cada sessão em um painel sempre visível: a status line que o aplicativo desktop do Windows não consegue renderizar sozinho.",
+    "O Greedout lê diretamente as transcrições de sessões de programação com IA e mostra o preenchimento de contexto, o gasto e o histórico em um painel sempre visível. Hoje a ferramenta compatível é o Claude Code: a status line que o seu aplicativo desktop do Windows não consegue renderizar sozinho.",
   "about.madeBy": "Criado por",
   "about.builtWith": "Construído com",
   "about.license": "Licença",

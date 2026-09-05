@@ -43,7 +43,7 @@ export const ko: PartialDict = {
   "status.memTip": "메모리 {used} / {total} GB",
 
   "settings.title": "설정",
-  "settings.followFocus": "Claude에서 열린 세션 따라가기",
+  "settings.followFocus": "포커스된 세션 따라가기",
   "settings.alwaysOnTop": "항상 위에 표시",
   "settings.showInTray": "트레이에 표시",
   "settings.showInTaskbar": "작업 표시줄에 표시",
@@ -82,7 +82,7 @@ export const ko: PartialDict = {
   "about.built": "빌드일 {date}",
   "about.tagline": "토큰 사용량 표시와 컨텍스트 탐색기.",
   "about.body":
-    "Greedout은 Claude Code 트랜스크립트를 직접 읽어 각 세션의 컨텍스트 사용량, 지출, 기록을 항상 위에 표시되는 대시보드로 보여줍니다: Windows 데스크톱 앱이 자체적으로 렌더링하지 못하는 상태 표시줄입니다.",
+    "Greedout은 AI 코딩 세션의 트랜스크립트를 직접 읽어 컨텍스트 사용량, 지출, 기록을 항상 위에 표시되는 대시보드로 보여줍니다. 현재 지원하는 도구는 Claude Code이며, 그 Windows 데스크톱 앱이 자체적으로 렌더링하지 못하는 상태 표시줄입니다.",
   "about.madeBy": "제작",
   "about.builtWith": "제작 도구",
   "about.license": "라이선스",

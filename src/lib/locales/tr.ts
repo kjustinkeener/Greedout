@@ -44,7 +44,7 @@ export const tr: PartialDict = {
   "status.memTip": "bellek {used} / {total} GB",
 
   "settings.title": "Ayarlar",
-  "settings.followFocus": "Claude'da açık olan oturumu izle",
+  "settings.followFocus": "Odaktaki oturumu izle",
   "settings.alwaysOnTop": "Her zaman üstte",
   "settings.showInTray": "Sistem tepsisinde göster",
   "settings.showInTaskbar": "Görev çubuğunda göster",
@@ -83,7 +83,7 @@ export const tr: PartialDict = {
   "about.built": "{date} tarihinde derlendi",
   "about.tagline": "Token harcama göstergesi ve bağlam gezgini.",
   "about.body":
-    "Greedout, Claude Code transkriptlerini doğrudan okuyup her oturumun bağlam doluluğunu, harcamasını ve geçmişini her zaman üstte kalan bir panoda gösterir: Windows masaüstü uygulamasının kendi başına gösteremediği durum satırı.",
+    "Greedout, yapay zekâ ile kodlama oturumlarının transkriptlerini doğrudan okuyup bağlam doluluğunu, harcamayı ve geçmişi her zaman üstte kalan bir panoda gösterir. Bugün desteklenen araç Claude Code: kendi Windows masaüstü uygulamasının tek başına gösteremediği durum satırı.",
   "about.madeBy": "Yapımcı",
   "about.builtWith": "Kullanılan araçlar",
   "about.license": "Lisans",

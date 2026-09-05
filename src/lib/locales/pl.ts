@@ -44,7 +44,7 @@ export const pl: PartialDict = {
   "status.memTip": "pamięć {used} / {total} GB",
 
   "settings.title": "Ustawienia",
-  "settings.followFocus": "Podążaj za sesją otwartą w Claude",
+  "settings.followFocus": "Podążaj za aktywną sesją",
   "settings.alwaysOnTop": "Zawsze na wierzchu",
   "settings.showInTray": "Pokaż w zasobniku systemowym",
   "settings.showInTaskbar": "Pokaż na pasku zadań",
@@ -83,7 +83,7 @@ export const pl: PartialDict = {
   "about.built": "zbudowano {date}",
   "about.tagline": "Odczyt zużycia tokenów i eksplorator kontekstu.",
   "about.body":
-    "Greedout odczytuje transkrypcje Claude Code bezpośrednio i pokazuje zapełnienie kontekstu, wydatki oraz historię każdej sesji jako pulpit zawsze na wierzchu: pasek stanu, którego aplikacja desktopowa Windows nie potrafi wyrenderować sama.",
+    "Greedout odczytuje bezpośrednio transkrypcje sesji programowania z AI i pokazuje zapełnienie kontekstu, wydatki oraz historię jako pulpit zawsze na wierzchu. Dziś obsługiwanym narzędziem jest Claude Code: to pasek stanu, którego jego aplikacja desktopowa na Windows nie potrafi wyrenderować sama.",
   "about.madeBy": "Stworzone przez",
   "about.builtWith": "Zbudowane przy użyciu",
   "about.license": "Licencja",

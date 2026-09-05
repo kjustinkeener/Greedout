@@ -77,7 +77,7 @@ export const en = {
 
   // Settings window
   "settings.title": "Settings",
-  "settings.followFocus": "Follow the session open in Claude",
+  "settings.followFocus": "Follow the focused session",
   "settings.alwaysOnTop": "Always on top",
   "settings.showInTray": "Show in tray",
   "settings.showInTaskbar": "Show in taskbar",
@@ -118,7 +118,7 @@ export const en = {
   "about.built": "built {date}",
   "about.tagline": "Token spend readout and context explorer.",
   "about.body":
-    "Greedout reads Claude Code transcripts directly and shows each session's context fill, spend, and history as an always-on-top dashboard: the status line the Windows desktop app can't render on its own.",
+    "Greedout reads AI coding session transcripts directly and shows context fill, spend, and history as an always-on-top dashboard. Claude Code is the harness it supports today: the status line its Windows desktop app can't render on its own.",
   "about.madeBy": "Made by",
   "about.builtWith": "Built with",
   "about.license": "License",

@@ -44,7 +44,7 @@ export const fr: PartialDict = {
   "status.memTip": "mémoire {used} / {total} Go",
 
   "settings.title": "Paramètres",
-  "settings.followFocus": "Suivre la session ouverte dans Claude",
+  "settings.followFocus": "Suivre la session active",
   "settings.alwaysOnTop": "Toujours au premier plan",
   "settings.showInTray": "Afficher dans la zone de notification",
   "settings.showInTaskbar": "Afficher dans la barre des tâches",
@@ -83,7 +83,7 @@ export const fr: PartialDict = {
   "about.built": "compilé le {date}",
   "about.tagline": "Relevé de la consommation de tokens et explorateur de contexte.",
   "about.body":
-    "Greedout lit directement les transcriptions de Claude Code et affiche, pour chaque session, le remplissage du contexte, la dépense et l'historique dans un tableau de bord toujours au premier plan : la ligne d'état que l'application de bureau Windows ne peut pas afficher elle-même.",
+    "Greedout lit directement les transcriptions des sessions de codage assisté par IA et affiche le remplissage du contexte, la dépense et l'historique dans un tableau de bord toujours au premier plan. Claude Code est l'outil pris en charge aujourd'hui : la ligne d'état que son application de bureau Windows ne peut pas afficher elle-même.",
   "about.madeBy": "Créé par",
   "about.builtWith": "Réalisé avec",
   "about.license": "Licence",

@@ -43,7 +43,7 @@ export const zhHans: PartialDict = {
   "status.memTip": "内存 {used} / {total} GB",
 
   "settings.title": "设置",
-  "settings.followFocus": "跟随 Claude 中打开的会话",
+  "settings.followFocus": "跟随当前聚焦的会话",
   "settings.alwaysOnTop": "始终置顶",
   "settings.showInTray": "在托盘中显示",
   "settings.showInTaskbar": "在任务栏中显示",
@@ -82,7 +82,7 @@ export const zhHans: PartialDict = {
   "about.built": "构建于 {date}",
   "about.tagline": "令牌消耗读数与上下文浏览器。",
   "about.body":
-    "Greedout 直接读取 Claude Code 的文字记录，以常驻置顶面板展示每个会话的上下文占用、花费与历史趋势：这是 Windows 桌面应用自身无法渲染的状态行。",
+    "Greedout 直接读取 AI 编程会话的文字记录，以常驻置顶面板展示上下文占用、花费与历史趋势。目前支持的工具是 Claude Code：这是其 Windows 桌面应用自身无法渲染的状态行。",
   "about.madeBy": "制作者",
   "about.builtWith": "技术栈",
   "about.license": "许可证",

@@ -44,7 +44,7 @@ export const zhHant: PartialDict = {
   "status.memTip": "記憶體 {used} / {total} GB",
 
   "settings.title": "設定",
-  "settings.followFocus": "跟隨 Claude 中開啟的工作階段",
+  "settings.followFocus": "跟隨目前聚焦的工作階段",
   "settings.alwaysOnTop": "永遠置頂",
   "settings.showInTray": "顯示於系統匣",
   "settings.showInTaskbar": "顯示於工作列",
@@ -83,7 +83,7 @@ export const zhHant: PartialDict = {
   "about.built": "建置於 {date}",
   "about.tagline": "權杖消耗讀數與上下文瀏覽器。",
   "about.body":
-    "Greedout 直接讀取 Claude Code 的對話紀錄,以永遠置頂的儀表板呈現每個工作階段的內容填充量、花費與歷史紀錄:這是 Windows 桌面應用程式本身無法呈現的狀態列。",
+    "Greedout 直接讀取 AI 程式設計工作階段的對話紀錄,以永遠置頂的儀表板呈現內容填充量、花費與歷史紀錄。目前支援的工具是 Claude Code:這是其 Windows 桌面應用程式本身無法呈現的狀態列。",
   "about.madeBy": "製作者",
   "about.builtWith": "使用技術",
   "about.license": "授權條款",

@@ -52,7 +52,7 @@ export const es: PartialDict = {
 
   // Ventana de configuración
   "settings.title": "Configuración",
-  "settings.followFocus": "Seguir la sesión abierta en Claude",
+  "settings.followFocus": "Seguir la sesión con el foco",
   "settings.alwaysOnTop": "Siempre visible",
   "settings.showInTray": "Mostrar en la bandeja",
   "settings.showInTaskbar": "Mostrar en la barra de tareas",
@@ -93,7 +93,7 @@ export const es: PartialDict = {
   "about.built": "compilado el {date}",
   "about.tagline": "Lectura del gasto de tokens y explorador de contexto.",
   "about.body":
-    "Greedout lee directamente las transcripciones de Claude Code y muestra el llenado de contexto, el gasto y el historial de cada sesión como un panel siempre visible: la barra de estado que la app de escritorio de Windows no puede mostrar por sí sola.",
+    "Greedout lee directamente las transcripciones de sesiones de programación con IA y muestra el llenado de contexto, el gasto y el historial en un panel siempre visible. Hoy la herramienta compatible es Claude Code: la barra de estado que su app de escritorio de Windows no puede mostrar por sí sola.",
   "about.madeBy": "Creado por",
   "about.builtWith": "Hecho con",
   "about.license": "Licencia",

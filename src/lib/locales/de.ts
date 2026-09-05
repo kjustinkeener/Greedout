@@ -44,7 +44,7 @@ export const de: PartialDict = {
   "status.memTip": "Arbeitsspeicher {used} / {total} GB",
 
   "settings.title": "Einstellungen",
-  "settings.followFocus": "Der in Claude geöffneten Sitzung folgen",
+  "settings.followFocus": "Der Sitzung im Fokus folgen",
   "settings.alwaysOnTop": "Immer im Vordergrund",
   "settings.showInTray": "Im Infobereich anzeigen",
   "settings.showInTaskbar": "In der Taskleiste anzeigen",
@@ -83,7 +83,7 @@ export const de: PartialDict = {
   "about.built": "erstellt am {date}",
   "about.tagline": "Token-Verbrauchsanzeige und Kontext-Explorer.",
   "about.body":
-    "Greedout liest Claude Code-Transkripte direkt und zeigt Kontextfüllung, Ausgaben und Verlauf jeder Sitzung als stets im Vordergrund bleibendes Dashboard: die Statuszeile, die die Windows-Desktop-App nicht selbst darstellen kann.",
+    "Greedout liest Transkripte von KI-Coding-Sitzungen direkt und zeigt Kontextfüllung, Ausgaben und Verlauf als stets im Vordergrund bleibendes Dashboard. Unterstützt wird derzeit Claude Code: die Statuszeile, die dessen Windows-Desktop-App nicht selbst darstellen kann.",
   "about.madeBy": "Erstellt von",
   "about.builtWith": "Erstellt mit",
   "about.license": "Lizenz",

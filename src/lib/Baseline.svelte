@@ -2059,9 +2059,9 @@
     outline-offset: -1px;
     box-shadow:
       inset 0 0 0 1px rgba(0, 0, 0, 0.4),
-      inset 0 0 clamp(2px, calc(var(--sh, 60px) * 0.1), 16px)
-        clamp(0px, calc(var(--sh, 60px) * 0.025), 4px) rgba(0, 0, 0, 0.9),
-      inset 0 0 clamp(3px, calc(var(--sh, 60px) * 0.28), 44px) rgba(0, 0, 0, 0.55);
+      inset 0 0 clamp(0.8px, calc(var(--sh, 60px) * 0.04), 6.4px)
+        clamp(0px, calc(var(--sh, 60px) * 0.01), 1.6px) rgba(0, 0, 0, 0.9),
+      inset 0 0 clamp(1.2px, calc(var(--sh, 60px) * 0.112), 17.6px) rgba(0, 0, 0, 0.55);
     transition: box-shadow 0.12s ease;
   }
   .tile.drill {
@@ -2215,7 +2215,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 5px;
-    padding: 6px 10px 0;
+    padding: 6px 10px 7px;
   }
   .typebar {
     padding: 2px 10px 4px;

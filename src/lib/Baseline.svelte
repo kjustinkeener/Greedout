@@ -2036,7 +2036,7 @@
   .map {
     position: relative;
     flex: 1 1 auto;
-    margin: 0 10px;
+    margin: 0 10px 8px;
     border: 1px solid #2a333f;
     border-radius: 9px;
     background: #171d26;
@@ -2215,7 +2215,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 5px;
-    padding: 6px 10px 7px;
+    padding: 6px 10px 0;
   }
   .typebar {
     padding: 2px 10px 4px;
@@ -2309,7 +2309,7 @@
     flex-wrap: nowrap;
     align-items: center;
     gap: 10px;
-    padding: 7px 10px;
+    padding: 4.2px 6px;
     border-top: 1px solid var(--edge);
     font-size: calc(11px * var(--size-ui));
     color: var(--muted);

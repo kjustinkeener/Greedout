@@ -4,6 +4,7 @@ export const nl: PartialDict = {
   "menu.menu": "Menu",
   "menu.closeMenu": "Menu sluiten",
   "menu.explorer": "Context Explorer…",
+  "menu.dailySpend": "Dagelijkse uitgaven…",
   "menu.settings": "Instellingen…",
   "menu.about": "Over…",
   "win.minimize": "Minimaliseren",

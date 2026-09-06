@@ -4,6 +4,7 @@ export const zhHant: PartialDict = {
   "menu.menu": "選單",
   "menu.closeMenu": "關閉選單",
   "menu.explorer": "內容檢視器…",
+  "menu.dailySpend": "每日花費…",
   "menu.settings": "設定…",
   "menu.about": "關於…",
   "win.minimize": "最小化",

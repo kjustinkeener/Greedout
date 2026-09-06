@@ -28,6 +28,7 @@ export const en = {
   "menu.menu": "Menu",
   "menu.closeMenu": "Close menu",
   "menu.explorer": "Context Explorer…",
+  "menu.dailySpend": "Daily Spend…",
   "menu.settings": "Settings…",
   "menu.about": "About…",
   "win.minimize": "Minimize",

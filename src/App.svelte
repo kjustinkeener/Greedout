@@ -280,6 +280,66 @@
     }
   }
 
+  // Open the Daily Spend window (its own window, sized like the Explorer). It has
+  // no per-session target, so it's a straight reuse-or-create like About. Reuse if
+  // already open.
+  async function openDailySpend() {
+    menuOpen = false;
+    const existing = await WebviewWindow.getByLabel("dailyspend");
+    if (existing) {
+      try {
+        await existing.unminimize();
+        await existing.show();
+        await existing.setFocus();
+        return;
+      } catch {
+        try {
+          await existing.close();
+        } catch {
+          // already gone
+        }
+      }
+    }
+    await createDailySpendWindow(true);
+  }
+
+  async function createDailySpendWindow(retry: boolean) {
+    let pos: { x: number; y: number } | undefined;
+    try {
+      const sf = await appWindow.scaleFactor();
+      const p = (await appWindow.outerPosition()).toLogical(sf);
+      pos = { x: Math.round(p.x + 24), y: Math.round(p.y + 24) };
+    } catch {
+      // Position unavailable; let the OS place it.
+    }
+    const aot = (await invoke<Config>("get_config").catch(() => null))?.always_on_top ?? true;
+    const w = new WebviewWindow("dailyspend", {
+      url: "dailyspend.html",
+      title: "Daily Spend",
+      width: 720,
+      height: 560,
+      minWidth: 420,
+      minHeight: 320,
+      resizable: true,
+      alwaysOnTop: aot,
+      focus: true,
+      ...(pos ? { x: pos.x, y: pos.y } : {}),
+    });
+    if (retry) {
+      void w.once("tauri://error", async () => {
+        const stale = await WebviewWindow.getByLabel("dailyspend");
+        if (stale) {
+          try {
+            await stale.close();
+          } catch {
+            // already gone
+          }
+        }
+        setTimeout(() => void createDailySpendWindow(false), 150);
+      });
+    }
+  }
+
   const openSession = (s: Session) =>
     openExplorer({ id: s.id, title: `${s.title} · ${s.project}`, project: s.project, view: "session" });
   const openProject = (s: Session) =>
@@ -534,6 +594,10 @@
             {t("menu.explorer")}
           </button>
         {/if}
+        <button class="item" onclick={openDailySpend}>
+          <span class="mi"><Icon name="bar-chart" size={14} /></span>
+          {t("menu.dailySpend")}
+        </button>
         <button class="item" onclick={openSettings}>
           <span class="mi"><Icon name="sliders" size={14} /></span>
           {t("menu.settings")}

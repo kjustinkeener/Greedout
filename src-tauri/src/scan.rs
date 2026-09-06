@@ -702,6 +702,167 @@ pub fn session_history(id: &str) -> Vec<Sample> {
     downsample(out, 200)
 }
 
+/// One billed assistant turn, for the Daily Spend window: a timestamp, its
+/// estimated cost, and which session/project it belongs to.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpendEvent {
+    /// Turn timestamp, epoch millis (matches the frontend clock).
+    pub t: i64,
+    /// This turn's estimated USD cost.
+    pub cost: f64,
+    /// Session id (transcript file stem) it was first seen in.
+    pub session: String,
+    /// Readable project name (leaf of the decoded transcript directory).
+    pub project: String,
+}
+
+/// One transcript's parsed spend rows, cached by (mtime, size) so reopening the
+/// Daily Spend window only re-reads files that actually changed. The whole tree is
+/// multi-GB; a cold read of all of it is the one slow step, and it happens once
+/// per app run rather than once per open. Session id and project are shared by
+/// every row in a file, so they're held once here, not per row.
+struct FileSpend {
+    mtime: i64,
+    size: u64,
+    session: String,
+    project: String,
+    /// (message id, timestamp ms, this turn's cost) for each billed assistant turn.
+    rows: Vec<(Option<String>, i64, f64)>,
+}
+
+fn spend_cache() -> &'static Mutex<HashMap<PathBuf, FileSpend>> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, FileSpend>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn mtime_ms(m: &std::fs::Metadata) -> i64 {
+    m.modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// Parse one transcript into its `FileSpend` (a whole-file read). Rows are kept
+/// undeduped: dedup is global across files and so must run at assembly time.
+fn parse_spend_file(path: &Path) -> Option<FileSpend> {
+    let meta = std::fs::metadata(path).ok()?;
+    let (mtime, size) = (mtime_ms(&meta), meta.len());
+    let project = path
+        .parent()
+        .and_then(|p| p.file_name())
+        .map(|s| last_component(&decode_project_dir(&s.to_string_lossy())))
+        .unwrap_or_default();
+    let session = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    let text = std::fs::read_to_string(path).ok()?;
+    let mut rows = Vec::new();
+    for line in text.lines() {
+        if !(line.contains("\"usage\"") && line.contains("\"assistant\"")) {
+            continue;
+        }
+        if let Some((id, t, _ctx, cost)) = history_row(line) {
+            rows.push((id, t, cost));
+        }
+    }
+    Some(FileSpend { mtime, size, session, project, rows })
+}
+
+/// Every billed assistant turn across all sessions, sorted by time, for the Daily
+/// Spend window. The message-id dedupe spans ALL files, so a turn that reappears
+/// in a resumed or compacted copy (the harness re-appends the whole prior
+/// transcript on resume) is billed to its first occurrence only -- without this
+/// the monthly/daily totals would overstate spend several-fold.
+///
+/// Files unchanged since the last call are served from `spend_cache`; only the
+/// stale ones are re-read, in parallel. First open of an app run reads the whole
+/// tree; later opens are near-instant.
+pub fn spend_events() -> Vec<SpendEvent> {
+    let pattern = claude_dir()
+        .join("projects")
+        .join("*")
+        .join("*.jsonl")
+        .to_string_lossy()
+        .replace('\\', "/");
+    let Ok(g) = glob::glob(&pattern) else { return Vec::new() };
+    let mut paths: Vec<PathBuf> = g.flatten().collect();
+    // Deterministic order so the "first occurrence wins" dedup is stable run to run.
+    paths.sort();
+
+    // Files whose (mtime, size) differ from the cache (or aren't cached yet).
+    let stale: Vec<PathBuf> = {
+        let cache = spend_cache().lock().ok();
+        paths
+            .iter()
+            .filter(|p| {
+                let cur = std::fs::metadata(p).ok().map(|m| (mtime_ms(&m), m.len()));
+                match (cache.as_ref().and_then(|c| c.get(*p)), cur) {
+                    (Some(fs), Some((mt, sz))) => fs.mtime != mt || fs.size != sz,
+                    _ => true,
+                }
+            })
+            .cloned()
+            .collect()
+    };
+
+    if !stale.is_empty() {
+        let nthreads =
+            std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8);
+        let chunk = stale.len().div_ceil(nthreads).max(1);
+        // `thread::scope`: read/parse the stale files across threads, each returning
+        // its (path, FileSpend) pairs; the disk read is what we're parallelizing.
+        let parsed: Vec<(PathBuf, FileSpend)> = std::thread::scope(|s| {
+            let handles: Vec<_> = stale
+                .chunks(chunk)
+                .map(|part| {
+                    s.spawn(move || {
+                        part.iter()
+                            .filter_map(|p| parse_spend_file(p).map(|fs| (p.clone(), fs)))
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect();
+            handles.into_iter().flat_map(|h| h.join().unwrap_or_default()).collect()
+        });
+        if let Ok(mut cache) = spend_cache().lock() {
+            for (p, fs) in parsed {
+                cache.insert(p, fs);
+            }
+            // Drop rows for transcripts that have since vanished, so the cache
+            // can't grow without bound across a long-running app.
+            let live: HashSet<&PathBuf> = paths.iter().collect();
+            cache.retain(|k, _| live.contains(k));
+        }
+    }
+
+    let mut out: Vec<SpendEvent> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    if let Ok(cache) = spend_cache().lock() {
+        for p in &paths {
+            let Some(fs) = cache.get(p) else { continue };
+            for (id, t, cost) in &fs.rows {
+                // Dedupe across the whole tree, before billing, exactly as the
+                // per-session history curve does.
+                if let Some(mid) = id {
+                    if !seen.insert(mid.clone()) {
+                        continue;
+                    }
+                }
+                if *cost > 0.0 {
+                    out.push(SpendEvent {
+                        t: *t,
+                        cost: *cost,
+                        session: fs.session.clone(),
+                        project: fs.project.clone(),
+                    });
+                }
+            }
+        }
+    }
+    out.sort_by_key(|e| e.t);
+    out
+}
+
 /// Full per-session metadata for the browse cache (see browse.rs). Unlike the
 /// poll-time `Session`, this is computed from a single WHOLE-file read, so it can
 /// report the deduped cumulative cost, the turn count, and whether the session

@@ -4,6 +4,7 @@ export const ko: PartialDict = {
   "menu.menu": "메뉴",
   "menu.closeMenu": "메뉴 닫기",
   "menu.explorer": "Context Explorer…",
+  "menu.dailySpend": "일일 지출…",
   "menu.settings": "설정…",
   "menu.about": "정보…",
   "win.minimize": "최소화",

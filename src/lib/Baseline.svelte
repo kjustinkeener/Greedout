@@ -808,7 +808,7 @@
       const s = sessionRows.find((x) => x.id === n.detail);
       if (!s) return "";
       if (!s.enriched) return "size only — open to load tokens";
-      const parts = [`${fmt(s.ctx ?? 0)} ctx`, `${s.turnCount} turns`];
+      const parts = [`${fmt(s.ctx ?? 0)} tok`, `${s.turnCount} turns`];
       if (s.model) parts.push(s.model);
       if (s.hasContextUsage) parts.push("/context ✓");
       return parts.join(" · ");
@@ -1294,15 +1294,12 @@
                 >
               {/if}
               <span class="tm-size" style="font-size:{Math.max(10, labelFont(t.w, t.h) * 0.62)}px;"
-                >{sizeMetric === "usd" && zoom === "session"
+                >{#if sizeMetric === "tok" && (tileCost(t.node) ?? 0) > 0 && t.w > 56 && t.h > 44}<span
+                    class="tm-cost">{fmtUsd(tileCost(t.node) ?? 0)}</span
+                  >{" · "}{/if}{sizeMetric === "usd" && zoom === "session"
                   ? fmtUsd(nodeUsd(t.node))
                   : tileSize(t.node.tokens)} · {tilePct(t.node)}</span
               >
-              {#if sizeMetric === "tok" && (tileCost(t.node) ?? 0) > 0 && t.w > 56 && t.h > 44}
-                <span class="tm-cost" style="font-size:{Math.max(10, labelFont(t.w, t.h) * 0.56)}px;"
-                  >{fmtUsd(tileCost(t.node) ?? 0)}</span
-                >
-              {/if}
               {#if zoom === "session" && fmtTime(t.node.ts) && t.w > 64 && t.h > 44}
                 <span class="tm-time" style="font-size:{Math.max(9, labelFont(t.w, t.h) * 0.5)}px;"
                   >{fmtTime(t.node.ts)}</span
@@ -1664,12 +1661,17 @@
         </nav>
         <span class="grand">
           <span class="metricsel" role="group" aria-label="Size rects by">
-            <button
-              class="mbtn"
-              class:on={sizeMetric === "tok"}
-              onclick={() => (sizeMetric = "tok")}
-              title="Size rects by tokens">{fmt(displayTotal)} tok</button
-            >
+            {#if zoom === "session"}
+              <!-- tok is a point-in-time context reading; summing it across
+                   sessions/projects is meaningless, so only the session level
+                   shows a tok total. Cost is additive and stays at every level. -->
+              <button
+                class="mbtn"
+                class:on={sizeMetric === "tok"}
+                onclick={() => (sizeMetric = "tok")}
+                title="Size rects by tokens">{fmt(displayTotal)} tok</button
+              >
+            {/if}
             <button
               class="mbtn"
               class:on={sizeMetric === "usd"}
@@ -2094,6 +2096,7 @@
     justify-content: safe center;
     text-align: center;
     line-height: 1.15;
+    overflow: hidden;
   }
   /* Shadow lives on each line (not the label) so its em blur resolves against
      that line's own font-size; otherwise smaller lines look over-blurred. */
@@ -2148,8 +2151,8 @@
     white-space: normal;
     overflow: hidden;
     display: -webkit-box;
-    -webkit-line-clamp: 4;
-    line-clamp: 4;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
   }
   /* FasterDB-style per-tile hide button: appears on tile hover, top-right. */

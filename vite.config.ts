@@ -15,6 +15,7 @@ export default defineConfig({
         settings: resolve(__dirname, "settings.html"),
         about: resolve(__dirname, "about.html"),
         baseline: resolve(__dirname, "baseline.html"),
+        dailyspend: resolve(__dirname, "dailyspend.html"),
         themes: resolve(__dirname, "themes.html"),
         fonts: resolve(__dirname, "fonts.html"),
       },

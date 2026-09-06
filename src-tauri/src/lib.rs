@@ -110,6 +110,12 @@ fn get_history(id: String) -> Vec<scan::Sample> {
     scan::session_history(&id)
 }
 
+/// Every billed turn across all sessions, deduped, for the Daily Spend window.
+#[tauri::command]
+fn get_spend_events() -> Vec<scan::SpendEvent> {
+    scan::spend_events()
+}
+
 /// Estimate the base-context breakdown (system prompt, tools, MCP, memory) for
 /// one session, reconciled against its real first-turn total.
 #[tauri::command]
@@ -370,6 +376,7 @@ pub fn run() {
             update::update_apply,
             get_sessions,
             get_history,
+            get_spend_events,
             analyze_baseline,
             chat_breakdown,
             chat_block,

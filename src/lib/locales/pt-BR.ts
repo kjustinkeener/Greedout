@@ -4,6 +4,7 @@ export const ptBR: PartialDict = {
   "menu.menu": "Menu",
   "menu.closeMenu": "Fechar menu",
   "menu.explorer": "Context Explorer…",
+  "menu.dailySpend": "Gasto diário…",
   "menu.settings": "Configurações…",
   "menu.about": "Sobre…",
   "win.minimize": "Minimizar",

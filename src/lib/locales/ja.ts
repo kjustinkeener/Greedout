@@ -4,6 +4,7 @@ export const ja: PartialDict = {
   "menu.menu": "メニュー",
   "menu.closeMenu": "メニューを閉じる",
   "menu.explorer": "コンテキストエクスプローラー…",
+  "menu.dailySpend": "日別コスト…",
   "menu.settings": "設定…",
   "menu.about": "バージョン情報…",
   "win.minimize": "最小化",

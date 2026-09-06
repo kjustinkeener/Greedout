@@ -4,6 +4,7 @@ export const tr: PartialDict = {
   "menu.menu": "Menü",
   "menu.closeMenu": "Menüyü kapat",
   "menu.explorer": "Bağlam Gezgini…",
+  "menu.dailySpend": "Günlük Harcama…",
   "menu.settings": "Ayarlar…",
   "menu.about": "Hakkında…",
   "win.minimize": "Küçült",

@@ -27,6 +27,15 @@ export interface Sample {
   cost: number; // cumulative spend (USD) at that moment
 }
 
+// One billed assistant turn, for the Daily Spend window. Deduped across all
+// transcripts by the backend, so summing costs never double-counts resumes.
+export interface SpendEvent {
+  t: number; // turn timestamp, epoch ms
+  cost: number; // this turn's estimated USD cost
+  session: string; // session id it was first seen in
+  project: string; // readable project name
+}
+
 // What the history graph reports while a line is hovered; the focus panel swaps
 // its big spend readout for these values.
 export interface HistHover {

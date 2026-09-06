@@ -204,8 +204,37 @@ fn init_db(conn: &Connection) -> rusqlite::Result<()> {
          );
          CREATE INDEX IF NOT EXISTS idx_hp ON sessions(harness, project);
          CREATE INDEX IF NOT EXISTS idx_sid ON sessions(session_id);
-         CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);",
-    )
+         CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+         -- Per-turn billed rows for Daily Spend, written during the enrich pass so
+         -- the tree is parsed once for both windows. Rows are raw (undeduped): the
+         -- Daily Spend read dedups by msg_id globally. One row set per session_path,
+         -- replaced wholesale when its transcript is re-enriched.
+         CREATE TABLE IF NOT EXISTS turns (
+            session_path TEXT NOT NULL,
+            msg_id TEXT,
+            ts INTEGER NOT NULL,
+            cost REAL NOT NULL
+         );
+         CREATE INDEX IF NOT EXISTS idx_turns_path ON turns(session_path);
+         CREATE INDEX IF NOT EXISTS idx_turns_ts ON turns(ts);",
+    )?;
+    // One-time migration: sessions enriched before the turns table existed carry a
+    // valid scanned_mtime but have no turn rows, so a normal (staleness-based) scan
+    // would skip them and Daily Spend would see nothing. Clear scanned_mtime once to
+    // force a single full re-enrich that populates turns; the flag makes it idempotent.
+    let migrated: bool = conn
+        .query_row("SELECT value FROM meta WHERE key='turns_ready'", [], |r| r.get::<_, String>(0))
+        .map(|s| s == "1")
+        .unwrap_or(false);
+    if !migrated {
+        conn.execute("UPDATE sessions SET scanned_mtime=NULL", [])?;
+        conn.execute(
+            "INSERT INTO meta (key, value) VALUES ('turns_ready', '1')
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            [],
+        )?;
+    }
+    Ok(())
 }
 
 /// Create the DB if it doesn't exist yet (called when the user opts in).
@@ -254,6 +283,58 @@ pub fn status(enabled: bool) -> BrowseStatus {
         last_full_scan,
         scanning: running().load(Ordering::Relaxed),
     }
+}
+
+/// Every billed assistant turn across all sessions, sorted by time, for the Daily
+/// Spend window. Read straight from the persistent `turns` table (populated by the
+/// enrich pass), so it survives restarts and shares the one tree walk with the
+/// Context Explorer. The message-id dedupe spans ALL files: a turn that reappears
+/// in a resumed/compacted copy is billed to its first occurrence only. Returns
+/// empty until the first enrich has run (the caller then triggers a scan).
+pub fn spend_events() -> Vec<scan::SpendEvent> {
+    if !cache_db_path().exists() {
+        return Vec::new();
+    }
+    let Ok(conn) = open_db() else { return Vec::new() };
+    // ORDER BY session_path makes "first occurrence wins" deterministic run to run
+    // (the old file-based path sorted the globbed paths for the same reason).
+    let Ok(mut stmt) = conn.prepare(
+        "SELECT t.msg_id, t.ts, t.cost, s.session_id, s.project
+         FROM turns t JOIN sessions s ON s.path = t.session_path
+         ORDER BY t.session_path, t.ts",
+    ) else {
+        return Vec::new();
+    };
+    let Ok(rows) = stmt.query_map([], |r| {
+        Ok((
+            r.get::<_, Option<String>>(0)?,
+            r.get::<_, i64>(1)?,
+            r.get::<_, f64>(2)?,
+            r.get::<_, Option<String>>(3)?,
+            r.get::<_, Option<String>>(4)?,
+        ))
+    }) else {
+        return Vec::new();
+    };
+    let mut out: Vec<scan::SpendEvent> = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (msg_id, ts, cost, session, project) in rows.flatten() {
+        if let Some(mid) = &msg_id {
+            if !seen.insert(mid.clone()) {
+                continue;
+            }
+        }
+        if cost > 0.0 {
+            out.push(scan::SpendEvent {
+                t: ts,
+                cost,
+                session: session.unwrap_or_default(),
+                project: project.unwrap_or_default(),
+            });
+        }
+    }
+    out.sort_by_key(|e| e.t);
+    out
 }
 
 /// Kick off a scan on a background thread. Pass 1 always runs; if `deep`, every
@@ -350,9 +431,11 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
             let existing: Vec<String> =
                 stmt.query_map([], |r| r.get::<_, String>(0))?.flatten().collect();
             let mut del = tx.prepare("DELETE FROM sessions WHERE path=?1")?;
+            let mut del_turns = tx.prepare("DELETE FROM turns WHERE session_path=?1")?;
             for p in existing {
                 if !seen.contains(&p) {
                     del.execute([&p])?;
+                    del_turns.execute([&p])?;
                 }
             }
         }
@@ -491,6 +574,15 @@ fn write_enrich(
             path_str,
         ],
     )?;
+    // Replace this transcript's per-turn rows wholesale (raw, undeduped).
+    conn.execute("DELETE FROM turns WHERE session_path=?1", [path_str])?;
+    if !m.turns.is_empty() {
+        let mut ins =
+            conn.prepare("INSERT INTO turns (session_path, msg_id, ts, cost) VALUES (?1, ?2, ?3, ?4)")?;
+        for (id, ts, cost) in &m.turns {
+            ins.execute(rusqlite::params![path_str, id, ts, cost])?;
+        }
+    }
     Ok(())
 }
 

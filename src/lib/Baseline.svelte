@@ -958,8 +958,20 @@
     return `linear-gradient(135deg, color-mix(in srgb, ${a} 60%, #12171f), color-mix(in srgb, ${a} 32%, #12171f))`;
   }
   // Dynamic label size: scales with the tile's WIDTH, 9px..34px.
-  function labelFont(w: number, _h: number): number {
-    return Math.max(9, Math.min(w / 8, 34));
+  function labelFont(w: number, h: number): number {
+    // Cap by height too, not just width: a wide-but-short tile must not get a
+    // huge width-driven font that overflows vertically and clips the top lines.
+    // Sum the line-height budget (in units of the returned base font) of exactly
+    // the lines that will render at this tile size, mirroring the markup gates.
+    const showMeta = h > 52;
+    const showAbout = showMeta && w > 140 && h > 78;
+    const showTime = showMeta && zoom === "session" && h > 44;
+    let mult = 1.12; // name (0.8em * 1.4 line-height)
+    if (showAbout) mult += 1.43; // 2 clamped lines * 0.42em * 1.3 + 0.8em margin
+    if (showMeta) mult += 0.71; // size (0.62em * 1.15)
+    if (showTime) mult += 0.58; // time (0.5em * 1.15)
+    const byH = (h - 8) / mult; // minus 4px+4px vertical padding
+    return Math.max(9, Math.min(w / 8, byH, 34));
   }
 
   function open(n: BaselineNode) {

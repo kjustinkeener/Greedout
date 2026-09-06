@@ -111,9 +111,23 @@ fn get_history(id: String) -> Vec<scan::Sample> {
 }
 
 /// Every billed turn across all sessions, deduped, for the Daily Spend window.
+/// Reads the persistent per-turn cache (shared with the Context Explorer); returns
+/// empty until the first enrich scan has populated it.
 #[tauri::command]
 fn get_spend_events() -> Vec<scan::SpendEvent> {
-    scan::spend_events()
+    browse::spend_events()
+}
+
+/// Ensure the shared cache exists and (re)scan so Daily Spend has per-turn data.
+/// Always deep -- the turns table is only written by the enrich pass. Reuses the
+/// browse scan machinery (progress via "browse-progress", cancel via browse_cancel)
+/// and is a no-op if a scan is already running. Independent of the browse opt-in:
+/// opening Daily Spend builds the cache without flipping the user's setting.
+#[tauri::command]
+fn spend_scan(app: tauri::AppHandle) -> Result<(), String> {
+    browse::enable()?;
+    browse::run_scan(app, true);
+    Ok(())
 }
 
 /// Estimate the base-context breakdown (system prompt, tools, MCP, memory) for
@@ -377,6 +391,7 @@ pub fn run() {
             get_sessions,
             get_history,
             get_spend_events,
+            spend_scan,
             analyze_baseline,
             chat_breakdown,
             chat_block,

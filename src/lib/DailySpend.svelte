@@ -8,6 +8,7 @@
   // resume/compaction double-counting is handled before it reaches us.
   import { onMount, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import type { SpendEvent } from "../types";
   import Brand from "./Brand.svelte";
   import Icon from "./Icon.svelte";
@@ -15,6 +16,10 @@
 
   let events = $state<SpendEvent[]>([]);
   let loading = $state(true);
+  // Scan state (the shared cache build, reused from the Context Explorer scan).
+  let scanning = $state(false);
+  let progress = $state<{ phase: string; done: number; total: number; current: string } | null>(null);
+  let scanLog = $state<string[]>([]); // rolling tail of files being read
   let level = $state<"months" | "days" | "day">("months");
   let curMonth = $state(""); // "YYYY-MM"
   let curDay = $state(""); // "YYYY-MM-DD"
@@ -27,14 +32,63 @@
   const unlistenLocale = watchLocale();
   onDestroy(() => void unlistenLocale.then((u) => u()));
 
-  onMount(async () => {
+  async function fetchEvents() {
     try {
       events = await invoke<SpendEvent[]>("get_spend_events");
     } catch {
       events = [];
     }
-    loading = false;
+  }
+  function startScan() {
+    scanning = true;
+    progress = null;
+    scanLog = [];
+    invoke("spend_scan").catch(() => {
+      scanning = false;
+    });
+  }
+  function cancelScan() {
+    invoke("browse_cancel").catch(() => {});
+  }
+  // Remaining fraction, as a width for the mask that obscures the unfilled part of
+  // the (statically full) gradient track. 100% at rest = fully masked/empty.
+  const progressRemaining = $derived(
+    progress && progress.total ? `${100 - (progress.done / progress.total) * 100}%` : "100%",
+  );
+  const progressLabel = $derived.by(() => {
+    if (!progress) return "Starting scan…";
+    const verb = progress.phase === "enrich" ? "Reading transcripts" : "Indexing";
+    return `${verb} ${progress.done}/${progress.total}`;
   });
+
+  onMount(async () => {
+    // Show whatever the persistent cache already has immediately (instant across
+    // restarts), then kick a background scan to fold in anything new.
+    await fetchEvents();
+    loading = false;
+    startScan();
+  });
+
+  // The scan reuses the Context Explorer's "browse-progress" event stream.
+  let unlistenProgress: Promise<() => void> | null = null;
+  onMount(() => {
+    unlistenProgress = listen<{ phase: string; done: number; total: number; current: string }>(
+      "browse-progress",
+      (e) => {
+        const p = e.payload;
+        progress = p;
+        if (p.current && (p.phase === "enrich" || p.phase === "index")) {
+          scanLog = [p.current, ...scanLog.filter((s) => s !== p.current)].slice(0, 8);
+        }
+        if (p.phase === "done" || p.phase === "canceled") {
+          scanning = false;
+          progress = null;
+          void fetchEvents(); // pull the freshly-written turns
+        }
+      },
+    );
+  });
+  onDestroy(() => void unlistenProgress?.then((u) => u()));
 
   // --- Local-time keys. Bucketing is by the user's clock, not UTC: "daily spend"
   // means the day the user was working, and a turn at 23:30 belongs to that day. ---
@@ -99,6 +153,16 @@
     let h = 0;
     for (let i = 0; i < p.length; i++) h = (h * 31 + p.charCodeAt(i)) >>> 0;
     return `hsl(${h % 360} 65% 55%)`;
+  }
+  // Place a swim lane along the theme gauge gradient (g0 -> g1 -> g2). Lanes are
+  // sorted highest-total first, so index 0 maps to the hot end (g2): heavier spend
+  // reads hotter, matching the gauge. color-mix keeps it live with theme changes
+  // and needs no color parsing. (Flip the p formula to 1 - that to reverse.)
+  function laneColor(i: number, n: number): string {
+    const p = n <= 1 ? 1 : (n - 1 - i) / (n - 1);
+    return p <= 0.5
+      ? `color-mix(in oklab, var(--g1) ${p * 200}%, var(--g0))`
+      : `color-mix(in oklab, var(--g2) ${(p - 0.5) * 200}%, var(--g1))`;
   }
   interface Seg {
     project: string;
@@ -259,31 +323,34 @@
     level = "day";
     hover = "";
   }
-  function shiftMonth(key: string, delta: number): string {
-    let [y, m] = key.split("-").map(Number);
-    m += delta;
-    while (m < 1) {
-      m += 12;
-      y--;
+  // Keys that actually have spend, sorted (string order is chronological for
+  // "YYYY-MM" / "YYYY-MM-DD"). Stepping walks these, so nav never lands on an
+  // empty month/day and stops at the ends of the data range.
+  const monthList = $derived([...new Set(events.map((e) => monthKey(e.t)))].sort());
+  const dayList = $derived([...new Set(events.map((e) => dayKey(e.t)))].sort());
+  function stepIn(list: string[], cur: string, delta: number): string {
+    if (!list.length) return cur;
+    const idx = list.indexOf(cur);
+    if (idx === -1) {
+      // Current key has no data: jump to the nearest populated one in this direction.
+      return delta > 0
+        ? (list.find((k) => k > cur) ?? cur)
+        : ([...list].reverse().find((k) => k < cur) ?? cur);
     }
-    while (m > 12) {
-      m -= 12;
-      y++;
-    }
-    return `${y}-${pad(m)}`;
-  }
-  function shiftDay(key: string, delta: number): string {
-    const [y, m, d] = key.split("-").map(Number);
-    const dt = new Date(y, m - 1, d + delta);
-    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    const j = idx + delta;
+    return j >= 0 && j < list.length ? list[j] : cur;
   }
   function stepMonth(delta: number) {
-    curMonth = shiftMonth(curMonth, delta);
+    const next = stepIn(monthList, curMonth, delta);
+    if (next === curMonth) return;
+    curMonth = next;
     hover = "";
   }
   function stepDay(delta: number) {
-    curDay = shiftDay(curDay, delta);
-    curMonth = curDay.slice(0, 7); // keep the breadcrumb month in sync
+    const next = stepIn(dayList, curDay, delta);
+    if (next === curDay) return;
+    curDay = next;
+    curMonth = next.slice(0, 7); // keep the breadcrumb month in sync
     hover = "";
   }
   function toMonths() {
@@ -302,7 +369,19 @@
       hover = "";
     }
   }
+  // Left/Right arrows drive the same prev/next stepping as the nav buttons:
+  // day view steps by day, days view steps by month, months view has no nav.
+  function onKey(e: KeyboardEvent) {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const delta = e.key === "ArrowLeft" ? -1 : 1;
+    if (level === "day") stepDay(delta);
+    else if (level === "days") stepMonth(delta);
+    else return;
+    e.preventDefault();
+  }
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <div class="wrap" oncontextmenu={zoomOut} role="presentation">
   <header class="bar">
@@ -325,10 +404,29 @@
     {/if}
   </nav>
 
+  {#if scanning}
+    <div class="scanbar">
+      <div class="prow">
+        <div class="ptrack"><div class="pmask" style:width={progressRemaining}></div></div>
+        <button class="pcancel" onclick={cancelScan}>Cancel</button>
+      </div>
+      <div class="pmeta">
+        <span>{progressLabel}</span>
+      </div>
+      {#if scanLog.length}
+        <ul class="plog">
+          {#each scanLog as line (line)}
+            <li>{line}</li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  {/if}
+
   {#if loading}
     <div class="msg">{t("common.loading")}</div>
   {:else if !events.length}
-    <div class="msg">No spend recorded yet.</div>
+    <div class="msg">{scanning ? "Building the spend cache…" : "No spend recorded yet."}</div>
   {:else if level === "months"}
     <div class="sub">
       <span class="readout">{hover || "Click a month to break it down by day"}</span>
@@ -418,7 +516,7 @@
               <span class="grid" style:left={`${(h / 24) * 100}%`}></span>
             {/each}
           </div>
-          {#each lanes as l (l.project)}
+          {#each lanes as l, i (l.project)}
             <div class="lane">
               <div class="track">
                 {#each l.spans as sp}
@@ -426,7 +524,7 @@
                     class="span"
                     style:left={`${frac(sp.start) * 100}%`}
                     style:width={`max(3px, ${(frac(sp.end) - frac(sp.start)) * 100}%)`}
-                    style:background={projColor(l.project)}
+                    style:background={laneColor(i, lanes.length)}
                     onmouseenter={() =>
                       (hover = `${l.project} · ${clock(sp.start)}–${clock(sp.end)} · ${usd(sp.cost)}`)}
                     onmouseleave={() => (hover = "")}
@@ -546,6 +644,76 @@
   .nav:hover {
     background: var(--panel);
     color: var(--fg);
+  }
+
+  /* Shared-cache scan progress (mirrors the Context Explorer scan bar). */
+  .scanbar {
+    flex: none;
+    padding: 8px 14px 6px;
+    border-bottom: 1px solid var(--panel);
+  }
+  .prow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ptrack {
+    position: relative;
+    flex: 1;
+    height: 6px;
+    /* Full theme gauge gradient, painted statically across the whole track. */
+    background: linear-gradient(to right, var(--g0), var(--g1), var(--g2));
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  /* Obscures the unfilled (right) part; shrinking it reveals the static gradient.
+     Must be OPAQUE -- var(--panel) is semi-transparent in some themes and would
+     let the gradient show through. --bg is the solid window ground. */
+  .pmask {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    background: var(--bg);
+    transition: width 0.2s;
+  }
+  .pcancel {
+    flex: none;
+    background: none;
+    border: 1px solid var(--panel);
+    color: var(--muted);
+    border-radius: 5px;
+    padding: 2px 8px;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .pcancel:hover {
+    color: var(--fg);
+    border-color: var(--muted);
+  }
+  .pmeta {
+    margin-top: 3px;
+    font-size: 10px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .plog {
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 9px;
+    color: var(--muted);
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+    max-height: 44px;
+    overflow: hidden;
+  }
+  .plog li {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
   }
 
   /* Bar charts (months, days) */

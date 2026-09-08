@@ -566,9 +566,14 @@ fn tail_scan(path: &Path) -> Option<Tailed> {
         let mut buf = Vec::with_capacity((len - start) as usize);
         file.read_to_end(&mut buf).ok()?;
         let out = scan_tail_buf(&buf, start > 0);
-        // Found the real context, or we've already read from byte 0 (nothing more
-        // to grow into): accept this result.
-        if out.ctx.is_some() || start == 0 {
+        // Grow until we have BOTH the current context AND the newest last-prompt,
+        // or we've read from byte 0 (nothing more to grow into). ctx sits at the
+        // very end, but a single turn whose output exceeds the window pushes that
+        // turn's last-prompt (written when the prompt landed) back past a tail
+        // sized for ctx alone -- so without also waiting for the subtitle we'd
+        // show a stale prompt. Every session with a prompt has a last-prompt, so
+        // this terminates near EOF rather than forcing a full read.
+        if (out.ctx.is_some() && out.subtitle.is_some()) || start == 0 {
             return Some(out);
         }
         win = win.saturating_mul(8);

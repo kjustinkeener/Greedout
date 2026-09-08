@@ -165,7 +165,7 @@ fn default_font_num() -> String {
 }
 
 fn default_font_mono() -> String {
-    "syne-mono".to_string()
+    "source-code-pro".to_string()
 }
 
 fn default_size() -> f64 {

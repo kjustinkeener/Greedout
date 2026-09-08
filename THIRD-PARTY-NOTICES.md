@@ -63,7 +63,6 @@ rename any face.
 | Source Code Pro | `@fontsource-variable/source-code-pro` |
 | Space Grotesk | `@fontsource-variable/space-grotesk` |
 | Space Mono | `@fontsource/space-mono` |
-| Syne Mono | `@fontsource/syne-mono` |
 | Teko | `@fontsource-variable/teko` |
 | Tektur | `@fontsource-variable/tektur` |
 | Titillium Web | `@fontsource/titillium-web` |

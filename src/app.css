@@ -127,8 +127,6 @@
 @import "@fontsource/dm-mono/latin-ext-400.css";
 @import "@fontsource/dm-mono/latin-500.css";
 @import "@fontsource/dm-mono/latin-ext-500.css";
-@import "@fontsource/syne-mono/latin-400.css";
-@import "@fontsource/syne-mono/latin-ext-400.css";
 @import "@fontsource/major-mono-display/latin-400.css";
 @import "@fontsource/major-mono-display/latin-ext-400.css";
 
@@ -187,7 +185,7 @@
      on its own, so the numbers never look bolted on by default. */
   --font-ui: "Jura Variable", "Segoe UI", system-ui, sans-serif;
   --font-num: "Jura Light", var(--font-ui);
-  --font-mono: "Syne Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --font-mono: "Source Code Pro Variable", ui-monospace, "Cascadia Mono", Consolas, monospace;
   /* Pinned x-height for display faces that would otherwise render far bigger
      or smaller than a text face at the same px size. `none` = leave alone. */
   --font-ui-adj: none;

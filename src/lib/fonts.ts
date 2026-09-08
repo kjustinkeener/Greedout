@@ -512,16 +512,6 @@ export const FONTS: FontDef[] = [
     adj: TEXT_XH,
     note: "display face; capitals are decorative, so units read oddly",
   },
-  {
-    id: "syne-mono",
-    label: "Syne Mono",
-    stack: '"Syne Mono"' + MONO,
-    group: "Readout",
-    slots: ["num", "mono"],
-    weights: "400 only",
-    adj: TEXT_XH,
-    note: "lab instrument print",
-  },
 ];
 
 export const GROUP_ORDER = ["System", "Sans", "Techno", "Mono", "Readout"] as const;
@@ -612,7 +602,7 @@ export const FONT_SETS: FontSet[] = [
   set("studio", "Studio", "sora", "sora", "dm-mono"),
   set("softline", "Softline", "manrope", "manrope", "sono"),
   set("ledger", "Ledger", "inter", "jetbrains-mono", "jetbrains-mono", 0, 1, 0.95),
-  set("scope", "Oscilloscope", "jura", "jura-light", "syne-mono", 0, 1, 1.05),
+  set("scope", "Oscilloscope", "jura", "jura-light", "source-code-pro", 0, 1, 1.05),
   set("tower", "Tower", "saira", "teko", "martian-mono", 0, 1, 1.1),
 ];
 
@@ -635,7 +625,7 @@ export const SLOTS: { id: Slot; label: string; hint: string }[] = [
 export const DEFAULT_FONTS = {
   font_ui: "jura",
   font_num: "jura-light",
-  font_mono: "syne-mono",
+  font_mono: "source-code-pro",
   font_weight: 0,
   size_ui: 1,
   size_num: 1.05,

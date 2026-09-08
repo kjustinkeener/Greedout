@@ -306,6 +306,11 @@
     return out;
   });
   const dayTotal = $derived(lanes.reduce((a, l) => a + l.total, 0));
+  // Header total tracks the drill level: all sessions → the open month → the open day.
+  const headerTotal = $derived(level === "day" ? dayTotal : level === "days" ? monthTotal : grandTotal);
+  const headerTitle = $derived(
+    level === "day" ? dayLong(curDay) : level === "days" ? monthLong(curMonth) : "Total across all sessions",
+  );
   const dayStart = $derived(curDay ? dayStartMs(curDay) : 0);
   const HOURS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
 
@@ -386,7 +391,7 @@
 <div class="wrap" oncontextmenu={zoomOut} role="presentation">
   <header class="bar">
     <Brand size={15} font={14} />
-    <span class="total" title="Total across all sessions">{usd(grandTotal)}</span>
+    <span class="total" title={headerTitle}>{usd(headerTotal)}</span>
   </header>
   <nav class="crumbs" aria-label="breadcrumb">
     <button class="crumb" class:active={level === "months"} onclick={toMonths}>

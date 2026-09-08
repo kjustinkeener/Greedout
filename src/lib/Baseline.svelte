@@ -935,9 +935,12 @@
     const k = 0.5;
     return `linear-gradient(90deg, ${dim(gaugeColor(0), k)}, ${dim(gaugeColor(0.52), k)} 52%, ${dim(gaugeColor(1), k)})`;
   });
-  function tileFill(n: number): string {
+  // The two 135deg gradient stops for a tile, as [a, b]. Exposed to CSS as
+  // --ta/--tb so :hover can brighten the stops without touching the box-shadow
+  // inner glow.
+  function tileFill(n: number): [string, string] {
     void tick; // recolor when the theme changes
-    if (!n || n <= 0) return "var(--muted)";
+    if (!n || n <= 0) return ["var(--muted)", "var(--muted)"];
     const f = n / colorMax;
     const b = 0.18; // bracket width → the two corners show distinct hues
     const k = 0.5; // knock 50% off tile brightness
@@ -945,17 +948,20 @@
     // past 100% still fades red→orange instead of clamping to flat red.
     const hi = Math.min(f + b, 1);
     const lo = hi - 2 * b;
-    return `linear-gradient(135deg, ${dim(gaugeColor(lo), k)}, ${dim(gaugeColor(hi), k)})`;
+    return [dim(gaugeColor(lo), k), dim(gaugeColor(hi), k)];
   }
-  // Tile background. For leaf chat blocks in the session view, color by BLOCK TYPE
+  // Tile stops. For leaf chat blocks in the session view, color by BLOCK TYPE
   // (the filter-chip's author accent) so a rect reads as User/Agent/Thinking/Tool
   // at a glance; everything else (turns, top-level, browse) keeps the gauge fill.
-  function tileColor(n: BaselineNode): string {
+  function tileStops(n: BaselineNode): [string, string] {
     const t = zoom === "session" ? blockType(n) : null;
     if (!t) return tileFill(n.tokens);
     void tick; // recolor on theme switch
     const a = authorAccent(t);
-    return `linear-gradient(135deg, color-mix(in srgb, ${a} 60%, #12171f), color-mix(in srgb, ${a} 32%, #12171f))`;
+    return [
+      `color-mix(in srgb, ${a} 60%, #12171f)`,
+      `color-mix(in srgb, ${a} 32%, #12171f)`,
+    ];
   }
   // Dynamic label size: scales with the tile's WIDTH, 9px..34px.
   function labelFont(w: number, h: number): number {
@@ -1279,7 +1285,7 @@
         style="left:{t.x + 1}px; top:{t.y + 1}px; width:{Math.max(0, t.w - 2)}px; height:{Math.max(
           0,
           t.h - 2,
-        )}px; background:{tileColor(t.node)}; --sh:{Math.max(
+        )}px; --ta:{tileStops(t.node)[0]}; --tb:{tileStops(t.node)[1]}; --sh:{Math.max(
           0,
           Math.min(t.w - 2, t.h - 2),
         )}px;"
@@ -2054,6 +2060,7 @@
     overflow: hidden;
     cursor: default;
     font: inherit;
+    background: linear-gradient(135deg, var(--ta), var(--tb));
     font-size-adjust: var(--font-ui-adj);
     outline: 1px solid rgba(0, 0, 0, 0.45);
     outline-offset: -1px;
@@ -2062,7 +2069,7 @@
       inset 0 0 clamp(0.8px, calc(var(--sh, 60px) * 0.04), 6.4px)
         clamp(0px, calc(var(--sh, 60px) * 0.01), 1.6px) rgba(0, 0, 0, 0.9),
       inset 0 0 clamp(1.2px, calc(var(--sh, 60px) * 0.112), 17.6px) rgba(0, 0, 0, 0.55);
-    transition: box-shadow 0.12s ease;
+    transition: background 0.12s ease;
   }
   .tile.drill {
     cursor: pointer;
@@ -2087,15 +2094,15 @@
         0 0 10px 3px color-mix(in srgb, var(--g1, #fffe00) 70%, transparent);
     }
   }
+  /* No border on hover: brighten just the two gradient stops (the box-shadow
+     inner glow is unchanged, so it stays dark). */
   .tile:hover {
-    outline: 2px solid #4aa3df;
-    outline-offset: -2px;
     z-index: 2;
-    box-shadow:
-      inset 0 0 0 1px rgba(0, 0, 0, 0.4),
-      inset 0 0 clamp(2px, calc(var(--sh, 60px) * 0.088), 14px)
-        clamp(0px, calc(var(--sh, 60px) * 0.019), 3px) rgba(0, 0, 0, 0.62),
-      inset 0 0 clamp(3px, calc(var(--sh, 60px) * 0.28), 44px) rgba(0, 0, 0, 0.28);
+    background: linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ta) 82%, #fff),
+      color-mix(in srgb, var(--tb) 82%, #fff)
+    );
   }
   .tm-label {
     position: absolute;

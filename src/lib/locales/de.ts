@@ -53,6 +53,7 @@ export const de: PartialDict = {
   "settings.closeToTray": "In den Infobereich schließen",
   "settings.enableExplorer": "Context Explorer aktivieren",
   "settings.showStatusbar": "CPU-/Speicher-Statusleiste anzeigen",
+  "settings.showPrompt": "Prompt-Text anzeigen",
   "settings.checkUpdates": "Beim Start nach Updates suchen",
   "settings.debugLogging": "Debug-Protokollierung in Datei",
   "settings.lockoutTip":

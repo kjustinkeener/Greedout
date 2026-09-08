@@ -52,6 +52,7 @@ export const ja: PartialDict = {
   "settings.closeToTray": "閉じるときにトレイへ格納",
   "settings.enableExplorer": "コンテキストエクスプローラーを有効化",
   "settings.showStatusbar": "CPU / メモリのステータスバーを表示",
+  "settings.showPrompt": "プロンプトのテキストを表示",
   "settings.checkUpdates": "起動時に更新を確認",
   "settings.debugLogging": "デバッグログをファイルに出力",
   "settings.lockoutTip":

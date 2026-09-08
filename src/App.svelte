@@ -357,6 +357,8 @@
   let visible = $state(99);
   let dimHours = $state(24);
   let showStatusbar = $state(false);
+  // Show each session's latest prompt under its title; on by default.
+  let showPrompt = $state(true);
   // Context Explorer offered at all (menu entry + clickable titles); on by default.
   let explorerEnabled = $state(true);
 
@@ -503,6 +505,7 @@
     let unlistenDim: (() => void) | undefined;
     let unlistenTheme: (() => void) | undefined;
     let unlistenStatusbar: (() => void) | undefined;
+    let unlistenPrompt: (() => void) | undefined;
     let unlistenExplorer: (() => void) | undefined;
     let unlistenLocale: (() => void) | undefined;
     window.addEventListener("wheel", onWheel, { passive: false });
@@ -516,6 +519,7 @@
         uiScale = cfg0.ui_scale ?? 1;
         dimHours = cfg0.dim_hours ?? 24;
         showStatusbar = cfg0.show_statusbar ?? false;
+        showPrompt = cfg0.show_prompt ?? true;
         explorerEnabled = cfg0.explorer_enabled ?? true;
         // Fire and forget, and silent on failure: an app that cannot reach
         // GitHub is still a working app, and saying so on every launch behind a
@@ -536,6 +540,8 @@
         unlistenDim = await listen<number>("dim-hours", (e) => (dimHours = e.payload));
         // Settings (separate window) toggles the status bar live.
         unlistenStatusbar = await listen<boolean>("show-statusbar", (e) => (showStatusbar = e.payload));
+        // Settings toggles the prompt text under each session live.
+        unlistenPrompt = await listen<boolean>("show-prompt", (e) => (showPrompt = e.payload));
         // Settings toggles the Explorer live; switching it off also closes the
         // window if it's open, so no orphaned Explorer stays behind.
         unlistenExplorer = await listen<boolean>("explorer-enabled", async (e) => {
@@ -564,6 +570,7 @@
       unlistenDim?.();
       unlistenTheme?.();
       unlistenStatusbar?.();
+      unlistenPrompt?.();
       unlistenExplorer?.();
       unlistenLocale?.();
       window.removeEventListener("wheel", onWheel);
@@ -653,6 +660,7 @@
           onOpenSession={() => openSession(s)}
           onOpenProject={() => openProject(s)}
           explorer={explorerEnabled}
+          {showPrompt}
         />
       {:else}
         <Row
@@ -663,6 +671,7 @@
           explorer={explorerEnabled}
           top={i === 0}
           {dimHours}
+          {showPrompt}
         />
       {/if}
     {/each}

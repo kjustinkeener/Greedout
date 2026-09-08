@@ -53,6 +53,7 @@ export const zhHant: PartialDict = {
   "settings.closeToTray": "關閉時縮到系統匣",
   "settings.enableExplorer": "啟用內容檢視器",
   "settings.showStatusbar": "顯示 CPU / 記憶體狀態列",
+  "settings.showPrompt": "顯示提示詞文字",
   "settings.checkUpdates": "啟動時檢查更新",
   "settings.debugLogging": "將偵錯記錄寫入檔案",
   "settings.lockoutTip":

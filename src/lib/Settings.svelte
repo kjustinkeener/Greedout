@@ -130,6 +130,7 @@
     dim_hours: 24,
     theme: "dark",
     show_statusbar: true,
+    show_prompt: true,
     explorer_enabled: true,
     check_updates: true,
     ...DEFAULT_FONTS,
@@ -231,6 +232,7 @@
       // Context Breakdown window. Omitting it would reset it to false on save.
       browse_enabled: cfg.browse_enabled,
       show_statusbar: cfg.show_statusbar,
+      show_prompt: cfg.show_prompt,
       explorer_enabled: cfg.explorer_enabled,
       check_updates: cfg.check_updates,
       font_ui: cfg.font_ui,
@@ -248,6 +250,7 @@
     previewOpacity(clean.opacity); // keep the applied value on the main window
     void emit("dim-hours", clean.dim_hours); // live-apply on the main window
     void emit("show-statusbar", clean.show_statusbar); // live-toggle the status bar
+    void emit("show-prompt", clean.show_prompt); // live-toggle prompt text in the main window
     void emit("explorer-enabled", clean.explorer_enabled); // live-toggle the Explorer entry points
   }
 </script>
@@ -308,6 +311,10 @@
     <label class="check" oncontextmenu={(e) => resetField("show_statusbar", e)}>
       <input type="checkbox" bind:checked={cfg.show_statusbar} />
       {t("settings.showStatusbar")}
+    </label>
+    <label class="check" oncontextmenu={(e) => resetField("show_prompt", e)}>
+      <input type="checkbox" bind:checked={cfg.show_prompt} />
+      {t("settings.showPrompt")}
     </label>
     <label class="check" oncontextmenu={(e) => resetField("check_updates", e)}>
       <input type="checkbox" bind:checked={cfg.check_updates} />

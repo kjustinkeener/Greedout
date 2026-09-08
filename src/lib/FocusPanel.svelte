@@ -13,6 +13,7 @@
     onOpenSession,
     onOpenProject,
     explorer = true,
+    showPrompt = true,
   }: {
     session: Session;
     samples: Sample[];
@@ -21,6 +22,8 @@
     onOpenProject: () => void;
     /** Context Explorer is enabled; when off, titles are plain text (rename only). */
     explorer?: boolean;
+    /** Show the session's latest prompt under its title. */
+    showPrompt?: boolean;
   } = $props();
 
   // Single click explores; double click renames (a short timer lets the double
@@ -119,7 +122,7 @@
 
   <History {samples} target={session.target} onHover={(h) => (hov = h)} />
 
-  {#if session.subtitle}
+  {#if showPrompt && session.subtitle}
     <div class="subtitle">{session.subtitle}</div>
   {/if}
 </div>

@@ -12,6 +12,7 @@
     explorer = true,
     top = false,
     dimHours = 24,
+    showPrompt = true,
   }: {
     session: Session;
     onRename: () => void;
@@ -21,6 +22,8 @@
     explorer?: boolean;
     top?: boolean;
     dimHours?: number;
+    /** Show the session's latest prompt under its title. */
+    showPrompt?: boolean;
   } = $props();
 
   // Single click opens the Explorer for this session; double click renames. A
@@ -136,7 +139,7 @@
       {#if top && session.model}<span class="model" title={modelTip()}>{session.model}{session.modelVersion ? ` ${session.modelVersion}` : ""}</span><span class="mid">·</span>{/if}
       <span class="size" title={sizeTip()}>{fmtMB(session.sizeBytes)}<span class="unit">MB</span></span>
     </div>
-    {#if session.subtitle}
+    {#if showPrompt && session.subtitle}
       <div class="subtitle">{session.subtitle}</div>
     {/if}
   </div>

@@ -187,6 +187,7 @@ export interface Config {
   theme: string; // color palette id; "auto" follows the OS (see THEMES in theme.ts)
   browse_enabled: boolean; // cross-session browse index built + shown (opt-in)
   show_statusbar: boolean; // bottom status bar: per-core CPU + memory usage
+  show_prompt: boolean; // show each session's latest prompt under its title
   explorer_enabled: boolean;
   check_updates: boolean; // ask GitHub for a newer version at launch
   font_ui: string;

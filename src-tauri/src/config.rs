@@ -70,6 +70,10 @@ pub struct Config {
     /// Show the bottom status bar (per-core CPU + memory usage). On by default.
     #[serde(default = "default_true")]
     pub show_statusbar: bool,
+    /// Show each session's latest prompt text under its title in the main window.
+    /// On by default.
+    #[serde(default = "default_true")]
+    pub show_prompt: bool,
     /// Ask GitHub once, at launch, whether a newer version exists. On by
     /// default, and the only outbound request the app ever makes: with it off,
     /// nothing here touches the network unless the user asks in About.
@@ -193,6 +197,7 @@ impl Default for Config {
             theme: "dark".to_string(),
             browse_enabled: false,
             show_statusbar: true,
+            show_prompt: true,
             explorer_enabled: true,
             check_updates: true,
             font_ui: default_font_ui(),

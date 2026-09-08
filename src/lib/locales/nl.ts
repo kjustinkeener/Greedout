@@ -53,6 +53,7 @@ export const nl: PartialDict = {
   "settings.closeToTray": "Sluiten naar systeemvak",
   "settings.enableExplorer": "Context Explorer inschakelen",
   "settings.showStatusbar": "CPU-/geheugenstatusbalk weergeven",
+  "settings.showPrompt": "Prompttekst weergeven",
   "settings.checkUpdates": "Bij het starten op updates controleren",
   "settings.debugLogging": "Foutopsporingslogboek naar bestand",
   "settings.lockoutTip":

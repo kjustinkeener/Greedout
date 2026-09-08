@@ -262,10 +262,23 @@ fn build_session(
     };
 
     // Title precedence: custom label > native customTitle > project name.
+    // A native title found in the tail (a recent rename, or the original on a
+    // short session) is authoritative and refreshes the cache; otherwise fall
+    // back to the head-read title (the original, which sits above the tail
+    // window on long sessions) before giving up to the project name.
+    let native_title = match t.title.clone() {
+        Some(tt) => {
+            if let Ok(mut c) = title_cache().lock() {
+                c.insert(id.clone(), tt.clone());
+            }
+            Some(tt)
+        }
+        None => head_title(&id, path),
+    };
     let title = labels
         .get(&id)
         .cloned()
-        .or_else(|| t.title.clone())
+        .or(native_title)
         .unwrap_or_else(|| project.clone());
 
     // Model drives the gauge budget, the hard window, and the label. Unknown /
@@ -488,6 +501,51 @@ fn initial_ctx(id: &str, path: &Path) -> Option<u64> {
         cache.insert(id.to_string(), found);
     }
     Some(found)
+}
+
+/// The session's title, cached per id. Claude writes the native `custom-title`
+/// ONCE near the top of the transcript, so `tail_scan` (which stops growing as
+/// soon as it has ctx, always within the last 64KB) never reaches it on a long
+/// session and the row would fall back to the project name. So: read the title
+/// from the file HEAD when we don't already have it cached. A later rename is
+/// appended near EOF, caught by `tail_scan`, and written back into this cache by
+/// the caller, so the cache always holds the freshest title we have ever seen.
+fn title_cache() -> &'static Mutex<HashMap<String, String>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn head_title(id: &str, path: &Path) -> Option<String> {
+    if let Ok(cache) = title_cache().lock() {
+        if let Some(v) = cache.get(id) {
+            return Some(v.clone());
+        }
+    }
+    let mut file = std::fs::File::open(path).ok()?;
+    let len = file.metadata().ok()?.len();
+    // The title is near the top, but big early records (a long first prompt, an
+    // attachment) can push it past a small head window, so grow until we find it
+    // or have read the whole file. Only reached on a cache miss, then cached.
+    let mut win = TAIL_BYTES;
+    loop {
+        file.seek(SeekFrom::Start(0)).ok()?;
+        let mut buf = vec![0u8; win.min(len) as usize];
+        let read = file.read(&mut buf).ok()?;
+        let text = String::from_utf8_lossy(&buf[..read]);
+        let found = text.lines().find_map(|line| {
+            line.contains("custom-title").then(|| parse_field(line, "customTitle")).flatten()
+        });
+        if let Some(v) = found {
+            if let Ok(mut cache) = title_cache().lock() {
+                cache.insert(id.to_string(), v.clone());
+            }
+            return Some(v);
+        }
+        if win >= len {
+            return None;
+        }
+        win = win.saturating_mul(8);
+    }
 }
 
 /// Read a trailing window and scan lines backward for the newest of each target

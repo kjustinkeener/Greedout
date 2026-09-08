@@ -2222,7 +2222,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 5px;
-    padding: 6px 10px 0;
+    padding: 2px 10px 6px;
   }
   .typebar {
     padding: 2px 10px 4px;

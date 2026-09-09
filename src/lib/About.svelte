@@ -95,7 +95,7 @@
   }}
 />
 
-<div class="panel">
+<div class="panel" data-tauri-drag-region>
   <span class="mark"><BrandIcon size={64} /></span>
   <div class="name">greedout</div>
   {#if version}
@@ -110,27 +110,12 @@
 
   <p class="body">{t("about.body")}</p>
 
-  <div class="meta">
-    <div class="mrow"><span class="k">{t("about.madeBy")}</span><span class="v">Justin Keener</span></div>
-    <div class="mrow"><span class="k">{t("about.builtWith")}</span><span class="v">Rust · Tauri · Svelte</span></div>
-    <!-- The bundled fonts are OFL-1.1 and ship inside the exe, so their notices have to
-         be reachable from the installed app, not only from the repo. -->
-    <div class="mrow">
-      <span class="k">{t("about.license")}</span>
-      <span class="v"><a href={REPO + "/blob/main/LICENSE"} onclick={openLink}>MIT</a></span>
-    </div>
-    <div class="mrow">
-      <span class="k">{t("about.notices")}</span>
-      <span class="v"><a href={REPO + "/blob/main/THIRD-PARTY-NOTICES.md"} onclick={openLink}>THIRD-PARTY-NOTICES.md</a></span>
-    </div>
-  </div>
-
-  <!-- Full URLs and a contact address, shown in full and opened in the shell (the
-       webview would otherwise navigate this window). The email is a mailto: link,
-       which open_url now allows alongside https. -->
+  <!-- Links open in the shell (the webview would otherwise navigate this window);
+       the email is a mailto:, which open_url allows alongside https. Order and
+       scheme-less display mirror the Moonpool About. -->
   <div class="links">
-    <a href={REPO} onclick={openLink}>{REPO}</a>
-    <a href="https://fasterdb.com/software/greedout/" onclick={openLink}>https://fasterdb.com/software/greedout</a>
+    <a href="https://fasterdb.com/software/greedout/" onclick={openLink}>fasterdb.com/software/greedout</a>
+    <a href={REPO} onclick={openLink}>github.com/kjustinkeener/Greedout</a>
     <a href="mailto:gofast@fasterdb.com" onclick={openLink}>gofast@fasterdb.com</a>
   </div>
 
@@ -146,19 +131,20 @@
     </button>
     <button class="btn primary" onclick={onClose}>{t("common.close")}</button>
   </div>
+
+  <!-- Compact footer: build stack, then license + bundled-font notices (OFL-1.1
+       requires the notices stay reachable from the installed app) and author. -->
+  <div class="foot">
+    <div>{t("about.builtWith")} Rust · Tauri · Svelte</div>
+    <div>
+      <a href={REPO + "/blob/main/LICENSE"} onclick={openLink}>MIT</a>
+      · <a href={REPO + "/blob/main/THIRD-PARTY-NOTICES.md"} onclick={openLink}>{t("about.notices")}</a>
+      · {t("about.madeBy")} Justin Keener
+    </div>
+  </div>
 </div>
 
 <style>
-  .mrow a {
-    color: inherit;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    cursor: pointer;
-  }
-  .mrow a:hover {
-    color: var(--g1);
-  }
-
   .links {
     align-self: stretch;
     margin-top: 12px;
@@ -242,7 +228,7 @@
     height: 1px;
     align-self: stretch;
     background: var(--edge);
-    margin: 12px 0;
+    margin: 10px 0;
   }
   .body {
     color: var(--muted);
@@ -250,28 +236,30 @@
     line-height: 1.5;
     margin: 0;
   }
-  .meta {
+  .actions {
+    margin-top: auto;
+    padding-top: 14px;
+  }
+  .foot {
     align-self: stretch;
     margin-top: 12px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-  }
-  .mrow {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: calc(11px * var(--size-ui));
-  }
-  .k {
+    align-items: center;
+    gap: 2px;
     color: var(--muted);
+    font-size: calc(10.5px * var(--size-ui));
+    line-height: 1.4;
+    text-align: center;
   }
-  .v {
-    color: var(--fg);
+  .foot a {
+    color: var(--muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
   }
-  .actions {
-    margin-top: auto;
-    padding-top: 14px;
+  .foot a:hover {
+    color: var(--g1);
   }
   .btn {
     background: var(--track);

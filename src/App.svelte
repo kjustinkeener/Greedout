@@ -123,6 +123,9 @@
       title: "About Greedout",
       width: 420,
       height: 400,
+      // Borderless, like Moonpool's About: the panel is one full-page drag region
+      // (data-tauri-drag-region) with its own Close button, so no OS title bar.
+      decorations: false,
       resizable: false,
       alwaysOnTop: aot,
       focus: true,

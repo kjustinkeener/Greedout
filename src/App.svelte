@@ -121,8 +121,8 @@
     const w = new WebviewWindow("about", {
       url: "about.html",
       title: "About Greedout",
-      width: 336,
-      height: 320,
+      width: 340,
+      height: 404,
       // Borderless, like Moonpool's About: the panel is one full-page drag region
       // (data-tauri-drag-region) with its own Close button, so no OS title bar.
       decorations: false,

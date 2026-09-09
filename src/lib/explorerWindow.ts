@@ -5,6 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { placeWindow } from "./windowGeom";
 import type { Config } from "../types";
 
 export interface ExplorerTarget {
@@ -67,6 +68,7 @@ async function createExplorerWindow(opts: ExplorerTarget, retry: boolean): Promi
     focus: true,
     ...(pos ? { x: pos.x, y: pos.y } : {}),
   });
+  placeWindow(w, "baseline");
   if (retry) {
     void w.once("tauri://error", async () => {
       const stale = await WebviewWindow.getByLabel("baseline");

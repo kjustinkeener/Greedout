@@ -12,7 +12,7 @@ mod winstate;
 
 use scan::Session;
 use std::sync::Mutex;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
@@ -53,20 +53,12 @@ fn track_geometry(app: &tauri::AppHandle) {
     winstate::save(&w);
 }
 
-/// Append a diagnostic line when debug logging is on.
+/// Append a diagnostic line when debug logging is on. Delegates to config so the
+/// log lands in the app data dir (`%LOCALAPPDATA%\Greedout`) like every other
+/// sidecar; writing it here to `~/.claude/greedout` was recreating the very dir
+/// the 0.2.3 move exists to vacate.
 fn log_line(cfg: &config::Config, msg: &str) {
-    if !cfg.debug_logging {
-        return;
-    }
-    let path = config::claude_dir().join("greedout").join("greedout.log");
-    if let Some(p) = path.parent() {
-        let _ = std::fs::create_dir_all(p);
-    }
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
-        use std::io::Write;
-        let ts = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0);
-        let _ = writeln!(f, "{ts} {msg}");
-    }
+    config::debug_log(cfg, msg);
 }
 
 /// Bring the window back from the tray.
@@ -200,6 +192,15 @@ fn set_ui_scale(scale: f64) -> Result<(), String> {
 #[tauri::command]
 fn set_label(id: String, label: Option<String>) -> Result<(), String> {
     config::save_label(&id, label).map_err(|e| e.to_string())
+}
+
+/// Saved geometry for a secondary window, so the frontend can restore its size and
+/// position (and clamp it on-screen) right after creating it. `None` if never saved.
+/// Main restores in `setup`; the JS-created windows never pass through it, so they
+/// read their entry back here.
+#[tauri::command]
+fn load_window_state(label: String) -> Option<winstate::WinState> {
+    winstate::get(&label)
 }
 
 // --- Cross-session browse (opt-in; see browse.rs) ---
@@ -379,6 +380,8 @@ pub fn run() {
     // Move our sidecars out of `~/.claude/greedout` (pre-0.2.3 location) into our
     // own LOCALAPPDATA dir, so we never write inside Claude Code's config home.
     config::migrate_sidecars();
+    // Fresh log each run so it can't grow without bound when debug logging is left on.
+    config::truncate_log();
 
     tauri::Builder::default()
         // MUST be the first plugin registered. A second launch would otherwise get its
@@ -403,6 +406,7 @@ pub fn run() {
             set_ui_scale,
             system_fonts,
             set_label,
+            load_window_state,
             get_config,
             set_config,
             browse_status,
@@ -605,6 +609,23 @@ pub fn run() {
                 }
                 tauri::WindowEvent::Moved(_) if window.label() == "main" => {
                     track_geometry(window.app_handle());
+                }
+                // Every other persisted window: remember size and position so it
+                // reopens where the user left it. Main has its own Win+D repair
+                // above; these windows have decorations and a min size, so a plain
+                // save is enough. Skip while minimized so a taskbar-minimize does not
+                // overwrite the real geometry with the minimized rectangle.
+                tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_)
+                    if matches!(
+                        window.label(),
+                        "settings" | "about" | "baseline" | "dailyspend" | "themes" | "fonts"
+                    ) =>
+                {
+                    if !window.is_minimized().unwrap_or(false) {
+                        if let Some(w) = window.app_handle().get_webview_window(window.label()) {
+                            winstate::save(&w);
+                        }
+                    }
                 }
                 _ => {}
             }

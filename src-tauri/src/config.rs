@@ -249,7 +249,6 @@ pub fn migrate_sidecars() {
         "config.json",
         "labels.json",
         "window-state.json",
-        "greedout.log",
         "cache.sqlite",
         "cache.sqlite-wal",
         "cache.sqlite-shm",
@@ -264,7 +263,18 @@ pub fn migrate_sidecars() {
             }
         }
     }
+    // The log is disposable (see truncate_log): drop the old one rather than move
+    // it, both so a stale multi-run log does not follow the user across the move
+    // and so the old dir is empty enough to remove below.
+    let _ = std::fs::remove_file(old.join("greedout.log"));
     let _ = std::fs::remove_dir(&old);
+}
+
+/// Start each run with an empty log. The log is a rolling diagnostic, not a record
+/// worth keeping between runs, and it is append-only, so leaving debug logging on
+/// otherwise grows it without bound. Best-effort; a missing file is fine.
+pub fn truncate_log() {
+    let _ = std::fs::remove_file(app_dir().join("greedout.log"));
 }
 
 /// Path to the opt-in cross-session metadata cache. Only created once browsing is

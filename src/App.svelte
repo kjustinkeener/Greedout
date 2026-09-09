@@ -14,6 +14,7 @@
   import { applyOpacity, applyTheme, type Theme } from "./lib/theme";
   import { t, watchLocale } from "./lib/i18n.svelte";
   import { openExplorer } from "./lib/explorerWindow";
+  import { placeWindow } from "./lib/windowGeom";
   import type { Config } from "./types";
 
   let menuOpen = $state(false);
@@ -73,6 +74,7 @@
       focus: true,
       ...(pos ? { x: pos.x, y: pos.y } : {}),
     });
+    placeWindow(w, "settings");
     if (retry) {
       void w.once("tauri://error", async () => {
         const stale = await WebviewWindow.getByLabel("settings");
@@ -126,6 +128,7 @@
       focus: true,
       ...(pos ? { x: pos.x, y: pos.y } : {}),
     });
+    placeWindow(w, "about");
     void w.once("tauri://error", async () => {
       const stale = await WebviewWindow.getByLabel("about");
       if (stale) {
@@ -147,12 +150,11 @@
     if (!s) return;
     const existing = await WebviewWindow.getByLabel("baseline");
     if (existing) {
-      // Live window → reveal it, and always snap it back to the default size
-      // (this window intentionally never persists its size). A ghost
-      // mid-teardown rejects these, so force it closed and recreate.
+      // Live window → reveal it at whatever size/position it was left at (it now
+      // persists its geometry like the other windows). A ghost mid-teardown
+      // rejects these, so force it closed and recreate.
       try {
         await existing.unminimize();
-        await existing.setSize(new LogicalSize(720, 560));
         await existing.show();
         await existing.setFocus();
         return;
@@ -192,6 +194,7 @@
       focus: true,
       ...(pos ? { x: pos.x, y: pos.y } : {}),
     });
+    placeWindow(w, "baseline");
     if (retry) {
       void w.once("tauri://error", async () => {
         const stale = await WebviewWindow.getByLabel("baseline");
@@ -252,6 +255,7 @@
       focus: true,
       ...(pos ? { x: pos.x, y: pos.y } : {}),
     });
+    placeWindow(w, "dailyspend");
     if (retry) {
       void w.once("tauri://error", async () => {
         const stale = await WebviewWindow.getByLabel("dailyspend");

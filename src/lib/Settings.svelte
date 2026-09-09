@@ -5,6 +5,7 @@
   import type { Config } from "../types";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { placeWindow } from "./windowGeom";
   import { onDestroy } from "svelte";
   import { applyTheme, THEMES, type Theme } from "./theme";
   import {
@@ -74,6 +75,7 @@
       focus: true,
       ...(pos ? { x: pos.x, y: pos.y } : {}),
     });
+    placeWindow(win, label);
     void win.once("tauri://error", async () => {
       const stale = await WebviewWindow.getByLabel(label);
       if (stale) {

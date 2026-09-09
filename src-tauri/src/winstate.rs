@@ -6,12 +6,15 @@
 //! (`%LOCALAPPDATA%\Greedout`), so the plugin's one stray folder was the only thing the
 //! app left outside that dir. Writing `window-state.json` next to `config.json` removes it.
 //!
-//! Scope is deliberately tiny: physical size, position and a maximized flag, main window
-//! only. A missing or corrupt file restores nothing, so the app falls back to the
-//! config default size, OS-centered. Every write is best-effort; bad state never panics.
-//! Follows the shared window-state pattern used across these apps.
+//! Scope: physical size, position and a maximized flag, per window label. The file
+//! is a `{ label -> state }` map; `main` restores in Rust `setup()`, and the
+//! secondary windows (created in JS) read their entry back through the
+//! `load_window_state` command to place themselves. A missing or corrupt file
+//! restores nothing, so a window falls back to its create-time size. Every write is
+//! best-effort; bad state never panics.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::{Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 
@@ -31,7 +34,7 @@ pub fn too_small(w: u32, h: u32) -> bool {
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
-struct WinState {
+pub struct WinState {
     x: i32,
     y: i32,
     width: u32,
@@ -44,9 +47,30 @@ fn state_file() -> PathBuf {
     crate::config::app_dir().join("window-state.json")
 }
 
-fn load() -> Option<WinState> {
-    let text = std::fs::read_to_string(state_file()).ok()?;
-    serde_json::from_str(&text).ok()
+/// Every persisted window, keyed by label. Tolerates the pre-0.2.4 flat file (a
+/// single main-only object) by wrapping it under the `main` key, so an upgrade
+/// keeps the main window's saved geometry.
+fn load_all() -> HashMap<String, WinState> {
+    let Ok(text) = std::fs::read_to_string(state_file()) else {
+        return HashMap::new();
+    };
+    if let Ok(map) = serde_json::from_str::<HashMap<String, WinState>>(&text) {
+        return map;
+    }
+    if let Ok(one) = serde_json::from_str::<WinState>(&text) {
+        return HashMap::from([("main".to_string(), one)]);
+    }
+    HashMap::new()
+}
+
+fn load_one(label: &str) -> Option<WinState> {
+    load_all().get(label).copied()
+}
+
+/// The saved geometry for one window label, so the JS side can place a secondary
+/// window it just created. Physical pixels. `None` if never saved.
+pub fn get(label: &str) -> Option<WinState> {
+    load_one(label)
 }
 
 /// Does the saved rectangle still overlap a monitor that is plugged in right now?
@@ -94,7 +118,7 @@ fn migrate_from_plugin(window: &WebviewWindow) {
             height: h as u32,
             maximized: m["maximized"].as_bool().unwrap_or(false),
         };
-        write(&s);
+        write("main", s);
     }
     let _ = std::fs::remove_file(&old);
     let _ = std::fs::remove_dir(&dir);
@@ -105,7 +129,7 @@ pub fn restore(window: &WebviewWindow) {
     if !state_file().exists() {
         migrate_from_plugin(window);
     }
-    let Some(s) = load() else { return };
+    let Some(s) = load_one(window.label()) else { return };
     if too_small(s.width, s.height) {
         return;
     }
@@ -124,8 +148,10 @@ pub fn restore(window: &WebviewWindow) {
 /// While maximized, keep the previously saved normal bounds and only flip the flag, so a
 /// later unmaximize lands on a reasonable size instead of the maximized rectangle.
 pub fn save(window: &WebviewWindow) {
+    let label = window.label().to_string();
     let maximized = window.is_maximized().unwrap_or(false);
-    let mut s = load().unwrap_or(WinState { x: 0, y: 0, width: 340, height: 260, maximized: false });
+    let mut s =
+        load_one(&label).unwrap_or(WinState { x: 0, y: 0, width: 340, height: 260, maximized: false });
     if maximized {
         s.maximized = true;
     } else if let (Ok(sz), Ok(pos)) = (window.inner_size(), window.outer_position()) {
@@ -138,15 +164,17 @@ pub fn save(window: &WebviewWindow) {
         s.y = pos.y;
         s.maximized = false;
     }
-    write(&s);
+    write(&label, s);
 }
 
-fn write(s: &WinState) {
+fn write(label: &str, s: WinState) {
     let path = state_file();
     if let Some(p) = path.parent() {
         let _ = std::fs::create_dir_all(p);
     }
-    if let Ok(text) = serde_json::to_string_pretty(s) {
+    let mut map = load_all();
+    map.insert(label.to_string(), s);
+    if let Ok(text) = serde_json::to_string_pretty(&map) {
         let _ = std::fs::write(&path, text);
     }
 }

@@ -51,7 +51,6 @@ export const ptBR: PartialDict = {
   "settings.showInTaskbar": "Mostrar na barra de tarefas",
   "settings.minimizeToTray": "Minimizar para a bandeja",
   "settings.closeToTray": "Fechar para a bandeja",
-  "settings.enableExplorer": "Ativar Context Explorer",
   "settings.showStatusbar": "Mostrar barra de status de CPU / memória",
   "settings.showPrompt": "Mostrar texto do prompt",
   "settings.checkUpdates": "Verificar atualizações ao iniciar",

@@ -51,7 +51,6 @@ export const zhHant: PartialDict = {
   "settings.showInTaskbar": "顯示於工作列",
   "settings.minimizeToTray": "最小化至系統匣",
   "settings.closeToTray": "關閉時縮到系統匣",
-  "settings.enableExplorer": "啟用內容檢視器",
   "settings.showStatusbar": "顯示 CPU / 記憶體狀態列",
   "settings.showPrompt": "顯示提示詞文字",
   "settings.checkUpdates": "啟動時檢查更新",

@@ -51,7 +51,6 @@ export const pl: PartialDict = {
   "settings.showInTaskbar": "Pokaż na pasku zadań",
   "settings.minimizeToTray": "Minimalizuj do zasobnika",
   "settings.closeToTray": "Zamknij do zasobnika",
-  "settings.enableExplorer": "Włącz Eksplorator kontekstu",
   "settings.showStatusbar": "Pokaż pasek stanu CPU / pamięci",
   "settings.showPrompt": "Pokaż tekst promptu",
   "settings.checkUpdates": "Sprawdzaj aktualizacje przy uruchamianiu",

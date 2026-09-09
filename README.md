@@ -158,7 +158,7 @@ The keys that matter most:
 | `dim_hours` | `24` | Rows fade out over this many hours of inactivity |
 | `follow_focus` | `true` | Pin whichever session has focus to the top |
 | `theme` | `auto` | Theme id, or `auto` to follow the OS |
-| `browse_enabled` / `explorer_enabled` | | Opt in to the disk cache the browse and Explorer windows use |
+| `browse_enabled` | | Opt in to the disk cache the cross-session browse view uses |
 
 Custom row labels live in `~/.claude/greedout/labels.json`; double-click a row title to
 rename it. Window position, size and zoom are remembered between runs.

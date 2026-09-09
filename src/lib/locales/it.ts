@@ -51,7 +51,6 @@ export const it: PartialDict = {
   "settings.showInTaskbar": "Mostra nella barra delle applicazioni",
   "settings.minimizeToTray": "Riduci nell'area di notifica",
   "settings.closeToTray": "Chiudi nell'area di notifica",
-  "settings.enableExplorer": "Abilita Esplora contesto",
   "settings.showStatusbar": "Mostra barra di stato CPU / memoria",
   "settings.showPrompt": "Mostra testo del prompt",
   "settings.checkUpdates": "Cerca aggiornamenti all'avvio",

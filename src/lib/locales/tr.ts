@@ -51,7 +51,6 @@ export const tr: PartialDict = {
   "settings.showInTaskbar": "Görev çubuğunda göster",
   "settings.minimizeToTray": "Tepsiye küçült",
   "settings.closeToTray": "Tepsiye kapat",
-  "settings.enableExplorer": "Bağlam Gezgini'ni etkinleştir",
   "settings.showStatusbar": "CPU / bellek durum çubuğunu göster",
   "settings.showPrompt": "İstem metnini göster",
   "settings.checkUpdates": "Başlangıçta güncellemeleri denetle",

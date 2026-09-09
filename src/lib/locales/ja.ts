@@ -50,7 +50,6 @@ export const ja: PartialDict = {
   "settings.showInTaskbar": "タスクバーに表示",
   "settings.minimizeToTray": "最小化時にトレイへ格納",
   "settings.closeToTray": "閉じるときにトレイへ格納",
-  "settings.enableExplorer": "コンテキストエクスプローラーを有効化",
   "settings.showStatusbar": "CPU / メモリのステータスバーを表示",
   "settings.showPrompt": "プロンプトのテキストを表示",
   "settings.checkUpdates": "起動時に更新を確認",

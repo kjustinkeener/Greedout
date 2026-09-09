@@ -9,7 +9,6 @@
     onRename,
     onOpenSession,
     onOpenProject,
-    explorer = true,
     top = false,
     dimHours = 24,
     showPrompt = true,
@@ -18,8 +17,6 @@
     onRename: () => void;
     onOpenSession: () => void;
     onOpenProject: () => void;
-    /** Context Explorer is enabled; when off, titles are plain text (rename only). */
-    explorer?: boolean;
     top?: boolean;
     dimHours?: number;
     /** Show the session's latest prompt under its title. */
@@ -31,7 +28,6 @@
   let clickTimer: ReturnType<typeof setTimeout> | undefined;
   function titleClick() {
     clearTimeout(clickTimer);
-    if (!explorer) return;
     clickTimer = setTimeout(() => onOpenSession(), 220);
   }
   function titleDbl() {
@@ -105,17 +101,15 @@
         class="title"
         onclick={titleClick}
         ondblclick={titleDbl}
-        class:plain={!explorer}
-        title={explorer ? t("main.exploreOrRename") : t("main.rename")}
+        title={t("main.exploreOrRename")}
         >{session.title}</button
       >
       <span class="meta1">
         <span class="ago" title={agoTip()}>{fmtAgo(session.mtime)}</span><span class="mid">·</span>
         <button
         class="project"
-        class:plain={!explorer}
-        onclick={() => explorer && onOpenProject()}
-        title={explorer ? t("main.exploreProject") : session.projectPath}
+        onclick={onOpenProject}
+        title={t("main.exploreProject")}
         >{session.project}{#if session.subPath}<span class="sub"
             >/{session.subPath}</span
           >{/if}</button
@@ -255,19 +249,6 @@
   }
   .title:hover {
     text-decoration: underline;
-  }
-  /* With the Explorer off there is nothing to open, so the titles stop
-     advertising themselves as links (double-click still renames). */
-  .title.plain,
-  .project.plain {
-    cursor: default;
-  }
-  .title.plain:hover {
-    text-decoration: none;
-  }
-  .project.plain:hover {
-    text-decoration: none;
-    color: var(--muted);
   }
   .model {
     flex: 0 0 auto;

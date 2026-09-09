@@ -50,7 +50,6 @@ export const ko: PartialDict = {
   "settings.showInTaskbar": "작업 표시줄에 표시",
   "settings.minimizeToTray": "트레이로 최소화",
   "settings.closeToTray": "트레이로 닫기",
-  "settings.enableExplorer": "Context Explorer 사용",
   "settings.showStatusbar": "CPU / 메모리 상태 표시줄 표시",
   "settings.showPrompt": "프롬프트 텍스트 표시",
   "settings.checkUpdates": "시작할 때 업데이트 확인",

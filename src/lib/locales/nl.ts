@@ -51,7 +51,6 @@ export const nl: PartialDict = {
   "settings.showInTaskbar": "Weergeven op taakbalk",
   "settings.minimizeToTray": "Minimaliseren naar systeemvak",
   "settings.closeToTray": "Sluiten naar systeemvak",
-  "settings.enableExplorer": "Context Explorer inschakelen",
   "settings.showStatusbar": "CPU-/geheugenstatusbalk weergeven",
   "settings.showPrompt": "Prompttekst weergeven",
   "settings.checkUpdates": "Bij het starten op updates controleren",

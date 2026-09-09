@@ -51,7 +51,6 @@ export const ru: PartialDict = {
   "settings.showInTaskbar": "Показывать на панели задач",
   "settings.minimizeToTray": "Сворачивать в трей",
   "settings.closeToTray": "Закрывать в трей",
-  "settings.enableExplorer": "Включить обозреватель контекста",
   "settings.showStatusbar": "Показывать строку состояния CPU / памяти",
   "settings.showPrompt": "Показывать текст запроса",
   "settings.checkUpdates": "Проверять обновления при запуске",

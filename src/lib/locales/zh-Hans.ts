@@ -50,7 +50,6 @@ export const zhHans: PartialDict = {
   "settings.showInTaskbar": "在任务栏中显示",
   "settings.minimizeToTray": "最小化到托盘",
   "settings.closeToTray": "关闭到托盘",
-  "settings.enableExplorer": "启用上下文浏览器",
   "settings.showStatusbar": "显示 CPU / 内存状态栏",
   "settings.showPrompt": "显示提示词文本",
   "settings.checkUpdates": "启动时检查更新",

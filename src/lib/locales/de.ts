@@ -51,7 +51,6 @@ export const de: PartialDict = {
   "settings.showInTaskbar": "In der Taskleiste anzeigen",
   "settings.minimizeToTray": "In den Infobereich minimieren",
   "settings.closeToTray": "In den Infobereich schließen",
-  "settings.enableExplorer": "Context Explorer aktivieren",
   "settings.showStatusbar": "CPU-/Speicher-Statusleiste anzeigen",
   "settings.showPrompt": "Prompt-Text anzeigen",
   "settings.checkUpdates": "Beim Start nach Updates suchen",

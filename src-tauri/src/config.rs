@@ -79,10 +79,6 @@ pub struct Config {
     /// nothing here touches the network unless the user asks in About.
     #[serde(default = "default_true")]
     pub check_updates: bool,
-    /// Offer the Context Explorer (menu entry + clickable session/project titles).
-    /// On by default; turning it off hides the entry points and closes the window.
-    #[serde(default = "default_true")]
-    pub explorer_enabled: bool,
     /// Interface font slots and the boldness preference. Frontend-applied; the
     /// values are ids from the catalog in `src/lib/fonts.ts`, not family names,
     /// so a face can be swapped or renamed without invalidating saved configs.
@@ -198,7 +194,6 @@ impl Default for Config {
             browse_enabled: false,
             show_statusbar: true,
             show_prompt: true,
-            explorer_enabled: true,
             check_updates: true,
             font_ui: default_font_ui(),
             font_num: default_font_num(),

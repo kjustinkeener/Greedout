@@ -13,6 +13,7 @@
   import { LogicalSize } from "@tauri-apps/api/dpi";
   import { applyOpacity, applyTheme, type Theme } from "./lib/theme";
   import { t, watchLocale } from "./lib/i18n.svelte";
+  import { openExplorer } from "./lib/explorerWindow";
   import type { Config } from "./types";
 
   let menuOpen = $state(false);
@@ -63,10 +64,10 @@
     const w = new WebviewWindow("settings", {
       url: "settings.html",
       title: "Greedout Settings",
-      width: 300,
-      height: 520,
-      minWidth: 240,
-      minHeight: 200,
+      width: 520,
+      height: 420,
+      minWidth: 440,
+      minHeight: 240,
       resizable: true,
       alwaysOnTop: aot,
       focus: true,
@@ -142,7 +143,6 @@
   // one if none is focused. Reuse the window if it's already open.
   async function openBaseline() {
     menuOpen = false;
-    if (!explorerEnabled) return;
     const s = sessions.find((x) => x.focused) ?? sessions[0];
     if (!s) return;
     const existing = await WebviewWindow.getByLabel("baseline");
@@ -203,79 +203,6 @@
           }
         }
         setTimeout(() => void createBaselineWindow(s, false), 150);
-      });
-    }
-  }
-
-  // Open the Explorer targeted at a specific session or project (clicking a
-  // title/project in the list). Reuses the window (retargeting via an event) or
-  // creates it with the target baked into the URL.
-  async function openExplorer(opts: {
-    id?: string;
-    title: string;
-    project?: string;
-    view: "session" | "project";
-  }) {
-    if (!explorerEnabled) return;
-    const existing = await WebviewWindow.getByLabel("baseline");
-    if (existing) {
-      try {
-        await existing.unminimize();
-        await existing.show();
-        await existing.setFocus();
-        await existing.emit("baseline-goto", opts);
-        return;
-      } catch {
-        try {
-          await existing.close();
-        } catch {
-          // already gone
-        }
-      }
-    }
-    await createExplorerWindow(opts, true);
-  }
-
-  async function createExplorerWindow(
-    opts: { id?: string; title: string; project?: string; view: "session" | "project" },
-    retry: boolean,
-  ) {
-    let pos: { x: number; y: number } | undefined;
-    try {
-      const sf = await appWindow.scaleFactor();
-      const p = (await appWindow.outerPosition()).toLogical(sf);
-      pos = { x: Math.round(p.x + 24), y: Math.round(p.y + 24) };
-    } catch {
-      // Position unavailable; let the OS place it.
-    }
-    const aot = (await invoke<Config>("get_config").catch(() => null))?.always_on_top ?? true;
-    const q = new URLSearchParams({
-      id: opts.id ?? "",
-      title: opts.title,
-      view: opts.view,
-      ...(opts.project ? { project: opts.project } : {}),
-    });
-    const w = new WebviewWindow("baseline", {
-      url: `baseline.html?${q.toString()}`,
-      title: "Context Explorer",
-      width: 720,
-      height: 560,
-      resizable: true,
-      alwaysOnTop: aot,
-      focus: true,
-      ...(pos ? { x: pos.x, y: pos.y } : {}),
-    });
-    if (retry) {
-      void w.once("tauri://error", async () => {
-        const stale = await WebviewWindow.getByLabel("baseline");
-        if (stale) {
-          try {
-            await stale.close();
-          } catch {
-            // already gone
-          }
-        }
-        setTimeout(() => void createExplorerWindow(opts, false), 150);
       });
     }
   }
@@ -359,8 +286,6 @@
   let showStatusbar = $state(false);
   // Show each session's latest prompt under its title; on by default.
   let showPrompt = $state(true);
-  // Context Explorer offered at all (menu entry + clickable titles); on by default.
-  let explorerEnabled = $state(true);
 
   // The update offer. Null until a check comes back with something newer, so
   // the banner does not exist on the overwhelmingly common launch where the app
@@ -506,7 +431,6 @@
     let unlistenTheme: (() => void) | undefined;
     let unlistenStatusbar: (() => void) | undefined;
     let unlistenPrompt: (() => void) | undefined;
-    let unlistenExplorer: (() => void) | undefined;
     let unlistenLocale: (() => void) | undefined;
     window.addEventListener("wheel", onWheel, { passive: false });
     (async () => {
@@ -520,7 +444,6 @@
         dimHours = cfg0.dim_hours ?? 24;
         showStatusbar = cfg0.show_statusbar ?? false;
         showPrompt = cfg0.show_prompt ?? true;
-        explorerEnabled = cfg0.explorer_enabled ?? true;
         // Fire and forget, and silent on failure: an app that cannot reach
         // GitHub is still a working app, and saying so on every launch behind a
         // captive portal would be noise.
@@ -542,19 +465,6 @@
         unlistenStatusbar = await listen<boolean>("show-statusbar", (e) => (showStatusbar = e.payload));
         // Settings toggles the prompt text under each session live.
         unlistenPrompt = await listen<boolean>("show-prompt", (e) => (showPrompt = e.payload));
-        // Settings toggles the Explorer live; switching it off also closes the
-        // window if it's open, so no orphaned Explorer stays behind.
-        unlistenExplorer = await listen<boolean>("explorer-enabled", async (e) => {
-          explorerEnabled = e.payload;
-          if (!explorerEnabled) {
-            const w = await WebviewWindow.getByLabel("baseline");
-            try {
-              await w?.close();
-            } catch {
-              // already gone
-            }
-          }
-        });
         // The Settings window (separate) previews/saves opacity via this event.
         unlistenOpacity = await listen<number>("opacity-preview", (e) => applyOpacity(e.payload));
         // Settings (separate window) pushes a live theme preview on change.
@@ -571,7 +481,6 @@
       unlistenTheme?.();
       unlistenStatusbar?.();
       unlistenPrompt?.();
-      unlistenExplorer?.();
       unlistenLocale?.();
       window.removeEventListener("wheel", onWheel);
     };
@@ -595,12 +504,10 @@
     {#if menuOpen}
       <button class="scrim" aria-label={t("menu.closeMenu")} onclick={() => (menuOpen = false)}></button>
       <div class="dropdown">
-        {#if explorerEnabled}
-          <button class="item" onclick={openBaseline}>
+        <button class="item" onclick={openBaseline}>
           <span class="mi"><Icon name="layout" size={14} /></span>
-            {t("menu.explorer")}
-          </button>
-        {/if}
+          {t("menu.explorer")}
+        </button>
         <button class="item" onclick={openDailySpend}>
           <span class="mi"><Icon name="bar-chart" size={14} /></span>
           {t("menu.dailySpend")}
@@ -659,7 +566,6 @@
           onRename={() => rename(s)}
           onOpenSession={() => openSession(s)}
           onOpenProject={() => openProject(s)}
-          explorer={explorerEnabled}
           {showPrompt}
         />
       {:else}
@@ -668,7 +574,6 @@
           onRename={() => rename(s)}
           onOpenSession={() => openSession(s)}
           onOpenProject={() => openProject(s)}
-          explorer={explorerEnabled}
           top={i === 0}
           {dimHours}
           {showPrompt}

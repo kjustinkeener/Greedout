@@ -12,6 +12,7 @@
   import type { SpendEvent } from "../types";
   import Brand from "./Brand.svelte";
   import Icon from "./Icon.svelte";
+  import { openExplorer } from "./explorerWindow";
   import { t, watchLocale, activeLocale } from "./i18n.svelte";
 
   let events = $state<SpendEvent[]>([]);
@@ -24,6 +25,9 @@
   let curMonth = $state(""); // "YYYY-MM"
   let curDay = $state(""); // "YYYY-MM-DD"
   let hover = $state<string>(""); // free-form readout for the hovered bar/span
+  // When a clicked lane holds more than one session, this holds it so a chooser
+  // can list them; null when no chooser is open.
+  let chooser = $state<Lane | null>(null);
 
   const HOUR = 3_600_000;
   const DAY = 86_400_000;
@@ -144,6 +148,12 @@
       new Date(ms),
     );
   }
+  // Short date for a session's last turn in the chooser (e.g. "Sep 8").
+  function dateAbbr(ms: number): string {
+    return new Intl.DateTimeFormat(activeLocale(), { month: "short", day: "numeric" }).format(
+      new Date(ms),
+    );
+  }
 
   const grandTotal = $derived(events.reduce((a, e) => a + e.cost, 0));
 
@@ -261,11 +271,20 @@
     cost: number;
     count: number;
   }
+  // One session that contributed to a lane, for the chooser when a lane (project)
+  // holds more than one session's turns.
+  interface SessionSlice {
+    id: string;
+    title: string;
+    cost: number;
+    last: number; // session's overall last-activity time (mtime), epoch ms
+  }
   interface Lane {
     project: string;
     spans: Span[];
     total: number;
     first: number;
+    sessions: SessionSlice[]; // distinct sessions in this lane, cost desc
   }
   // One lane per PROJECT for the day: all of that project's turns (across every
   // session it ran that day) merge into a single row, then split into spans
@@ -295,11 +314,22 @@
         }
       }
       if (cur) spans.push(cur);
+      // Break the lane down by session so a lane covering more than one session
+      // can offer a chooser rather than guessing which to open.
+      const bySession = new Map<string, SessionSlice>();
+      for (const e of evs) {
+        const o = bySession.get(e.session) ?? { id: e.session, title: e.title, cost: 0, last: e.mtime };
+        if (!o.title && e.title) o.title = e.title;
+        o.cost += e.cost;
+        if (e.mtime > o.last) o.last = e.mtime;
+        bySession.set(e.session, o);
+      }
       out.push({
         project,
         spans,
         total: spans.reduce((a, b) => a + b.cost, 0),
         first: evs[0].t,
+        sessions: [...bySession.values()].sort((a, b) => b.cost - a.cost),
       });
     }
     out.sort((a, b) => b.total - a.total);
@@ -327,6 +357,25 @@
     curDay = key;
     level = "day";
     hover = "";
+  }
+  // Open the Context Explorer for one session of a lane. Title mirrors the main
+  // window's clickable-title format ("<session> · <project>").
+  function openLaneSession(project: string, s: SessionSlice) {
+    void openExplorer({
+      id: s.id,
+      title: `${s.title || project} · ${project}`,
+      project,
+      view: "session",
+    });
+  }
+  // Click a lane: open its Explorer directly if it's a single session, else pop a
+  // chooser listing the sessions that shared the lane.
+  function pickLane(l: Lane) {
+    if (l.sessions.length <= 1) {
+      if (l.sessions[0]) openLaneSession(l.project, l.sessions[0]);
+      return;
+    }
+    chooser = l;
   }
   // Keys that actually have spend, sorted (string order is chronological for
   // "YYYY-MM" / "YYYY-MM-DD"). Stepping walks these, so nav never lands on an
@@ -377,6 +426,17 @@
   // Left/Right arrows drive the same prev/next stepping as the nav buttons:
   // day view steps by day, days view steps by month, months view has no nav.
   function onKey(e: KeyboardEvent) {
+    // While the chooser is open it owns the keyboard: Escape closes it, and the
+    // arrow keys must not step the day/month underneath it.
+    if (chooser) {
+      if (e.key === "Escape") {
+        chooser = null;
+        e.preventDefault();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+      }
+      return;
+    }
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     const delta = e.key === "ArrowLeft" ? -1 : 1;
     if (level === "day") stepDay(delta);
@@ -530,6 +590,7 @@
                     style:left={`${frac(sp.start) * 100}%`}
                     style:width={`max(3px, ${(frac(sp.end) - frac(sp.start)) * 100}%)`}
                     style:background={laneColor(i, lanes.length)}
+                    onclick={() => pickLane(l)}
                     onmouseenter={() =>
                       (hover = `${l.project} · ${clock(sp.start)}–${clock(sp.end)} · ${usd(sp.cost)}`)}
                     onmouseleave={() => (hover = "")}
@@ -539,20 +600,68 @@
                   ></span>
                 {/each}
               </div>
-              <div class="lmeta">
-                <span class="lname" title={l.project}>{l.project}</span>
+              <button
+                class="lmeta"
+                onclick={() => pickLane(l)}
+                title={l.sessions.length > 1
+                  ? `${l.project} · ${l.sessions.length} sessions · open in Context Explorer`
+                  : `${l.project} · open in Context Explorer`}
+              >
+                <span class="lname">{l.project}</span>
                 <span class="lcost">{usd(l.total)}</span>
-              </div>
+              </button>
             </div>
           {/each}
         </div>
       </div>
     {/if}
   {/if}
+
+  {#if chooser}
+    <div
+      class="chback"
+      onclick={() => (chooser = null)}
+      oncontextmenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        chooser = null;
+      }}
+      role="presentation"
+    >
+      <div class="chpanel" role="dialog" aria-label="Choose a session" onclick={(e) => e.stopPropagation()}>
+        <div class="chhead">
+          <span class="chtitle" title={chooser.project}>{chooser.project}</span>
+          <button class="chclose" onclick={() => (chooser = null)} aria-label={t("common.close")}>
+            <Icon name="x" size={12} />
+          </button>
+        </div>
+        <ul class="chlist">
+          {#each chooser.sessions as s (s.id)}
+            <li>
+              <button
+                class="chrow"
+                onclick={() => {
+                  if (chooser) openLaneSession(chooser.project, s);
+                  chooser = null;
+                }}
+              >
+                <span class="chmain">
+                  <span class="chname">{s.title || s.id.slice(0, 8)}</span>
+                  <span class="chsub">{chooser.project} · {dateAbbr(s.last)}</span>
+                </span>
+                <span class="chcost">{usd(s.cost)}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
   .wrap {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -870,8 +979,21 @@
     display: flex;
     align-items: baseline;
     gap: 8px;
-    padding-left: 10px;
+    padding: 2px 4px 2px 10px;
     min-width: 0;
+    background: none;
+    border: none;
+    border-radius: 5px;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .lmeta:hover {
+    background: var(--panel);
+  }
+  .lmeta:hover .lname {
+    color: var(--g0);
   }
   .lname {
     flex: 1;
@@ -887,5 +1009,105 @@
     text-align: right;
     font-variant-numeric: tabular-nums;
     flex: none;
+  }
+
+  /* Session chooser: shown when a clicked lane covers more than one session. */
+  .chback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
+    z-index: 10;
+  }
+  .chpanel {
+    width: min(340px, 82%);
+    max-height: 70%;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--panel);
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+  }
+  .chhead {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--panel);
+  }
+  .chtitle {
+    flex: 1;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chclose {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: none;
+    border: none;
+    border-radius: 5px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .chclose:hover {
+    background: var(--panel);
+    color: var(--fg);
+  }
+  .chlist {
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    overflow-y: auto;
+  }
+  .chrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 8px;
+    background: none;
+    border: none;
+    border-radius: 5px;
+    color: var(--fg);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .chrow:hover {
+    background: var(--panel);
+  }
+  .chmain {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .chname {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chsub {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chcost {
+    flex: none;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
   }
 </style>

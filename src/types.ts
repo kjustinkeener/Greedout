@@ -34,6 +34,8 @@ export interface SpendEvent {
   cost: number; // this turn's estimated USD cost
   session: string; // session id it was first seen in
   project: string; // readable project name
+  title: string; // session title (custom title/label), "" if none yet
+  mtime: number; // session's overall last-activity time (transcript mtime), epoch ms
 }
 
 // What the history graph reports while a line is hovered; the focus panel swaps
@@ -188,7 +190,6 @@ export interface Config {
   browse_enabled: boolean; // cross-session browse index built + shown (opt-in)
   show_statusbar: boolean; // bottom status bar: per-core CPU + memory usage
   show_prompt: boolean; // show each session's latest prompt under its title
-  explorer_enabled: boolean;
   check_updates: boolean; // ask GitHub for a newer version at launch
   font_ui: string;
   font_num: string;

@@ -778,6 +778,10 @@ pub struct SpendEvent {
     pub session: String,
     /// Readable project name (leaf of the decoded transcript directory).
     pub project: String,
+    /// Session title (custom title or user label); empty if not yet known.
+    pub title: String,
+    /// Session's overall last-activity time (transcript mtime), epoch millis.
+    pub mtime: i64,
 }
 
 /// Full per-session metadata for the browse cache (see browse.rs). Unlike the

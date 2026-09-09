@@ -557,6 +557,24 @@ pub fn run() {
                         let _ = window.hide();
                     }
                 }
+                // The shared transcript scan (Context Explorer + Daily Spend) exists
+                // only to feed those two windows. When the last of them closes, cancel
+                // any in-flight scan so it stops working in the background. The rows it
+                // already wrote persist, so reopening a window resumes the scan from
+                // where it left off rather than restarting. Guarded on "another
+                // reporting window still open" so closing one while the other is up
+                // leaves the scan running.
+                tauri::WindowEvent::Destroyed
+                    if matches!(window.label(), "baseline" | "dailyspend") =>
+                {
+                    let app = window.app_handle();
+                    let others_open = app.webview_windows().keys().any(|l| {
+                        l != window.label() && matches!(l.as_str(), "baseline" | "dailyspend")
+                    });
+                    if !others_open {
+                        browse::cancel();
+                    }
+                }
                 // Minimize-to-tray: a minimize arrives as a resize; hide when minimized.
                 // Also persist size/position now, since an external restart can kill the
                 // process before the plugin's save-on-exit can run.

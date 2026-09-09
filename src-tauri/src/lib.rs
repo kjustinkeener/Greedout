@@ -376,6 +376,9 @@ pub fn run() {
     // Then sweep up the copy a self-update left beside us last time, before
     // anything else can hold a handle on this directory.
     update::cleanup_old();
+    // Move our sidecars out of `~/.claude/greedout` (pre-0.2.3 location) into our
+    // own LOCALAPPDATA dir, so we never write inside Claude Code's config home.
+    config::migrate_sidecars();
 
     tauri::Builder::default()
         // MUST be the first plugin registered. A second launch would otherwise get its

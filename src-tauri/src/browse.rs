@@ -2,7 +2,7 @@
 //! `n` most-recent sessions the poll loop tracks.
 //!
 //! The whole feature is gated behind `config.browse_enabled`. Turning it on is
-//! what creates `~/.claude/greedout/cache.sqlite` -- so the user knowingly opts
+//! what creates `cache.sqlite` in the app data dir -- so the user knowingly opts
 //! into a potentially large first scan instead of getting one silently. No DB
 //! exists until then, keeping the default footprint tiny.
 //!

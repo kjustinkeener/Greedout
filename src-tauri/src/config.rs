@@ -1,4 +1,5 @@
-//! Config and custom-label sidecars, under `~/.claude/greedout/`.
+//! Config and custom-label sidecars, under `%LOCALAPPDATA%\Greedout`. The app
+//! reads Claude Code's home (`~/.claude`) but writes only its own data dir.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -38,7 +39,7 @@ pub struct Config {
     pub minimize_to_tray: bool,
     /// Closing the window hides it to the tray instead of quitting.
     pub close_to_tray: bool,
-    /// Append diagnostics to `~/.claude/greedout/greedout.log`.
+    /// Append diagnostics to `greedout.log` in the app data dir.
     pub debug_logging: bool,
     /// Keep the window above other windows.
     pub always_on_top: bool,
@@ -221,10 +222,49 @@ pub fn claude_dir() -> PathBuf {
     dirs::home_dir().unwrap_or_default().join(".claude")
 }
 
-/// `~/.claude/greedout/`: Greedout's own sidecar dir (config, labels, log, and the
-/// opt-in browse cache). Public so browse.rs can place `cache.sqlite` alongside.
+/// `%LOCALAPPDATA%\Greedout`: Greedout's own data dir (config, labels, log, and
+/// the opt-in browse cache). The app reads `~/.claude` but writes only here, so
+/// nothing of ours lands inside Claude Code's config home. Public so browse.rs
+/// can place `cache.sqlite` alongside. Falls back to the old location only if the
+/// platform has no local-data dir (not expected on Windows).
 pub fn app_dir() -> PathBuf {
-    claude_dir().join("greedout")
+    dirs::data_local_dir()
+        .map(|d| d.join("Greedout"))
+        .unwrap_or_else(|| claude_dir().join("greedout"))
+}
+
+/// One-time move of the sidecar files out of `~/.claude/greedout` (where versions
+/// up to 0.2.2 kept them) into `app_dir()`. Best-effort and idempotent: it only
+/// moves a file when the destination does not already exist, and on any failure
+/// the app still runs from the new dir. Removes the old dir once it is empty so
+/// nothing of ours lingers in Claude Code's config home.
+pub fn migrate_sidecars() {
+    let old = claude_dir().join("greedout");
+    let new = app_dir();
+    if old == new || !old.exists() {
+        return;
+    }
+    let _ = std::fs::create_dir_all(&new);
+    for name in [
+        "config.json",
+        "labels.json",
+        "window-state.json",
+        "greedout.log",
+        "cache.sqlite",
+        "cache.sqlite-wal",
+        "cache.sqlite-shm",
+    ] {
+        let src = old.join(name);
+        let dst = new.join(name);
+        if src.exists() && !dst.exists() {
+            // A rename is instant within a volume; across volumes it fails, so
+            // fall back to copy-then-delete.
+            if std::fs::rename(&src, &dst).is_err() && std::fs::copy(&src, &dst).is_ok() {
+                let _ = std::fs::remove_file(&src);
+            }
+        }
+    }
+    let _ = std::fs::remove_dir(&old);
 }
 
 /// Path to the opt-in cross-session metadata cache. Only created once browsing is

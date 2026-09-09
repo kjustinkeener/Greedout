@@ -1533,7 +1533,7 @@
         <div class="etitle">Browse context across every session</div>
         <p class="ebody">
           Zoom out from this one session to all your projects. Greedout builds a local index of
-          every Claude Code transcript (in <code>~/.claude/greedout/cache.sqlite</code>) so it can
+          every Claude Code transcript (in <code>%LOCALAPPDATA%\Greedout\cache.sqlite</code>) so it can
           size projects and sessions. The first pass just reads file sizes and is quick; token and
           cost details load as you drill in.
         </p>

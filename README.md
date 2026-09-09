@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/kjustinkeener/Greedout/actions/workflows/ci.yml/badge.svg)](https://github.com/kjustinkeener/Greedout/actions/workflows/ci.yml)
 
-An always-on-top dashboard showing your most recently active AI coding sessions as live
+A dashboard showing your most recently active AI coding sessions as live
 gauges: how full each one's context window is, what it has cost so far, and how that has
 moved over the session. **Claude Code** is the harness it supports today.
 
@@ -68,9 +68,9 @@ exe and it shows an install card instead of the gauge window; it copies itself t
 the box), and registers itself under Installed apps so it uninstalls the ordinary
 way.
 
-Per-user, so there is no administrator prompt, and nothing is written outside that
-folder and `~/.claude/greedout`. Uninstalling removes both the folder and the
-shortcuts; your settings sidecar is left alone.
+Per-user, so there is no administrator prompt, and everything Greedout writes (its
+config, labels, log and the opt-in browse cache) stays inside that one folder;
+`~/.claude` is only ever read. Uninstalling removes the folder and the shortcuts.
 
 The download page is [fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/),
 on my own site, and it is the address the install card links to. It is the one that stays
@@ -145,7 +145,7 @@ cargo check --locked --manifest-path src-tauri/Cargo.toml
 
 ## Configuration
 
-Settings live in `~/.claude/greedout/config.json`, created with defaults on first run.
+Settings live in `%LOCALAPPDATA%\Greedout\config.json`, created with defaults on first run.
 Most of it is reachable from the Settings window, so hand-editing is rarely necessary.
 
 The keys that matter most:
@@ -160,8 +160,10 @@ The keys that matter most:
 | `theme` | `auto` | Theme id, or `auto` to follow the OS |
 | `browse_enabled` | | Opt in to the disk cache the cross-session browse view uses |
 
-Custom row labels live in `~/.claude/greedout/labels.json`; double-click a row title to
-rename it. Window position, size and zoom are remembered between runs.
+Custom row labels live in `%LOCALAPPDATA%\Greedout\labels.json`; double-click a row title to
+rename it. Window position, size and zoom are remembered between runs. Versions up to 0.2.2
+kept these files under `~/.claude/greedout`; they move to the folder above automatically on
+first launch of a newer build.
 
 ## Privacy and network access
 

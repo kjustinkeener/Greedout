@@ -131,7 +131,6 @@
     theme: "dark",
     show_statusbar: true,
     show_prompt: true,
-    explorer_enabled: true,
     check_updates: true,
     ...DEFAULT_FONTS,
   };
@@ -233,7 +232,6 @@
       browse_enabled: cfg.browse_enabled,
       show_statusbar: cfg.show_statusbar,
       show_prompt: cfg.show_prompt,
-      explorer_enabled: cfg.explorer_enabled,
       check_updates: cfg.check_updates,
       font_ui: cfg.font_ui,
       font_num: cfg.font_num,
@@ -251,7 +249,6 @@
     void emit("dim-hours", clean.dim_hours); // live-apply on the main window
     void emit("show-statusbar", clean.show_statusbar); // live-toggle the status bar
     void emit("show-prompt", clean.show_prompt); // live-toggle prompt text in the main window
-    void emit("explorer-enabled", clean.explorer_enabled); // live-toggle the Explorer entry points
   }
 </script>
 
@@ -270,6 +267,8 @@
   {#if !cfg}
     <div class="loading">{t("common.loading")}</div>
   {:else}
+    <div class="cols">
+    <div class="col">
     <label class="check" oncontextmenu={(e) => resetField("follow_focus", e)}>
       <input type="checkbox" bind:checked={cfg.follow_focus} />
       {t("settings.followFocus")}
@@ -304,10 +303,6 @@
       <input type="checkbox" bind:checked={cfg.close_to_tray} />
       {t("settings.closeToTray")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("explorer_enabled", e)}>
-      <input type="checkbox" bind:checked={cfg.explorer_enabled} />
-      {t("settings.enableExplorer")}
-    </label>
     <label class="check" oncontextmenu={(e) => resetField("show_statusbar", e)}>
       <input type="checkbox" bind:checked={cfg.show_statusbar} />
       {t("settings.showStatusbar")}
@@ -324,9 +319,9 @@
       <input type="checkbox" bind:checked={cfg.debug_logging} />
       {t("settings.debugLogging")}
     </label>
+    </div>
 
-    <div class="sep"></div>
-
+    <div class="col">
     <label class="field">
       <span>{t("settings.language")}</span>
       <select
@@ -426,12 +421,14 @@
       </span>
     </label>
     <div class="hint">{t("settings.budgetHint")}</div>
+    </div>
+    </div>
 
     <div class="actions">
+      <span class="spacer"></span>
       <button class="btn reset" onclick={resetAll} title={t("settings.resetAllTip")}>
         {t("settings.resetAll")}
       </button>
-      <span class="spacer"></span>
       <button class="btn primary" onclick={onClose}>{t("common.close")}</button>
     </div>
   {/if}
@@ -474,10 +471,32 @@
     margin-bottom: 8px;
     cursor: pointer;
   }
-  .sep {
-    height: 1px;
-    background: var(--edge);
-    margin: 8px 0;
+  /* Two columns: toggles on the left, value fields on the right, split by a
+     vertical rule (the old horizontal divider is now that rule). Collapses to a
+     single column if the window is dragged narrow. */
+  .cols {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+  .col {
+    min-width: 0;
+  }
+  .cols .col + .col {
+    border-left: 1px solid var(--edge);
+    padding-left: 16px;
+  }
+  @media (max-width: 419px) {
+    .cols {
+      grid-template-columns: 1fr;
+    }
+    .cols .col + .col {
+      border-left: none;
+      padding-left: 0;
+      border-top: 1px solid var(--edge);
+      padding-top: 8px;
+    }
   }
   .sel {
     width: auto;

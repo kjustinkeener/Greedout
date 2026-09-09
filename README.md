@@ -73,8 +73,8 @@ config, labels, log and the opt-in browse cache) stays inside that one folder;
 `~/.claude` is only ever read. Uninstalling removes the folder and the shortcuts.
 
 Download it from [fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/)
-or the [releases page](https://github.com/kjustinkeener/Greedout/releases). No release yet?
-Build from source, below.
+or the [releases page](https://github.com/kjustinkeener/Greedout/releases), or build from
+source, below.
 
 ## Build from source
 

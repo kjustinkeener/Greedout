@@ -118,7 +118,7 @@ export const en = {
   // About window
   "about.version": "Version {version}",
   "about.built": "built {date}",
-  "about.tagline": "Token spend readout and context explorer.",
+  "about.tagline": "AI spend readout, reporting, and session history explorer",
   "about.body":
     "Greedout reads AI coding session transcripts directly and shows context fill, spend, and history as an always-on-top dashboard. Claude Code is the harness it supports today: the status line its Windows desktop app can't render on its own.",
   "about.madeBy": "Made by",

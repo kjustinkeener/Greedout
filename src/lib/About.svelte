@@ -256,16 +256,16 @@
     height: 1px;
     align-self: stretch;
     background: var(--edge);
-    margin: 10px 0;
+    margin: 16px 0 10px;
   }
   .actions {
     margin-top: 8px;
   }
   .foot {
     align-self: stretch;
-    /* Push the footer to the bottom; the slack sits below the buttons, not above. */
-    margin-top: auto;
-    padding-top: 12px;
+    /* Sits just under the buttons rather than pinned to the window bottom, so the
+       gap under the buttons stays small. */
+    margin-top: 14px;
     display: flex;
     flex-direction: column;
     align-items: center;

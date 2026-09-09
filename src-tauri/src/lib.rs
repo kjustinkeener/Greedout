@@ -616,10 +616,13 @@ pub fn run() {
                 // above; these windows have decorations and a min size, so a plain
                 // save is enough. Skip while minimized so a taskbar-minimize does not
                 // overwrite the real geometry with the minimized rectangle.
+                // About is non-resizable and always opens at its default size next
+                // to main, so it is deliberately not in this list: persisting it only
+                // pinned a stale size that masked a later default change.
                 tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_)
                     if matches!(
                         window.label(),
-                        "settings" | "about" | "baseline" | "dailyspend" | "themes" | "fonts"
+                        "settings" | "baseline" | "dailyspend" | "themes" | "fonts"
                     ) =>
                 {
                     if !window.is_minimized().unwrap_or(false) {

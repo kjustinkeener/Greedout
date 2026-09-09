@@ -83,7 +83,7 @@ export const fr: PartialDict = {
 
   "about.version": "Version {version}",
   "about.built": "compilé le {date}",
-  "about.tagline": "Relevé de la consommation de tokens et explorateur de contexte.",
+  "about.tagline": "Relevé des dépenses d'IA, rapports et explorateur de l'historique des sessions",
   "about.body":
     "Greedout lit directement les transcriptions des sessions de codage assisté par IA et affiche le remplissage du contexte, la dépense et l'historique dans un tableau de bord toujours au premier plan. Claude Code est l'outil pris en charge aujourd'hui : la ligne d'état que son application de bureau Windows ne peut pas afficher elle-même.",
   "about.madeBy": "Créé par",

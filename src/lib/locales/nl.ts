@@ -83,7 +83,7 @@ export const nl: PartialDict = {
 
   "about.version": "Versie {version}",
   "about.built": "gebouwd op {date}",
-  "about.tagline": "Uitlezing van tokenverbruik en contextverkenner.",
+  "about.tagline": "Uitlezing van AI-uitgaven, rapportage en verkenner van sessiegeschiedenis",
   "about.body":
     "Greedout leest transcripten van AI-codeersessies rechtstreeks en toont contextvulling, uitgaven en geschiedenis als een altijd-op-voorgrond dashboard. Claude Code is de tool die vandaag wordt ondersteund: de statusregel die de Windows-desktopapp daarvan niet zelf kan weergeven.",
   "about.madeBy": "Gemaakt door",

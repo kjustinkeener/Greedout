@@ -82,7 +82,7 @@ export const zhHans: PartialDict = {
 
   "about.version": "版本 {version}",
   "about.built": "构建于 {date}",
-  "about.tagline": "令牌消耗读数与上下文浏览器。",
+  "about.tagline": "AI 花费读数、报表与会话历史浏览器",
   "about.body":
     "Greedout 直接读取 AI 编程会话的文字记录，以常驻置顶面板展示上下文占用、花费与历史趋势。目前支持的工具是 Claude Code：这是其 Windows 桌面应用自身无法渲染的状态行。",
   "about.madeBy": "制作者",

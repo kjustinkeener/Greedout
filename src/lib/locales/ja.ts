@@ -82,7 +82,7 @@ export const ja: PartialDict = {
 
   "about.version": "バージョン {version}",
   "about.built": "ビルド日 {date}",
-  "about.tagline": "トークン消費量の表示とコンテキストの詳細表示。",
+  "about.tagline": "AI費用の表示、レポート、セッション履歴エクスプローラー",
   "about.body":
     "GreedoutはAIコーディングセッションのトランスクリプトを直接読み取り、コンテキスト使用量・支出・履歴を常に最前面のダッシュボードとして表示します。現在対応しているのはClaude Codeで、そのWindowsデスクトップアプリ単体では表示できないステータスラインです。",
   "about.madeBy": "制作",

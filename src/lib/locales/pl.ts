@@ -83,7 +83,7 @@ export const pl: PartialDict = {
 
   "about.version": "Wersja {version}",
   "about.built": "zbudowano {date}",
-  "about.tagline": "Odczyt zużycia tokenów i eksplorator kontekstu.",
+  "about.tagline": "Odczyt wydatków na AI, raporty i eksplorator historii sesji",
   "about.body":
     "Greedout odczytuje bezpośrednio transkrypcje sesji programowania z AI i pokazuje zapełnienie kontekstu, wydatki oraz historię jako pulpit zawsze na wierzchu. Dziś obsługiwanym narzędziem jest Claude Code: to pasek stanu, którego jego aplikacja desktopowa na Windows nie potrafi wyrenderować sama.",
   "about.madeBy": "Stworzone przez",

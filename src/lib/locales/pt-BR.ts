@@ -83,7 +83,7 @@ export const ptBR: PartialDict = {
 
   "about.version": "Versão {version}",
   "about.built": "compilado em {date}",
-  "about.tagline": "Leitura do gasto de tokens e explorador de contexto.",
+  "about.tagline": "Leitura de gastos com IA, relatórios e explorador de histórico de sessões",
   "about.body":
     "O Greedout lê diretamente as transcrições de sessões de programação com IA e mostra o preenchimento de contexto, o gasto e o histórico em um painel sempre visível. Hoje a ferramenta compatível é o Claude Code: a status line que o seu aplicativo desktop do Windows não consegue renderizar sozinho.",
   "about.madeBy": "Criado por",

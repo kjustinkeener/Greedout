@@ -83,7 +83,7 @@ export const de: PartialDict = {
 
   "about.version": "Version {version}",
   "about.built": "erstellt am {date}",
-  "about.tagline": "Token-Verbrauchsanzeige und Kontext-Explorer.",
+  "about.tagline": "KI-Ausgabenanzeige, Berichte und Sitzungsverlaufs-Explorer",
   "about.body":
     "Greedout liest Transkripte von KI-Coding-Sitzungen direkt und zeigt Kontextfüllung, Ausgaben und Verlauf als stets im Vordergrund bleibendes Dashboard. Unterstützt wird derzeit Claude Code: die Statuszeile, die dessen Windows-Desktop-App nicht selbst darstellen kann.",
   "about.madeBy": "Erstellt von",

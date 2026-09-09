@@ -93,7 +93,7 @@ export const es: PartialDict = {
   // Ventana Acerca de
   "about.version": "Versión {version}",
   "about.built": "compilado el {date}",
-  "about.tagline": "Lectura del gasto de tokens y explorador de contexto.",
+  "about.tagline": "Lectura del gasto de IA, informes y explorador del historial de sesiones",
   "about.body":
     "Greedout lee directamente las transcripciones de sesiones de programación con IA y muestra el llenado de contexto, el gasto y el historial en un panel siempre visible. Hoy la herramienta compatible es Claude Code: la barra de estado que su app de escritorio de Windows no puede mostrar por sí sola.",
   "about.madeBy": "Creado por",

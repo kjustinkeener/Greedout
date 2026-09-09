@@ -83,7 +83,7 @@ export const it: PartialDict = {
 
   "about.version": "Versione {version}",
   "about.built": "compilato il {date}",
-  "about.tagline": "Lettura della spesa in token ed esploratore del contesto.",
+  "about.tagline": "Lettura della spesa in IA, report ed esploratore della cronologia delle sessioni",
   "about.body":
     "Greedout legge direttamente le trascrizioni delle sessioni di coding con l'IA e mostra riempimento del contesto, spesa e cronologia in una dashboard sempre in primo piano. Oggi lo strumento supportato è Claude Code: la status line che la sua app desktop Windows non riesce a mostrare da sola.",
   "about.madeBy": "Realizzato da",

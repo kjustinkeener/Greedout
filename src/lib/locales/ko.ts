@@ -82,7 +82,7 @@ export const ko: PartialDict = {
 
   "about.version": "버전 {version}",
   "about.built": "빌드일 {date}",
-  "about.tagline": "토큰 사용량 표시와 컨텍스트 탐색기.",
+  "about.tagline": "AI 비용 표시, 리포트, 세션 기록 탐색기",
   "about.body":
     "Greedout은 AI 코딩 세션의 트랜스크립트를 직접 읽어 컨텍스트 사용량, 지출, 기록을 항상 위에 표시되는 대시보드로 보여줍니다. 현재 지원하는 도구는 Claude Code이며, 그 Windows 데스크톱 앱이 자체적으로 렌더링하지 못하는 상태 표시줄입니다.",
   "about.madeBy": "제작",

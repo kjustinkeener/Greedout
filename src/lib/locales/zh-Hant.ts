@@ -83,7 +83,7 @@ export const zhHant: PartialDict = {
 
   "about.version": "版本 {version}",
   "about.built": "建置於 {date}",
-  "about.tagline": "權杖消耗讀數與上下文瀏覽器。",
+  "about.tagline": "AI 花費讀數、報表與工作階段歷史瀏覽器",
   "about.body":
     "Greedout 直接讀取 AI 程式設計工作階段的對話紀錄,以永遠置頂的儀表板呈現內容填充量、花費與歷史紀錄。目前支援的工具是 Claude Code:這是其 Windows 桌面應用程式本身無法呈現的狀態列。",
   "about.madeBy": "製作者",

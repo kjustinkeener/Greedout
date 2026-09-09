@@ -83,7 +83,7 @@ export const tr: PartialDict = {
 
   "about.version": "Sürüm {version}",
   "about.built": "{date} tarihinde derlendi",
-  "about.tagline": "Token harcama göstergesi ve bağlam gezgini.",
+  "about.tagline": "Yapay zeka harcama göstergesi, raporlama ve oturum geçmişi gezgini",
   "about.body":
     "Greedout, yapay zekâ ile kodlama oturumlarının transkriptlerini doğrudan okuyup bağlam doluluğunu, harcamayı ve geçmişi her zaman üstte kalan bir panoda gösterir. Bugün desteklenen araç Claude Code: kendi Windows masaüstü uygulamasının tek başına gösteremediği durum satırı.",
   "about.madeBy": "Yapımcı",

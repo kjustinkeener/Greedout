@@ -15,6 +15,7 @@
   import type { Config } from "../types";
   import { applyTheme, type Theme } from "./theme";
   import BrandIcon from "./BrandIcon.svelte";
+  import Icon from "./Icon.svelte";
   import { onDestroy } from "svelte";
   import { t, watchLocale } from "./i18n.svelte";
 
@@ -96,19 +97,23 @@
 />
 
 <div class="panel" data-tauri-drag-region>
-  <span class="mark"><BrandIcon size={64} /></span>
-  <div class="name">greedout</div>
+  <!-- Borderless, so the panel supplies its own close button. -->
+  <button class="x" onclick={onClose} title={t("win.close")} aria-label={t("win.close")}>
+    <Icon name="x" size={13} width={1.5} />
+  </button>
+  <!-- The non-interactive blocks carry the drag attribute too, so a drag started
+       on the icon or any text still moves the window (only links/buttons don't). -->
+  <span class="mark" data-tauri-drag-region><BrandIcon size={64} /></span>
+  <div class="name" data-tauri-drag-region>greedout</div>
   {#if version}
-    <div class="ver">
+    <div class="ver" data-tauri-drag-region>
       {t("about.version", { version })}{#if built}&nbsp;&middot; {t("about.built", { date: built })}{/if}
     </div>
   {/if}
 
-  <p class="tagline">{t("about.tagline")}</p>
+  <p class="tagline" data-tauri-drag-region>{t("about.tagline")}</p>
 
-  <div class="sep"></div>
-
-  <p class="body">{t("about.body")}</p>
+  <div class="sep" data-tauri-drag-region></div>
 
   <!-- Links open in the shell (the webview would otherwise navigate this window);
        the email is a mailto:, which open_url allows alongside https. Order and
@@ -119,9 +124,9 @@
     <a href="mailto:gofast@fasterdb.com" onclick={openLink}>gofast@fasterdb.com</a>
   </div>
 
-  {#if updateMsg}
-    <p class="umsg">{updateMsg}</p>
-  {/if}
+  <!-- Always rendered (not gated on a message) so a check result appears without
+       shoving the buttons down: the line is reserved even when empty. -->
+  <p class="umsg" data-tauri-drag-region>{updateMsg}</p>
 
   <div class="actions">
     <!-- The manual check exists so turning the launch check off is not the same
@@ -169,6 +174,9 @@
 
   .umsg {
     margin: 10px 0 0;
+    /* Reserve a line so a check result appears in place instead of pushing the
+       buttons down; empty is invisible. */
+    min-height: 1.4em;
     font-size: 11.5px;
     color: var(--muted);
     text-align: center;
@@ -181,6 +189,7 @@
     background: var(--bg);
   }
   .panel {
+    position: relative;
     min-height: 100vh;
     box-sizing: border-box;
     padding: 16px;
@@ -189,6 +198,25 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
+  }
+  .x {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    color: var(--muted);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .x:hover {
+    color: var(--fg);
+    background: var(--hover);
   }
   .mark {
     display: block;
@@ -230,19 +258,14 @@
     background: var(--edge);
     margin: 10px 0;
   }
-  .body {
-    color: var(--muted);
-    font-size: calc(11px * var(--size-ui));
-    line-height: 1.5;
-    margin: 0;
-  }
   .actions {
-    margin-top: auto;
-    padding-top: 14px;
+    margin-top: 8px;
   }
   .foot {
     align-self: stretch;
-    margin-top: 12px;
+    /* Push the footer to the bottom; the slack sits below the buttons, not above. */
+    margin-top: auto;
+    padding-top: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;

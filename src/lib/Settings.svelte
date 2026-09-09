@@ -131,6 +131,7 @@
     theme: "dark",
     show_statusbar: true,
     show_prompt: true,
+    clickable_titles: true,
     check_updates: true,
     ...DEFAULT_FONTS,
   };
@@ -232,6 +233,7 @@
       browse_enabled: cfg.browse_enabled,
       show_statusbar: cfg.show_statusbar,
       show_prompt: cfg.show_prompt,
+      clickable_titles: cfg.clickable_titles,
       check_updates: cfg.check_updates,
       font_ui: cfg.font_ui,
       font_num: cfg.font_num,
@@ -249,6 +251,7 @@
     void emit("dim-hours", clean.dim_hours); // live-apply on the main window
     void emit("show-statusbar", clean.show_statusbar); // live-toggle the status bar
     void emit("show-prompt", clean.show_prompt); // live-toggle prompt text in the main window
+    void emit("clickable-titles", clean.clickable_titles); // live-toggle clickable titles
   }
 </script>
 
@@ -310,6 +313,10 @@
     <label class="check" oncontextmenu={(e) => resetField("show_prompt", e)}>
       <input type="checkbox" bind:checked={cfg.show_prompt} />
       {t("settings.showPrompt")}
+    </label>
+    <label class="check" oncontextmenu={(e) => resetField("clickable_titles", e)}>
+      <input type="checkbox" bind:checked={cfg.clickable_titles} />
+      {t("settings.clickableTitles")}
     </label>
     <label class="check" oncontextmenu={(e) => resetField("check_updates", e)}>
       <input type="checkbox" bind:checked={cfg.check_updates} />

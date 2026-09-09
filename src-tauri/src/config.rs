@@ -74,6 +74,11 @@ pub struct Config {
     /// On by default.
     #[serde(default = "default_true")]
     pub show_prompt: bool,
+    /// Make the session and project titles in the main window clickable (open the
+    /// Context Explorer). With it off, titles are plain text (double-click still
+    /// renames a session). On by default.
+    #[serde(default = "default_true")]
+    pub clickable_titles: bool,
     /// Ask GitHub once, at launch, whether a newer version exists. On by
     /// default, and the only outbound request the app ever makes: with it off,
     /// nothing here touches the network unless the user asks in About.
@@ -194,6 +199,7 @@ impl Default for Config {
             browse_enabled: false,
             show_statusbar: true,
             show_prompt: true,
+            clickable_titles: true,
             check_updates: true,
             font_ui: default_font_ui(),
             font_num: default_font_num(),

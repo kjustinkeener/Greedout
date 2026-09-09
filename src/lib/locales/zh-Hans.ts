@@ -52,6 +52,7 @@ export const zhHans: PartialDict = {
   "settings.closeToTray": "关闭到托盘",
   "settings.showStatusbar": "显示 CPU / 内存状态栏",
   "settings.showPrompt": "显示提示词文本",
+  "settings.clickableTitles": "主窗口中的可点击链接",
   "settings.checkUpdates": "启动时检查更新",
   "settings.debugLogging": "调试日志写入文件",
   "settings.lockoutTip":

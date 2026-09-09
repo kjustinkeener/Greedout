@@ -53,6 +53,7 @@ export const pl: PartialDict = {
   "settings.closeToTray": "Zamknij do zasobnika",
   "settings.showStatusbar": "Pokaż pasek stanu CPU / pamięci",
   "settings.showPrompt": "Pokaż tekst promptu",
+  "settings.clickableTitles": "Klikalne linki w oknie głównym",
   "settings.checkUpdates": "Sprawdzaj aktualizacje przy uruchamianiu",
   "settings.debugLogging": "Zapisuj dziennik debugowania do pliku",
   "settings.lockoutTip":

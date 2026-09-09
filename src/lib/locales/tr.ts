@@ -53,6 +53,7 @@ export const tr: PartialDict = {
   "settings.closeToTray": "Tepsiye kapat",
   "settings.showStatusbar": "CPU / bellek durum çubuğunu göster",
   "settings.showPrompt": "İstem metnini göster",
+  "settings.clickableTitles": "Ana pencerede tıklanabilir bağlantılar",
   "settings.checkUpdates": "Başlangıçta güncellemeleri denetle",
   "settings.debugLogging": "Dosyaya hata ayıklama günlüğü",
   "settings.lockoutTip":

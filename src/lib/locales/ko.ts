@@ -52,6 +52,7 @@ export const ko: PartialDict = {
   "settings.closeToTray": "트레이로 닫기",
   "settings.showStatusbar": "CPU / 메모리 상태 표시줄 표시",
   "settings.showPrompt": "프롬프트 텍스트 표시",
+  "settings.clickableTitles": "메인 창에서 클릭 가능한 링크",
   "settings.checkUpdates": "시작할 때 업데이트 확인",
   "settings.debugLogging": "파일에 디버그 로그 기록",
   "settings.lockoutTip":

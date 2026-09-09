@@ -190,6 +190,7 @@ export interface Config {
   browse_enabled: boolean; // cross-session browse index built + shown (opt-in)
   show_statusbar: boolean; // bottom status bar: per-core CPU + memory usage
   show_prompt: boolean; // show each session's latest prompt under its title
+  clickable_titles: boolean; // main-window session/project titles open the Explorer
   check_updates: boolean; // ask GitHub for a newer version at launch
   font_ui: string;
   font_num: string;

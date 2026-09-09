@@ -53,6 +53,7 @@ export const ru: PartialDict = {
   "settings.closeToTray": "Закрывать в трей",
   "settings.showStatusbar": "Показывать строку состояния CPU / памяти",
   "settings.showPrompt": "Показывать текст запроса",
+  "settings.clickableTitles": "Кликабельные ссылки в главном окне",
   "settings.checkUpdates": "Проверять обновления при запуске",
   "settings.debugLogging": "Отладочное логирование в файл",
   "settings.lockoutTip":

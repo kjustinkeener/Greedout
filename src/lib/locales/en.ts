@@ -86,6 +86,7 @@ export const en = {
   "settings.closeToTray": "Close to tray",
   "settings.showStatusbar": "Show CPU / memory status bar",
   "settings.showPrompt": "Show prompt text",
+  "settings.clickableTitles": "Clickable links in main window",
   "settings.checkUpdates": "Check for updates at launch",
   "settings.debugLogging": "Debug logging to file",
   "settings.lockoutTip":

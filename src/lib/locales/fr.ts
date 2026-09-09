@@ -53,6 +53,7 @@ export const fr: PartialDict = {
   "settings.closeToTray": "Fermer vers la zone de notification",
   "settings.showStatusbar": "Afficher la barre d'état CPU / mémoire",
   "settings.showPrompt": "Afficher le texte de l'invite",
+  "settings.clickableTitles": "Liens cliquables dans la fenêtre principale",
   "settings.checkUpdates": "Rechercher des mises à jour au démarrage",
   "settings.debugLogging": "Journalisation de débogage dans un fichier",
   "settings.lockoutTip":

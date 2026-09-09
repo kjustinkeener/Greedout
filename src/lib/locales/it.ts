@@ -53,6 +53,7 @@ export const it: PartialDict = {
   "settings.closeToTray": "Chiudi nell'area di notifica",
   "settings.showStatusbar": "Mostra barra di stato CPU / memoria",
   "settings.showPrompt": "Mostra testo del prompt",
+  "settings.clickableTitles": "Link cliccabili nella finestra principale",
   "settings.checkUpdates": "Cerca aggiornamenti all'avvio",
   "settings.debugLogging": "Registro di debug su file",
   "settings.lockoutTip":

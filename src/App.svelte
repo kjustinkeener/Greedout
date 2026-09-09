@@ -286,6 +286,8 @@
   let showStatusbar = $state(false);
   // Show each session's latest prompt under its title; on by default.
   let showPrompt = $state(true);
+  // Make the session/project titles clickable (open the Explorer); on by default.
+  let clickableTitles = $state(true);
 
   // The update offer. Null until a check comes back with something newer, so
   // the banner does not exist on the overwhelmingly common launch where the app
@@ -431,6 +433,7 @@
     let unlistenTheme: (() => void) | undefined;
     let unlistenStatusbar: (() => void) | undefined;
     let unlistenPrompt: (() => void) | undefined;
+    let unlistenLinks: (() => void) | undefined;
     let unlistenLocale: (() => void) | undefined;
     window.addEventListener("wheel", onWheel, { passive: false });
     (async () => {
@@ -444,6 +447,7 @@
         dimHours = cfg0.dim_hours ?? 24;
         showStatusbar = cfg0.show_statusbar ?? false;
         showPrompt = cfg0.show_prompt ?? true;
+        clickableTitles = cfg0.clickable_titles ?? true;
         // Fire and forget, and silent on failure: an app that cannot reach
         // GitHub is still a working app, and saying so on every launch behind a
         // captive portal would be noise.
@@ -465,6 +469,8 @@
         unlistenStatusbar = await listen<boolean>("show-statusbar", (e) => (showStatusbar = e.payload));
         // Settings toggles the prompt text under each session live.
         unlistenPrompt = await listen<boolean>("show-prompt", (e) => (showPrompt = e.payload));
+        // Settings toggles clickable session/project titles live.
+        unlistenLinks = await listen<boolean>("clickable-titles", (e) => (clickableTitles = e.payload));
         // The Settings window (separate) previews/saves opacity via this event.
         unlistenOpacity = await listen<number>("opacity-preview", (e) => applyOpacity(e.payload));
         // Settings (separate window) pushes a live theme preview on change.
@@ -481,6 +487,7 @@
       unlistenTheme?.();
       unlistenStatusbar?.();
       unlistenPrompt?.();
+      unlistenLinks?.();
       unlistenLocale?.();
       window.removeEventListener("wheel", onWheel);
     };
@@ -567,6 +574,7 @@
           onOpenSession={() => openSession(s)}
           onOpenProject={() => openProject(s)}
           {showPrompt}
+          linksEnabled={clickableTitles}
         />
       {:else}
         <Row
@@ -577,6 +585,7 @@
           top={i === 0}
           {dimHours}
           {showPrompt}
+          linksEnabled={clickableTitles}
         />
       {/if}
     {/each}

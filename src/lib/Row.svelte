@@ -12,6 +12,7 @@
     top = false,
     dimHours = 24,
     showPrompt = true,
+    linksEnabled = true,
   }: {
     session: Session;
     onRename: () => void;
@@ -21,12 +22,15 @@
     dimHours?: number;
     /** Show the session's latest prompt under its title. */
     showPrompt?: boolean;
+    /** Titles open the Explorer on click. Off: plain text (dbl-click still renames). */
+    linksEnabled?: boolean;
   } = $props();
 
   // Single click opens the Explorer for this session; double click renames. A
   // short timer lets a double click cancel the pending single-click open.
   let clickTimer: ReturnType<typeof setTimeout> | undefined;
   function titleClick() {
+    if (!linksEnabled) return;
     clearTimeout(clickTimer);
     clickTimer = setTimeout(() => onOpenSession(), 220);
   }
@@ -99,17 +103,19 @@
     <div class="line1">
       <button
         class="title"
+        class:plain={!linksEnabled}
         onclick={titleClick}
         ondblclick={titleDbl}
-        title={t("main.exploreOrRename")}
+        title={linksEnabled ? t("main.exploreOrRename") : t("main.rename")}
         >{session.title}</button
       >
       <span class="meta1">
         <span class="ago" title={agoTip()}>{fmtAgo(session.mtime)}</span><span class="mid">·</span>
         <button
         class="project"
-        onclick={onOpenProject}
-        title={t("main.exploreProject")}
+        class:plain={!linksEnabled}
+        onclick={() => { if (linksEnabled) onOpenProject(); }}
+        title={linksEnabled ? t("main.exploreProject") : undefined}
         >{session.project}{#if session.subPath}<span class="sub"
             >/{session.subPath}</span
           >{/if}</button
@@ -230,6 +236,18 @@
   .project:hover {
     color: var(--fg);
     text-decoration: underline;
+  }
+  /* Links off: titles are plain text (double-click still renames the session). */
+  .title.plain,
+  .project.plain {
+    cursor: default;
+  }
+  .title.plain:hover {
+    text-decoration: none;
+  }
+  .project.plain:hover {
+    color: var(--muted);
+    text-decoration: none;
   }
   .title {
     flex: 0 1 auto;

@@ -125,6 +125,15 @@
     </div>
   </div>
 
+  <!-- Full URLs and a contact address, shown in full and opened in the shell (the
+       webview would otherwise navigate this window). The email is a mailto: link,
+       which open_url now allows alongside https. -->
+  <div class="links">
+    <a href={REPO} onclick={openLink}>{REPO}</a>
+    <a href="https://fasterdb.com/software/greedout/" onclick={openLink}>https://fasterdb.com/software/greedout</a>
+    <a href="mailto:gofast@fasterdb.com" onclick={openLink}>gofast@fasterdb.com</a>
+  </div>
+
   {#if updateMsg}
     <p class="umsg">{updateMsg}</p>
   {/if}
@@ -148,6 +157,28 @@
   }
   .mrow a:hover {
     color: var(--g1);
+  }
+
+  .links {
+    align-self: stretch;
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-size: calc(10.5px * var(--size-ui));
+    /* Full URLs are one long unbreakable token; let them wrap at the window edge. */
+    overflow-wrap: anywhere;
+  }
+  .links a {
+    color: var(--muted);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .links a:hover {
+    color: var(--g1);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   .umsg {

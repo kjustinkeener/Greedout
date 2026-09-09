@@ -335,12 +335,13 @@ fn tray_menu<R: tauri::Runtime, M: tauri::Manager<R>>(
 /// one line against a DLL that ships with Windows, where the plugin is a crate,
 /// an npm package and a capability entry to open one hard-coded address.
 ///
-/// https only, and refuses anything with whitespace in it. The only caller
-/// passes a literal, but this is the frontend handing the shell a string, so the
+/// https and mailto only, and refuses anything with whitespace in it. The callers
+/// pass literals, but this is the frontend handing the shell a string, so the
 /// check belongs here rather than at the call site.
 #[tauri::command]
 fn open_url(url: String) {
-    if !url.starts_with("https://") || url.split_whitespace().count() != 1 {
+    let scheme_ok = url.starts_with("https://") || url.starts_with("mailto:");
+    if !scheme_ok || url.split_whitespace().count() != 1 {
         return;
     }
     let _ = std::process::Command::new("rundll32")

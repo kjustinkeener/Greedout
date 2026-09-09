@@ -178,7 +178,7 @@
        buttons down; empty is invisible. */
     min-height: 1.4em;
     font-size: 11.5px;
-    color: var(--muted);
+    color: var(--fg);
     text-align: center;
     /* Update errors carry whatever the network layer said, which usually means a
        URL: one unbreakable token that otherwise runs past the window edge. */

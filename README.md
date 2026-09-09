@@ -72,11 +72,9 @@ Per-user, so there is no administrator prompt, and everything Greedout writes (i
 config, labels, log and the opt-in browse cache) stays inside that one folder;
 `~/.claude` is only ever read. Uninstalling removes the folder and the shortcuts.
 
-The download page is [fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/),
-on my own site, and it is the address the install card links to. It is the one that stays
-put: today it points at the [releases page](https://github.com/kjustinkeener/Greedout/releases),
-which is where the binary is hosted, and if that ever changes the site is what gets updated.
-If there is no release yet, build from source, below.
+Download it from [fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/)
+or the [releases page](https://github.com/kjustinkeener/Greedout/releases). No release yet?
+Build from source, below.
 
 ## Build from source
 

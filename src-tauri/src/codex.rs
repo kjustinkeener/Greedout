@@ -77,13 +77,23 @@ fn id_from_path(path: &Path) -> String {
     }
 }
 
+/// One Codex usage block's raw counts (`input_tokens` already includes the cached
+/// part). Priced later, once the session's model is known.
+#[derive(Default, Clone, Copy)]
+struct Counts {
+    input: u64,
+    cached: u64,
+    cache_write: u64,
+    output: u64,
+}
+
 /// What one backward tail-scan of a rollout yields.
 #[derive(Default)]
 struct Tailed {
     /// Newest response's `input_tokens` (context window occupancy).
     ctx: Option<u64>,
-    /// Cumulative session spend, priced off the newest `thread_token_usage`.
-    cost: Option<f64>,
+    /// Whole-session `thread_token_usage` counts, priced once the model is known.
+    thread: Option<Counts>,
     model: Option<String>,
     cwd: Option<String>,
 }
@@ -107,6 +117,7 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config) -> Session
     let limit = mi.as_ref().map(|i| i.context_max).unwrap_or(cfg.target_tokens);
     let model = mi.as_ref().map(|i| i.label.to_string()).unwrap_or_default();
     let model_version = t.model.as_deref().map(parse_model_version).unwrap_or_default();
+    let cost_usd = t.thread.map(|c| price(&c, t.model.as_deref())).unwrap_or(0.0);
 
     let title = session_title(&id).unwrap_or_else(|| project.clone());
     let ctx = t.ctx;
@@ -130,7 +141,7 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config) -> Session
         live,
         mtime,
         size_bytes,
-        cost_usd: t.cost.unwrap_or(0.0),
+        cost_usd,
         focused: false,
     }
 }
@@ -168,9 +179,9 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
     let mut out = Tailed::default();
     for line in lines.iter().rev() {
         if out.ctx.is_none() && line.contains("\"token_usage_record\"") {
-            if let Some((ctx, cost)) = usage_from(line) {
+            if let Some((ctx, thread)) = usage_from(line) {
                 out.ctx = Some(ctx);
-                out.cost = Some(cost);
+                out.thread = Some(thread);
             }
         }
         if out.model.is_none() && line.contains("\"model\"") {
@@ -186,40 +197,42 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
     out
 }
 
-/// Context tokens and cumulative spend from one `token_usage_record` line. Context
-/// is this response's `usage.input_tokens`; spend prices the whole-session
-/// `thread_token_usage` (Codex's `input_tokens` already includes the cached part,
-/// so the non-cached remainder is billed at the input rate and the cached part at
-/// the cache-read rate).
-fn usage_from(line: &str) -> Option<(u64, f64)> {
+/// Context tokens and the whole-session `thread_token_usage` counts from one
+/// `token_usage_record` line. Context is this response's `usage.input_tokens`; the
+/// thread counts are priced later, once the session's model is resolved.
+fn usage_from(line: &str) -> Option<(u64, Counts)> {
     let v: Value = serde_json::from_str(line).ok()?;
     if v.get("type").and_then(Value::as_str) != Some("token_usage_record") {
         return None;
     }
     let p = v.get("payload")?;
-    let get = |block: &Value, k: &str| block.get(k).and_then(Value::as_u64).unwrap_or(0);
-
     let usage = p.get("usage")?;
-    let ctx = get(usage, "input_tokens");
-
-    let thread = p.get("thread_token_usage").unwrap_or(usage);
-    let cost = price(thread);
-    Some((ctx, cost))
+    let ctx = usage.get("input_tokens").and_then(Value::as_u64).unwrap_or(0);
+    let thread = counts_of(p.get("thread_token_usage").unwrap_or(usage));
+    Some((ctx, thread))
 }
 
-/// Price one Codex usage block. Model is looked up lazily -- the block itself
-/// doesn't name it -- so callers price with the session's model already resolved;
-/// here we can't see it, so we use the GPT row via a synthetic id.
-fn price(block: &Value) -> f64 {
-    let get = |k: &str| block.get(k).and_then(Value::as_u64).unwrap_or(0) as f64;
-    let mi = model_info("gpt");
-    let cached = get("cached_input_tokens");
-    let input = get("input_tokens");
-    let non_cached = (input - cached).max(0.0);
+/// Read a Codex usage block's raw token counts.
+fn counts_of(block: &Value) -> Counts {
+    let get = |k: &str| block.get(k).and_then(Value::as_u64).unwrap_or(0);
+    Counts {
+        input: get("input_tokens"),
+        cached: get("cached_input_tokens"),
+        cache_write: get("cache_write_input_tokens"),
+        output: get("output_tokens"),
+    }
+}
+
+/// Price one Codex usage block against the session's model. Codex's `input_tokens`
+/// already includes the cached part, so the non-cached remainder is billed at the
+/// input rate and the cached part at the (cheaper) cache-read rate.
+fn price(c: &Counts, model: Option<&str>) -> f64 {
+    let mi = model_info(model.unwrap_or("gpt"));
+    let non_cached = c.input.saturating_sub(c.cached) as f64;
     (non_cached * mi.price_in
-        + cached * mi.price_cache_read
-        + get("cache_write_input_tokens") * mi.price_cache_write
-        + get("output_tokens") * mi.price_out)
+        + c.cached as f64 * mi.price_cache_read
+        + c.cache_write as f64 * mi.price_cache_write
+        + c.output as f64 * mi.price_out)
         / 1_000_000.0
 }
 
@@ -264,6 +277,11 @@ pub fn history(id: &str) -> Vec<Sample> {
     };
     let Ok(text) = std::fs::read_to_string(&path) else { return Vec::new() };
 
+    // Resolve the session's model once so every per-turn row prices consistently.
+    let model = text.lines().rev().find_map(|l| {
+        l.contains("\"model\"").then(|| payload_str(l, "model")).flatten()
+    });
+
     let mut rows: Vec<(i64, u64, f64)> = Vec::new();
     for line in text.lines() {
         if !line.contains("\"token_usage_record\"") {
@@ -276,7 +294,8 @@ pub fn history(id: &str) -> Vec<Sample> {
         let Some(p) = v.get("payload") else { continue };
         let Some(usage) = p.get("usage") else { continue };
         let ctx = usage.get("input_tokens").and_then(Value::as_u64).unwrap_or(0);
-        let cost = price(usage);
+        // Per-turn spend from this response's own usage (running-summed below).
+        let cost = price(&counts_of(usage), model.as_deref());
         let Some(t) = v.get("timestamp").and_then(Value::as_str).and_then(iso_to_millis) else {
             continue;
         };

@@ -37,11 +37,28 @@ pub(crate) struct ModelInfo {
 pub(crate) fn model_info(model: &str) -> ModelInfo {
     let m = model.to_ascii_lowercase();
     // --- OpenAI GPT / Codex ---
-    // Codex (desktop + CLI) reports ids like "gpt-5", "gpt-5-codex", or internal
-    // codenames ("gpt-5.6-terra"); all match here. Window 400k total, sweet spot
-    // 272k (the input half of GPT-5's window). Codex's `input_tokens` already
-    // includes cached, so the cache-read row is priced against `cached_input_tokens`.
-    if m.contains("gpt") || m.starts_with('o') && m[1..].chars().next().is_some_and(|c| c.is_ascii_digit()) {
+    // Codex (desktop + CLI) reports ids like "gpt-5", "gpt-5-codex", the smaller
+    // "gpt-5-mini"/"gpt-5-nano", or internal codenames ("gpt-5.6-terra"). All share
+    // the 400k window (sweet spot 272k = the input half); only the price tier
+    // differs. Codex's `input_tokens` already includes cached, so the cache-read
+    // row is priced against `cached_input_tokens`. Rates per OpenAI's API pricing
+    // (verified 2026-09-09). NOTE: versioned codex variants (gpt-5.3-codex at
+    // 1.75/14, and the unpriced gpt-5.x codenames the desktop app ships) cost MORE
+    // than base gpt-5; without a published number they fall through to the gpt-5
+    // row below, so their spend is an under-estimate.
+    let gpt = m.contains("gpt")
+        || (m.starts_with('o') && m[1..].chars().next().is_some_and(|c| c.is_ascii_digit()));
+    if gpt {
+        if m.contains("nano") {
+            return ModelInfo { label: "GPT", price_in: 0.05, price_out: 0.40,
+                price_cache_write: 0.05, price_cache_read: 0.005,
+                context_max: 400_000, target: 272_000 };
+        }
+        if m.contains("mini") {
+            return ModelInfo { label: "GPT", price_in: 0.25, price_out: 2.0,
+                price_cache_write: 0.25, price_cache_read: 0.025,
+                context_max: 400_000, target: 272_000 };
+        }
         return ModelInfo { label: "GPT", price_in: 1.25, price_out: 10.0,
             price_cache_write: 1.25, price_cache_read: 0.125,
             context_max: 400_000, target: 272_000 };

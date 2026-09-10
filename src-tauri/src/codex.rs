@@ -96,6 +96,10 @@ struct Tailed {
     thread: Option<Counts>,
     model: Option<String>,
     cwd: Option<String>,
+    /// The REAL per-session context window the desktop app enforces
+    /// (`model_context_window`, e.g. 258400 = 272000 tier × 95% effective), read
+    /// from the rollout itself rather than the model's API-ceiling `context_max`.
+    window: Option<u64>,
 }
 
 /// Build one Codex session row for the poll list. Mirrors scan::build_session but
@@ -114,8 +118,15 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, focused: O
     };
 
     let mi = t.model.as_deref().map(model_info);
-    let target = mi.as_ref().map(|i| i.target).unwrap_or(cfg.target_tokens);
-    let limit = mi.as_ref().map(|i| i.context_max).unwrap_or(cfg.target_tokens);
+    // Prefer the session's own enforced window over the model's API ceiling: the
+    // desktop app caps context well below `context_max` (astra bills a 1.05M API
+    // window but the app enforces 258400). If we found it, it's also the hard
+    // `limit`, and the gauge's `target` sweet spot must sit at/under it -- the
+    // API-derived 272k target would otherwise exceed a 258400 window and never fill.
+    let target0 = mi.as_ref().map(|i| i.target).unwrap_or(cfg.target_tokens);
+    let max = mi.as_ref().map(|i| i.context_max).unwrap_or(cfg.target_tokens);
+    let limit = t.window.unwrap_or(max);
+    let target = t.window.map(|w| target0.min(w)).unwrap_or(target0);
     let model = mi.as_ref().map(|i| i.label.to_string()).unwrap_or_default();
     let model_version = t.model.as_deref().map(parse_model_version).unwrap_or_default();
     let cost_usd = t.thread.map(|c| price(&c, t.model.as_deref())).unwrap_or(0.0);
@@ -179,6 +190,19 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
 
     let mut out = Tailed::default();
     for line in lines.iter().rev() {
+        // Compaction resets the window: scanning backward, if we reach a `compacted`
+        // record before any `token_usage_record`, compaction is the newest context
+        // event and the pre-compact record beyond it is stale (226k → 27k in
+        // practice). Report 0 (empty) until the next turn writes a real usage record,
+        // rather than showing a phantom-full gauge -- the analog of scan.rs's Claude
+        // `compact_boundary` fix. A post-compact usage record nearer EOF is found
+        // first, so this guard only fires in the brief just-compacted gap.
+        if out.ctx.is_none()
+            && line.contains("\"compacted\"")
+            && is_record_type(line, "compacted")
+        {
+            out.ctx = Some(0);
+        }
         if out.ctx.is_none() && line.contains("\"token_usage_record\"") {
             if let Some((ctx, thread)) = usage_from(line) {
                 out.ctx = Some(ctx);
@@ -191,11 +215,37 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
         if out.cwd.is_none() && line.contains("\"cwd\"") {
             out.cwd = payload_str(line, "cwd");
         }
-        if out.ctx.is_some() && out.model.is_some() && out.cwd.is_some() {
+        if out.window.is_none() && line.contains("model_context_window") {
+            out.window = window_from(line);
+        }
+        if out.ctx.is_some() && out.model.is_some() && out.cwd.is_some() && out.window.is_some() {
             break;
         }
     }
     out
+}
+
+/// Cheap confirmation that a rollout line's top-level `type` equals `want` (the
+/// `contains` pre-check keeps this parse off the hot path). Guards against matching
+/// the word inside message text rather than a real record of that type.
+fn is_record_type(line: &str, want: &str) -> bool {
+    serde_json::from_str::<Value>(line)
+        .ok()
+        .and_then(|v| v.get("type").and_then(Value::as_str).map(|t| t == want))
+        .unwrap_or(false)
+}
+
+/// The enforced per-session context window from a line that carries
+/// `model_context_window` -- either an `event_msg/task_started` payload
+/// (`payload.model_context_window`) or a `token_count` (`payload.info.
+/// model_context_window`). Both report the same value; we accept whichever is present.
+fn window_from(line: &str) -> Option<u64> {
+    let v: Value = serde_json::from_str(line).ok()?;
+    let p = v.get("payload")?;
+    p.get("model_context_window")
+        .or_else(|| p.get("info").and_then(|i| i.get("model_context_window")))
+        .and_then(Value::as_u64)
+        .filter(|w| *w > 0)
 }
 
 /// Context tokens and the whole-session `thread_token_usage` counts from one

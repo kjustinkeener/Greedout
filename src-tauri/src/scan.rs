@@ -49,6 +49,16 @@ pub(crate) fn model_info(model: &str) -> ModelInfo {
     let gpt = m.contains("gpt")
         || (m.starts_with('o') && m[1..].chars().next().is_some_and(|c| c.is_ascii_digit()));
     if gpt {
+        // GPT-6 (gpt-6-astra, released 2026-09-03; VERIFIED against OpenAI docs
+        // 2026-09-10). 1.05M window; 272k is astra's real tier boundary -- above it
+        // the WHOLE request bills 2x input / 1.5x output, so 272k is a genuine
+        // "getting expensive" target, not a guess. We price per turn at the standard
+        // (<=272k) rate; a rare >272k turn is under-priced, acceptable for a gauge.
+        if m.contains("gpt-6") {
+            return ModelInfo { label: "GPT", price_in: 10.0, price_out: 50.0,
+                price_cache_write: 12.5, price_cache_read: 1.0,
+                context_max: 1_050_000, target: 272_000 };
+        }
         if m.contains("nano") {
             return ModelInfo { label: "GPT", price_in: 0.05, price_out: 0.40,
                 price_cache_write: 0.05, price_cache_read: 0.005,
@@ -173,17 +183,51 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     // The session currently open in the Claude app, if we can tell. It's forced
     // to the top so switching to a session shows its gauge immediately, without
     // waiting for Claude to write to the transcript.
-    let focused = if cfg.follow_focus {
-        focused_session_id()
+    // One focused session TOTAL across every harness, not one per harness: look up
+    // each harness's focus with its own freshness timestamp (Claude's
+    // `lastFocusedAt`, Codex's desktop-log mtime, both ms), then keep only the more
+    // recent -- that's the session the user is actually looking at right now. The
+    // loser is dropped so with n=1 the single gauge tracks true focus across apps.
+    let (focused, codex_focused) = if cfg.follow_focus {
+        let claude = focused_session_id();
+        let codex = crate::codex::focused_session_id();
+        // A bare alt-tab between the two apps writes nothing to either's logs
+        // (Claude rewrites `lastFocusedAt` only on a within-Claude thread switch;
+        // Codex logs a route line only when a DIFFERENT thread is selected), so the
+        // on-disk selection timestamps can't tell which app you just tabbed to. The
+        // OS foreground window can: if the frontmost process is one of the two apps,
+        // that app's last-selected thread is what you're looking at. Only when the
+        // foreground is neither (e.g. you clicked Greedout itself) do we fall back
+        // to whichever selection timestamp is newer.
+        // Which of the two apps was frontmost is remembered across polls (LAST_FG)
+        // so that tabbing AWAY to some third window (a browser, an editor) holds the
+        // last app you were actually in rather than flipping by stale timestamps.
+        use std::sync::atomic::{AtomicU8, Ordering};
+        static LAST_FG: AtomicU8 = AtomicU8::new(0); // 0 unknown, 1 claude, 2 codex
+        let fg = foreground_exe();
+        let app = match fg.as_deref() {
+            Some("chatgpt.exe") => 2,
+            Some("claude.exe") => 1,
+            _ => LAST_FG.load(Ordering::Relaxed), // third window: keep last app
+        };
+        match app {
+            2 if codex.is_some() => {
+                LAST_FG.store(2, Ordering::Relaxed);
+                (None, codex.map(|(id, _)| id))
+            }
+            1 if claude.is_some() => {
+                LAST_FG.store(1, Ordering::Relaxed);
+                (claude.map(|(id, _)| id), None)
+            }
+            // No remembered app yet (or its session vanished): newest selection wins.
+            _ => match (&claude, &codex) {
+                (Some((_, ct)), Some((_, xt))) if xt > ct => (None, codex.map(|(id, _)| id)),
+                (Some(_), Some(_)) => (claude.map(|(id, _)| id), None),
+                _ => (claude.map(|(id, _)| id), codex.map(|(id, _)| id)),
+            },
+        }
     } else {
-        None
-    };
-    // The Codex thread currently open, from its own desktop-app DB (best-effort;
-    // its own id space, so a separate lookup from the Claude focus above).
-    let codex_focused = if cfg.follow_focus {
-        crate::codex::focused_session_id()
-    } else {
-        None
+        (None, None)
     };
 
     // (path, mtime) for every transcript. We keep the list ALWAYS full: rather
@@ -752,7 +796,63 @@ fn claude_sessions_dir() -> Option<PathBuf> {
     plain.is_dir().then_some(plain)
 }
 
-fn focused_session_id() -> Option<String> {
+/// Lowercased file name of the process that owns the OS foreground window
+/// (e.g. `"chatgpt.exe"`, `"claude.exe"`, `"greedout.exe"`), or None if it can't be
+/// determined. Used to tell which app the user just tabbed to when no thread was
+/// selected. Win32 declared inline to avoid pulling in the whole `windows` crate.
+#[cfg(windows)]
+fn foreground_exe() -> Option<String> {
+    use std::os::windows::ffi::OsStringExt;
+    #[link(name = "user32")]
+    extern "system" {
+        fn GetForegroundWindow() -> isize;
+        fn GetWindowThreadProcessId(hwnd: isize, pid: *mut u32) -> u32;
+    }
+    extern "system" {
+        fn OpenProcess(access: u32, inherit: i32, pid: u32) -> isize;
+        fn QueryFullProcessImageNameW(h: isize, flags: u32, buf: *mut u16, size: *mut u32) -> i32;
+        fn CloseHandle(h: isize) -> i32;
+    }
+    const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd == 0 {
+            return None;
+        }
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid == 0 {
+            return None;
+        }
+        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if h == 0 {
+            return None;
+        }
+        let mut buf = [0u16; 260];
+        let mut size = buf.len() as u32;
+        let ok = QueryFullProcessImageNameW(h, 0, buf.as_mut_ptr(), &mut size);
+        CloseHandle(h);
+        if ok == 0 {
+            return None;
+        }
+        let path = std::ffi::OsString::from_wide(&buf[..size as usize]);
+        Some(
+            std::path::Path::new(&path)
+                .file_name()?
+                .to_string_lossy()
+                .to_lowercase(),
+        )
+    }
+}
+
+#[cfg(not(windows))]
+fn foreground_exe() -> Option<String> {
+    None
+}
+
+/// Returns `(session id, lastFocusedAt in ms)` so the caller can compare Claude
+/// focus freshness against Codex's and pick a single globally-focused session.
+fn focused_session_id() -> Option<(String, u64)> {
     let base = claude_sessions_dir()?;
     // The glob crate matches unreliably across multiple `\`-separated wildcard
     // segments on Windows; forward slashes match fine and Windows accepts them.
@@ -773,7 +873,7 @@ fn focused_session_id() -> Option<String> {
             best = Some((focused_at, cli.to_string()));
         }
     }
-    best.map(|(_, id)| id)
+    best.map(|(t, id)| (id, t))
 }
 
 /// Full over-time curve for one session, reconstructed from its transcript:

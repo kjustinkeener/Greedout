@@ -181,7 +181,7 @@ fn default_size_num() -> f64 {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            n: 5,
+            n: 1,
             poll_seconds: 0.5,
             target_tokens: 200_000,
             follow_focus: true,

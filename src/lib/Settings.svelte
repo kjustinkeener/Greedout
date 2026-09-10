@@ -118,7 +118,7 @@
   // `font_sets` likewise: those are the user's own saved sets, not a setting to
   // restore, and resetting the look should not throw them away.
   const DEFAULTS: Omit<Config, "ui_scale" | "browse_enabled" | "font_sets"> = {
-    N: 5,
+    N: 1,
     poll_seconds: 0.5,
     target_tokens: 200_000,
     follow_focus: true,

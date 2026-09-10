@@ -250,29 +250,85 @@ fn payload_str(line: &str, key: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Best guess at the Codex thread the user currently has open. Codex writes no
-/// focus sidecar (unlike Claude's `lastFocusedAt`), so we use the closest signal
-/// in its desktop-app DB `~/.codex/state_5.sqlite`: the newest-`recency_at_ms`
-/// non-archived thread. Opened READ-ONLY so we never disturb the live DB the app
-/// holds open; any error (locked, missing, schema drift) just yields None = no pin.
+/// The Codex thread the user currently has open, including an IDLE one they just
+/// clicked into without sending a turn. Codex writes no focus sidecar, and its
+/// `state_5.sqlite` `recency_at_ms` (tried first, reverted) advances only on
+/// activity -- so selecting a thread and sitting there was invisible. The one
+/// place idle selection IS observable is the desktop app's own debug log: opening
+/// or switching to a thread (no turn required) emits a line carrying
+/// `ownerRoutePath=/local/<thread-uuid>`. We tail the newest such log and take the
+/// last route id. Best-effort: any missing path / read error yields None = no pin,
+/// same staleness tolerance as Claude's focus sidecar (a stale value just pins the
+/// last thread the user looked at).
 ///
-/// CAVEAT (pending live verification): `recency_at_ms` is known to advance on
-/// activity; whether it also advances the instant a thread is merely selected
-/// (true focus) is what decides if this beats the plain mtime sort.
-pub fn focused_session_id() -> Option<String> {
-    use rusqlite::{Connection, OpenFlags};
-    let db = codex_dir().join("state_5.sqlite");
-    let conn = Connection::open_with_flags(
-        db,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
-    )
-    .ok()?;
-    conn.query_row(
-        "SELECT id FROM threads WHERE archived = 0 ORDER BY recency_at_ms DESC LIMIT 1",
-        [],
-        |row| row.get::<_, String>(0),
-    )
-    .ok()
+/// The log lives under the MSIX-virtualized LocalAppData, per-launch and
+/// date-partitioned, so we glob for it rather than reading a fixed path:
+/// `%LOCALAPPDATA%\Packages\OpenAI.Codex_*\LocalCache\Local\Codex\Logs\Y\M\D\*t0*.log`
+/// (only the `t0` renderer log carries route events; t1/t2 are worker/utility).
+/// Returns `(session id, focus timestamp in ms)`. The timestamp is the log file's
+/// mtime, letting the caller compare Codex focus freshness against Claude's
+/// `lastFocusedAt` to pick a single globally-focused session across harnesses.
+pub fn focused_session_id() -> Option<(String, u64)> {
+    let local = std::env::var_os("LOCALAPPDATA")?;
+    // Forward slashes only (glob treats `\` as an escape on Windows -- same trap as
+    // candidates()). `*t0*` picks the main renderer log across any launch/pid.
+    let pat = PathBuf::from(local)
+        .join("Packages").join("OpenAI.Codex_*")
+        .join("LocalCache").join("Local").join("Codex").join("Logs")
+        .join("*").join("*").join("*").join("*t0*.log")
+        .to_string_lossy()
+        .replace('\\', "/");
+    let newest = glob::glob(&pat)
+        .ok()?
+        .flatten()
+        .filter_map(|p| {
+            let ms = std::fs::metadata(&p)
+                .and_then(|m| m.modified())
+                .ok()?
+                .duration_since(UNIX_EPOCH)
+                .ok()?
+                .as_millis() as u64;
+            Some((p, ms))
+        })
+        .max_by_key(|(_, ms)| *ms)
+        .map(|(p, _)| p)?;
+    last_route(&newest)
+}
+
+/// The last `ownerRoutePath=/local/<uuid>` in a Codex desktop log = the most
+/// recently focused thread, as `(id, selection time in ms)`. The time is parsed
+/// from the SELECTION LINE's own leading ISO-Z timestamp, NOT the file mtime: the
+/// log gets background writes with no thread change, so mtime is not a focus event
+/// and would make Codex spuriously outrank Claude's `lastFocusedAt`. Reads only the
+/// file's tail (route events cluster near EOF) and validates the 36-char uuid.
+fn last_route(log: &Path) -> Option<(String, u64)> {
+    const MARKER: &str = "ownerRoutePath=/local/";
+    let mut f = std::fs::File::open(log).ok()?;
+    let len = f.metadata().ok()?.len();
+    let start = len.saturating_sub(256 * 1024);
+    f.seek(SeekFrom::Start(start)).ok()?;
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).ok()?;
+    let text = String::from_utf8_lossy(&buf);
+    let at = text.rfind(MARKER)?;
+    let id: String = text[at + MARKER.len()..].chars().take(36).collect();
+    if !is_uuid(&id) {
+        return None;
+    }
+    // The line starts with `2026-09-10T20:35:22.530Z ` -- take the first token.
+    let line_start = text[..at].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let stamp = text[line_start..].split_whitespace().next()?;
+    let ms = iso_to_millis(stamp)?.max(0) as u64;
+    Some((id, ms))
+}
+
+/// Canonical 8-4-4-4-12 hex uuid check (dashes at 8/13/18/23, hex elsewhere).
+fn is_uuid(s: &str) -> bool {
+    s.len() == 36
+        && s.char_indices().all(|(i, c)| match i {
+            8 | 13 | 18 | 23 => c == '-',
+            _ => c.is_ascii_hexdigit(),
+        })
 }
 
 /// The session's title from `~/.codex/session_index.jsonl` (`id` -> `thread_name`).

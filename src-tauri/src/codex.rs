@@ -68,7 +68,7 @@ pub fn candidates() -> Vec<(PathBuf, u64)> {
 /// The session uuid encoded in a `rollout-<ts>-<uuid>.jsonl` filename. The uuid is
 /// canonical (36 chars) and always the tail of the stem, so we slice it off the end
 /// rather than trying to split the timestamp apart.
-fn id_from_path(path: &Path) -> String {
+pub(crate) fn id_from_path(path: &Path) -> String {
     let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
     if stem.len() >= 36 {
         stem[stem.len() - 36..].to_string()
@@ -100,8 +100,9 @@ struct Tailed {
 
 /// Build one Codex session row for the poll list. Mirrors scan::build_session but
 /// for Codex's on-disk shape; grouping/labels are applied by the caller.
-pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config) -> Session {
+pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, focused: Option<&str>) -> Session {
     let id = id_from_path(path);
+    let is_focused = focused == Some(id.as_str());
     let t = tail_scan(path).unwrap_or_default();
     let size_bytes = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
@@ -142,7 +143,7 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config) -> Session
         mtime,
         size_bytes,
         cost_usd,
-        focused: false,
+        focused: is_focused,
     }
 }
 
@@ -247,6 +248,31 @@ fn payload_str(line: &str, key: &str) -> Option<String> {
         .and_then(Value::as_str)
         .filter(|s| !s.is_empty())
         .map(str::to_string)
+}
+
+/// Best guess at the Codex thread the user currently has open. Codex writes no
+/// focus sidecar (unlike Claude's `lastFocusedAt`), so we use the closest signal
+/// in its desktop-app DB `~/.codex/state_5.sqlite`: the newest-`recency_at_ms`
+/// non-archived thread. Opened READ-ONLY so we never disturb the live DB the app
+/// holds open; any error (locked, missing, schema drift) just yields None = no pin.
+///
+/// CAVEAT (pending live verification): `recency_at_ms` is known to advance on
+/// activity; whether it also advances the instant a thread is merely selected
+/// (true focus) is what decides if this beats the plain mtime sort.
+pub fn focused_session_id() -> Option<String> {
+    use rusqlite::{Connection, OpenFlags};
+    let db = codex_dir().join("state_5.sqlite");
+    let conn = Connection::open_with_flags(
+        db,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
+    )
+    .ok()?;
+    conn.query_row(
+        "SELECT id FROM threads WHERE archived = 0 ORDER BY recency_at_ms DESC LIMIT 1",
+        [],
+        |row| row.get::<_, String>(0),
+    )
+    .ok()
 }
 
 /// The session's title from `~/.codex/session_index.jsonl` (`id` -> `thread_name`).

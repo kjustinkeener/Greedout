@@ -178,6 +178,13 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     } else {
         None
     };
+    // The Codex thread currently open, from its own desktop-app DB (best-effort;
+    // its own id space, so a separate lookup from the Claude focus above).
+    let codex_focused = if cfg.follow_focus {
+        crate::codex::focused_session_id()
+    } else {
+        None
+    };
 
     // (path, mtime) for every transcript. We keep the list ALWAYS full: rather
     // than drop a session the instant it goes idle, we show the `n` most-recent
@@ -202,15 +209,20 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
         candidates.push((path, mtime, true));
     }
 
-    // Sort key: focused session pinned first, then most-recent mtime. Focus is a
-    // Claude-only signal (the Codex app exposes no focus sidecar we read), so a
-    // Codex candidate is never pinned.
+    // Sort key: the focused session (Claude via its focus sidecar, or Codex via its
+    // desktop-app DB) is pinned to the very top; everything else ranks by mtime.
     let sort_key = |p: &Path, mtime: u64, is_codex: bool| -> u64 {
-        let focused_here = !is_codex
-            && focused
+        let focused_here = if is_codex {
+            codex_focused
+                .as_deref()
+                .map(|f| crate::codex::id_from_path(p) == f)
+                .unwrap_or(false)
+        } else {
+            focused
                 .as_deref()
                 .map(|f| p.file_stem().map(|s| s == f).unwrap_or(false))
-                .unwrap_or(false);
+                .unwrap_or(false)
+        };
         if focused_here {
             u64::MAX
         } else {
@@ -224,7 +236,7 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
         .into_iter()
         .map(|(path, mtime, is_codex)| {
             if is_codex {
-                crate::codex::build_session(&path, mtime, now, cfg)
+                crate::codex::build_session(&path, mtime, now, cfg, codex_focused.as_deref())
             } else {
                 build_session(&path, mtime, now, cfg, labels, focused.as_deref())
             }

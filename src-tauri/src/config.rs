@@ -222,6 +222,15 @@ pub fn claude_dir() -> PathBuf {
     dirs::home_dir().unwrap_or_default().join(".claude")
 }
 
+/// `~/.codex`: the Codex (OpenAI) home, where the CLI and the desktop app both
+/// write per-session rollout transcripts. Honors CODEX_HOME if set.
+pub fn codex_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("CODEX_HOME") {
+        return PathBuf::from(dir);
+    }
+    dirs::home_dir().unwrap_or_default().join(".codex")
+}
+
 /// `%LOCALAPPDATA%\Greedout`: Greedout's own data dir (config, labels, log, and
 /// the opt-in browse cache). The app reads `~/.claude` but writes only here, so
 /// nothing of ours lands inside Claude Code's config home. Public so browse.rs

@@ -1,5 +1,6 @@
 mod baseline;
 mod browse;
+mod codex;
 mod config;
 mod grouping;
 mod i18n;

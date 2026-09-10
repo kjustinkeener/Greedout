@@ -21,21 +21,31 @@ const SUBTITLE_MAX: usize = 80;
 /// Pricing and context limits for one model. Prices are USD per million tokens
 /// (as published), converted to per-token at use. `context_max` is the hard
 /// enforced window; `target` is the recommended "sweet spot" the gauge fills to.
-struct ModelInfo {
-    label: &'static str,
-    price_in: f64,
-    price_out: f64,
-    price_cache_write: f64,
-    price_cache_read: f64,
-    context_max: u64,
-    target: u64,
+pub(crate) struct ModelInfo {
+    pub label: &'static str,
+    pub price_in: f64,
+    pub price_out: f64,
+    pub price_cache_write: f64,
+    pub price_cache_read: f64,
+    pub context_max: u64,
+    pub target: u64,
 }
 
 /// Look up a model by (case-insensitive substring of) its id. Central table --
 /// add rows here as we bring in other clouds (GPT, Gemini, etc.). Unknown models
 /// fall back to the Opus row (a safe high estimate) with a "?" label.
-fn model_info(model: &str) -> ModelInfo {
+pub(crate) fn model_info(model: &str) -> ModelInfo {
     let m = model.to_ascii_lowercase();
+    // --- OpenAI GPT / Codex ---
+    // Codex (desktop + CLI) reports ids like "gpt-5", "gpt-5-codex", or internal
+    // codenames ("gpt-5.6-terra"); all match here. Window 400k total, sweet spot
+    // 272k (the input half of GPT-5's window). Codex's `input_tokens` already
+    // includes cached, so the cache-read row is priced against `cached_input_tokens`.
+    if m.contains("gpt") || m.starts_with('o') && m[1..].chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        return ModelInfo { label: "GPT", price_in: 1.25, price_out: 10.0,
+            price_cache_write: 1.25, price_cache_read: 0.125,
+            context_max: 400_000, target: 272_000 };
+    }
     // --- Anthropic Claude ---
     // Sweet spot 200k, hard window 1M (per our own findings).
     if m.contains("opus") {
@@ -147,7 +157,9 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     // transcripts and let idle ones stay until a newer session bumps them off the
     // bottom. Age is conveyed by the row's mtime-based dimming (frontend), so there
     // is no idle cutoff here at all.
-    let mut candidates: Vec<(PathBuf, u64)> = Vec::new();
+    // Each candidate is (path, mtime, is_codex). Claude and Codex sessions compete
+    // in one pool so the `n` most-recent across BOTH harnesses are what show.
+    let mut candidates: Vec<(PathBuf, u64, bool)> = Vec::new();
     if let Ok(paths) = glob::glob(&pattern) {
         for entry in paths.flatten() {
             let Ok(meta) = std::fs::metadata(&entry) else { continue };
@@ -156,28 +168,40 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
                 .duration_since(UNIX_EPOCH)
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
-            candidates.push((entry, mtime));
+            candidates.push((entry, mtime, false));
         }
     }
+    for (path, mtime) in crate::codex::candidates() {
+        candidates.push((path, mtime, true));
+    }
 
-    // Sort key: focused session pinned first, then most-recent mtime.
-    let sort_key = |p: &Path, mtime: u64| -> u64 {
-        let focused_here = focused
-            .as_deref()
-            .map(|f| p.file_stem().map(|s| s == f).unwrap_or(false))
-            .unwrap_or(false);
+    // Sort key: focused session pinned first, then most-recent mtime. Focus is a
+    // Claude-only signal (the Codex app exposes no focus sidecar we read), so a
+    // Codex candidate is never pinned.
+    let sort_key = |p: &Path, mtime: u64, is_codex: bool| -> u64 {
+        let focused_here = !is_codex
+            && focused
+                .as_deref()
+                .map(|f| p.file_stem().map(|s| s == f).unwrap_or(false))
+                .unwrap_or(false);
         if focused_here {
             u64::MAX
         } else {
             mtime
         }
     };
-    candidates.sort_by(|a, b| sort_key(&b.0, b.1).cmp(&sort_key(&a.0, a.1)));
+    candidates.sort_by(|a, b| sort_key(&b.0, b.1, b.2).cmp(&sort_key(&a.0, a.1, a.2)));
     candidates.truncate(cfg.n);
 
     let mut sessions: Vec<Session> = candidates
         .into_iter()
-        .map(|(path, mtime)| build_session(&path, mtime, now, cfg, labels, focused.as_deref()))
+        .map(|(path, mtime, is_codex)| {
+            if is_codex {
+                crate::codex::build_session(&path, mtime, now, cfg)
+            } else {
+                build_session(&path, mtime, now, cfg, labels, focused.as_deref())
+            }
+        })
         .collect();
     apply_grouping(&mut sessions);
     sessions
@@ -726,7 +750,9 @@ pub fn session_history(id: &str) -> Vec<Sample> {
         .to_string_lossy()
         .replace('\\', "/");
     let Some(path) = glob::glob(&pattern).ok().and_then(|mut g| g.find_map(Result::ok)) else {
-        return Vec::new();
+        // Not a Claude transcript: it may be a Codex session (different id space
+        // and on-disk format), so let the Codex adapter reconstruct the curve.
+        return crate::codex::history(id);
     };
     let Ok(text) = std::fs::read_to_string(&path) else { return Vec::new() };
 
@@ -895,7 +921,7 @@ pub fn transcript_path(id: &str) -> Option<PathBuf> {
 }
 
 /// Evenly thin a series down to at most `max` points, always keeping the last.
-fn downsample(v: Vec<Sample>, max: usize) -> Vec<Sample> {
+pub(crate) fn downsample(v: Vec<Sample>, max: usize) -> Vec<Sample> {
     let n = v.len();
     if n <= max || max == 0 {
         return v;
@@ -951,7 +977,7 @@ fn parse_ctx(line: &str) -> Option<u64> {
 /// Extract a human version from a raw model id, e.g. "claude-opus-4-8-2025..."
 /// -> "4.8", "claude-sonnet-5" -> "5". Numeric segments after the family name are
 /// joined with '.'; long segments (8+ digits, i.e. a date stamp) are ignored.
-fn parse_model_version(id: &str) -> String {
+pub(crate) fn parse_model_version(id: &str) -> String {
     let parts: Vec<&str> = id
         .split(['-', '_'])
         .filter(|s| s.chars().all(|c| c.is_ascii_digit()) && !s.is_empty() && s.len() < 4)

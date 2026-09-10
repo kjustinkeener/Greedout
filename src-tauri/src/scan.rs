@@ -59,6 +59,16 @@ pub(crate) fn model_info(model: &str) -> ModelInfo {
                 price_cache_write: 0.25, price_cache_read: 0.025,
                 context_max: 400_000, target: 272_000 };
         }
+        // PLACEHOLDER (recheck ~2026-09-11): versioned codex codenames like
+        // "gpt-5.6-terra"/"gpt-5.6-sol" have no published price. The decimal minor
+        // (the `.` after 5) distinguishes them from base "gpt-5"/"gpt-5-codex".
+        // Proxy them to the one confirmed higher tier, gpt-5.3-codex (1.75 / 14),
+        // rather than under-billing them at the base rate.
+        if m.contains("gpt-5.") {
+            return ModelInfo { label: "GPT", price_in: 1.75, price_out: 14.0,
+                price_cache_write: 1.75, price_cache_read: 0.175,
+                context_max: 400_000, target: 272_000 };
+        }
         return ModelInfo { label: "GPT", price_in: 1.25, price_out: 10.0,
             price_cache_write: 1.25, price_cache_read: 0.125,
             context_max: 400_000, target: 272_000 };

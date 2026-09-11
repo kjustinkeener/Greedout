@@ -967,6 +967,9 @@ pub struct SearchHit {
     pub last_ms: i64,
     pub score: u32,
     pub snippet: String,
+    /// "claude-code" | "codex" -- which harness this session belongs to, so the
+    /// results list can badge cross-harness hits.
+    pub harness: String,
 }
 
 /// Progress for a running search.
@@ -1278,7 +1281,7 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
                 if is_current() {
                     let _ = app.emit(
                         "search-hit",
-                        SearchHit { id, title, project, project_path, size_bytes: size, mtime, first_ms, last_ms, score, snippet },
+                        SearchHit { id, title, project, project_path, size_bytes: size, mtime, first_ms, last_ms, score, snippet, harness: if is_codex { "codex".into() } else { HARNESS.into() } },
                     );
                 }
             }

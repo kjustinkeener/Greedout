@@ -169,6 +169,7 @@ export interface SearchHit {
   lastMs: number; // last transcript turn (last activity)
   score: number;
   snippet: string;
+  harness: string; // "claude-code" | "codex"
 }
 
 // Mirror of the Rust `Config` (note the `N` key for max sessions).

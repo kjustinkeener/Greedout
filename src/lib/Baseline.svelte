@@ -129,6 +129,11 @@
   function cancelSearch() {
     invoke("browse_search_cancel").catch(() => {});
   }
+  // Short harness label for a search-hit badge.
+  function harnessLabel(h: string): string {
+    return h === "codex" ? "Codex" : "Claude";
+  }
+
   // Escape HTML, then bold the matched query terms in a snippet. Terms mirror the
   // backend: the whole query plus each word of length >= 2.
   function highlight(snippet: string): string {
@@ -1529,6 +1534,7 @@
           {#each shownHits as h (h.projectPath + "|" + h.id)}
             <button class="hit" onclick={() => openHit(h)}>
               <div class="hrow">
+                <span class="hbadge" class:codex={h.harness === "codex"}>{harnessLabel(h.harness)}</span>
                 <span class="htitle">{h.title}</span>
                 <span class="hproj">{h.project}</span>
                 <span class="hdates" title="First → last activity">{fmtSpan(h.firstMs, h.lastMs)}</span>
@@ -1945,6 +1951,22 @@
     display: flex;
     align-items: baseline;
     gap: 8px;
+  }
+  .hbadge {
+    flex: 0 0 auto;
+    align-self: center;
+    font-size: calc(9.5px * var(--size-ui));
+    font-weight: var(--w-semibold);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 999px;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--muted) 16%, transparent);
+  }
+  .hbadge.codex {
+    color: var(--accent, #4aa3df);
+    background: color-mix(in srgb, var(--accent, #4aa3df) 18%, transparent);
   }
   .htitle {
     flex: 1 1 auto;

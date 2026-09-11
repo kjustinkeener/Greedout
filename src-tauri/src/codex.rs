@@ -228,10 +228,19 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
         {
             out.ctx = Some(0);
         }
-        if out.ctx.is_none() && line.contains("\"token_usage_record\"") {
+        // ctx and cumulative spend are DECOUPLED: a compaction zeroes ctx (above),
+        // but `thread_token_usage` is money already spent and must survive it, so
+        // keep reading the newest usage record for `thread` even once ctx is set.
+        // Otherwise the just-compacted gap shows a phantom $0 spend on the live
+        // gauge (the enrich path already tracks thread independently).
+        if (out.ctx.is_none() || out.thread.is_none()) && line.contains("\"token_usage_record\"") {
             if let Some((ctx, thread)) = usage_from(line) {
-                out.ctx = Some(ctx);
-                out.thread = Some(thread);
+                if out.ctx.is_none() {
+                    out.ctx = Some(ctx);
+                }
+                if out.thread.is_none() {
+                    out.thread = Some(thread);
+                }
             }
         }
         if out.model.is_none() && line.contains("\"model\"") {
@@ -243,7 +252,7 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
         if out.window.is_none() && line.contains("model_context_window") {
             out.window = window_from(line);
         }
-        if out.ctx.is_some() && out.model.is_some() && out.cwd.is_some() && out.window.is_some() {
+        if out.ctx.is_some() && out.thread.is_some() && out.model.is_some() && out.cwd.is_some() && out.window.is_some() {
             break;
         }
     }

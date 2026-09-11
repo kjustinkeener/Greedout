@@ -45,6 +45,7 @@ export const ja: PartialDict = {
 
   "settings.title": "設定",
   "settings.followFocus": "フォーカス中のセッションに追従",
+  "settings.gaugePerHarness": "ツールごとに大きなゲージを1つ表示",
   "settings.alwaysOnTop": "常に最前面に表示",
   "settings.showInTray": "トレイに表示",
   "settings.showInTaskbar": "タスクバーに表示",
@@ -70,6 +71,9 @@ export const ja: PartialDict = {
   "settings.budgetHint": "セッションのモデルが認識できない場合にのみ使用されます。",
   "settings.resetAll": "すべてリセット",
   "settings.resetAllTip": "すべての設定を既定値に戻す",
+  "settings.clearCache": "キャッシュを消去",
+  "settings.clearCacheTip": "セッション横断のインデックスと支出キャッシュを削除します（次回のスキャン時に再構築されます）",
+  "settings.clearCacheDone": "キャッシュを消去しました",
 
   "bold.lightest": "最も細く",
   "bold.lighter": "細め",

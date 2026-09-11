@@ -45,6 +45,7 @@ export const ko: PartialDict = {
 
   "settings.title": "설정",
   "settings.followFocus": "포커스된 세션 따라가기",
+  "settings.gaugePerHarness": "도구별로 큰 게이지 하나",
   "settings.alwaysOnTop": "항상 위에 표시",
   "settings.showInTray": "트레이에 표시",
   "settings.showInTaskbar": "작업 표시줄에 표시",
@@ -70,6 +71,9 @@ export const ko: PartialDict = {
   "settings.budgetHint": "세션의 모델을 인식하지 못할 때만 사용됩니다.",
   "settings.resetAll": "모두 초기화",
   "settings.resetAllTip": "모든 설정을 기본값으로 초기화",
+  "settings.clearCache": "캐시 지우기",
+  "settings.clearCacheTip": "세션 간 인덱스와 지출 캐시를 삭제합니다 (다음 스캔 시 다시 만들어집니다)",
+  "settings.clearCacheDone": "캐시가 지워졌습니다",
 
   "bold.lightest": "가장 얇게",
   "bold.lighter": "얇게",

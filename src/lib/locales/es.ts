@@ -54,6 +54,7 @@ export const es: PartialDict = {
   // Ventana de configuración
   "settings.title": "Configuración",
   "settings.followFocus": "Seguir la sesión con el foco",
+  "settings.gaugePerHarness": "Un indicador grande por herramienta",
   "settings.alwaysOnTop": "Siempre visible",
   "settings.showInTray": "Mostrar en la bandeja",
   "settings.showInTaskbar": "Mostrar en la barra de tareas",
@@ -79,6 +80,9 @@ export const es: PartialDict = {
   "settings.budgetHint": "Se usa solo cuando no se reconoce el modelo de una sesión.",
   "settings.resetAll": "Restablecer todo",
   "settings.resetAllTip": "Restablecer cada opción a su valor predeterminado",
+  "settings.clearCache": "Borrar caché",
+  "settings.clearCacheTip": "Elimina el índice entre sesiones y la caché de gasto (se reconstruye en el próximo análisis)",
+  "settings.clearCacheDone": "Caché borrada",
 
   // Los cinco niveles del control de grosor, del más fino al más grueso.
   "bold.lightest": "Más fino",

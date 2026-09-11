@@ -21,9 +21,6 @@ pub fn debug_enabled() -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
-    /// Max sessions to show.
-    #[serde(rename = "N")]
-    pub n: usize,
     /// Poll interval, in seconds (fractional allowed, e.g. 0.25).
     pub poll_seconds: f64,
     /// Denominator for the gauge (context budget).
@@ -31,6 +28,11 @@ pub struct Config {
     /// Sort the session focused in the Claude app to the top (reads the app's
     /// `main.log`). Best-effort; ignored if the log/marker isn't found.
     pub follow_focus: bool,
+    /// One large gauge (speedo + graph) PER HARNESS when true -- the focused
+    /// Claude session and the focused Codex session each get their own panel --
+    /// versus one gauge TOTAL (the single most-recently-focused session across all
+    /// harnesses) when false. Only meaningful with `follow_focus`.
+    pub gauge_per_harness: bool,
     /// Show a system-tray icon.
     pub show_in_tray: bool,
     /// Show the window in the taskbar.
@@ -181,10 +183,10 @@ fn default_size_num() -> f64 {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            n: 1,
             poll_seconds: 0.5,
             target_tokens: 200_000,
             follow_focus: true,
+            gauge_per_harness: false,
             show_in_tray: true,
             show_in_taskbar: true,
             minimize_to_tray: true,

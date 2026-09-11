@@ -46,6 +46,7 @@ export const zhHant: PartialDict = {
 
   "settings.title": "設定",
   "settings.followFocus": "跟隨目前聚焦的工作階段",
+  "settings.gaugePerHarness": "每個工具顯示一個大儀表",
   "settings.alwaysOnTop": "永遠置頂",
   "settings.showInTray": "顯示於系統匣",
   "settings.showInTaskbar": "顯示於工作列",
@@ -71,6 +72,9 @@ export const zhHant: PartialDict = {
   "settings.budgetHint": "僅在工作階段的模型無法辨識時使用。",
   "settings.resetAll": "全部重設",
   "settings.resetAllTip": "將每項設定重設為預設值",
+  "settings.clearCache": "清除快取",
+  "settings.clearCacheTip": "刪除跨工作階段索引與花費快取(下次掃描時重建)",
+  "settings.clearCacheDone": "快取已清除",
 
   "bold.lightest": "最細",
   "bold.lighter": "較細",

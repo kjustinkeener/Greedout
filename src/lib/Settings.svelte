@@ -118,10 +118,10 @@
   // `font_sets` likewise: those are the user's own saved sets, not a setting to
   // restore, and resetting the look should not throw them away.
   const DEFAULTS: Omit<Config, "ui_scale" | "browse_enabled" | "font_sets"> = {
-    N: 1,
     poll_seconds: 0.5,
     target_tokens: 200_000,
     follow_focus: true,
+    gauge_per_harness: false,
     show_in_tray: true,
     show_in_taskbar: true,
     minimize_to_tray: true,
@@ -157,6 +157,19 @@
     previewTheme(cfg.theme);
     previewFonts();
     commit(true);
+  }
+
+  // Wipe the cross-session cache DB (index + spend history). Not a config field, so
+  // it lives outside resetAll; shows a brief inline result.
+  let cacheMsg = $state("");
+  async function clearCache() {
+    try {
+      await invoke("clear_cache");
+      cacheMsg = t("settings.clearCacheDone");
+    } catch (e) {
+      cacheMsg = String(e);
+    }
+    setTimeout(() => (cacheMsg = ""), 3000);
   }
 
   // Apply the font preferences here and in every other window.
@@ -216,10 +229,10 @@
     if (!cfg) return;
     // Clamp to sane minimums so a stray 0 can't stall the poll loop.
     const clean: Config = {
-      N: Math.max(1, Math.round(cfg.N)),
       poll_seconds: Math.max(0.1, cfg.poll_seconds),
       target_tokens: Math.max(1000, Math.round(cfg.target_tokens)),
       follow_focus: cfg.follow_focus,
+      gauge_per_harness: cfg.gauge_per_harness,
       show_in_tray: cfg.show_in_tray,
       show_in_taskbar: cfg.show_in_taskbar,
       minimize_to_tray: cfg.minimize_to_tray,
@@ -277,6 +290,10 @@
     <label class="check" oncontextmenu={(e) => resetField("follow_focus", e)}>
       <input type="checkbox" bind:checked={cfg.follow_focus} />
       {t("settings.followFocus")}
+    </label>
+    <label class="check" oncontextmenu={(e) => resetField("gauge_per_harness", e)}>
+      <input type="checkbox" bind:checked={cfg.gauge_per_harness} disabled={!cfg.follow_focus} />
+      {t("settings.gaugePerHarness")}
     </label>
     <label class="check" oncontextmenu={(e) => resetField("always_on_top", e)}>
       <input type="checkbox" bind:checked={cfg.always_on_top} />
@@ -393,14 +410,6 @@
       <span class="pctval">{Math.round(cfg.opacity * 100)}%</span>
     </label>
 
-    <label class="field" oncontextmenu={(e) => resetField("N", e)}>
-      <span>{t("settings.maxSessions")}</span>
-      <span class="numwrap">
-        <input type="number" min="1" bind:value={cfg.N} />
-        <span class="unit"></span>
-      </span>
-    </label>
-
     <label class="field" oncontextmenu={(e) => resetField("poll_seconds", e)}>
       <span>{t("settings.refreshEvery")}</span>
       <span class="numwrap">
@@ -434,11 +443,15 @@
     </div>
 
     <div class="actions">
+      {#if cacheMsg}<span class="cachemsg">{cacheMsg}</span>{/if}
       <span class="spacer"></span>
+      <button class="btn" onclick={clearCache} title={t("settings.clearCacheTip")}>
+        {t("settings.clearCache")}
+      </button>
       <button class="btn reset" onclick={resetAll} title={t("settings.resetAllTip")}>
         {t("settings.resetAll")}
       </button>
-      <button class="btn primary" onclick={onClose}>{t("common.close")}</button>
+      <button class="btn" onclick={onClose}>{t("common.close")}</button>
     </div>
   {/if}
 </div>
@@ -547,7 +560,9 @@
     padding: 0;
     background: none;
     border: none;
-    accent-color: var(--green);
+    /* The theme's gauge/brand accent (not the fixed green), matching the button
+       borders so controls share one themed color. */
+    accent-color: var(--g0);
   }
   .pctval {
     width: 34px;
@@ -598,12 +613,13 @@
   .spacer {
     flex: 1 1 auto;
   }
-  .btn.reset {
-    color: var(--muted);
-  }
   .btn {
     background: var(--track);
-    border: 1px solid var(--edge);
+    /* Themed accent border (the gauge/brand color) so buttons carry a color from
+       the theme without a loud fill; text stays `--fg` for contrast in every theme
+       (a `--g0` fill would be unreadable on light themes). Earlier the muted tone
+       made these read as disabled. */
+    border: 1px solid var(--g0);
     border-radius: 4px;
     color: var(--fg);
     padding: 3px 10px;
@@ -611,11 +627,13 @@
     font: inherit;
     font-size-adjust: var(--font-ui-adj);
   }
-  .btn.primary {
-    background: var(--green);
-    border-color: var(--green);
-    color: #06210c;
-    font-weight: var(--w-semibold);
+  .btn:hover {
+    background: color-mix(in srgb, var(--g0) 14%, var(--track));
+  }
+  .cachemsg {
+    color: var(--muted);
+    font-size: calc(11px * var(--size-ui));
+    align-self: center;
   }
   .btn:disabled {
     opacity: 0.6;

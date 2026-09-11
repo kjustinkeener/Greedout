@@ -46,6 +46,7 @@ export const ptBR: PartialDict = {
 
   "settings.title": "Configurações",
   "settings.followFocus": "Seguir a sessão em foco",
+  "settings.gaugePerHarness": "Um medidor grande por ferramenta",
   "settings.alwaysOnTop": "Sempre visível",
   "settings.showInTray": "Mostrar na bandeja",
   "settings.showInTaskbar": "Mostrar na barra de tarefas",
@@ -71,6 +72,9 @@ export const ptBR: PartialDict = {
   "settings.budgetHint": "Usado apenas quando o modelo de uma sessão não é reconhecido.",
   "settings.resetAll": "Redefinir tudo",
   "settings.resetAllTip": "Redefinir todas as configurações para o padrão",
+  "settings.clearCache": "Limpar cache",
+  "settings.clearCacheTip": "Exclui o índice entre sessões e o cache de gasto (reconstruído na próxima varredura)",
+  "settings.clearCacheDone": "Cache limpo",
 
   "bold.lightest": "Mais leve",
   "bold.lighter": "Leve",

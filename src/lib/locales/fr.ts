@@ -46,6 +46,7 @@ export const fr: PartialDict = {
 
   "settings.title": "Paramètres",
   "settings.followFocus": "Suivre la session active",
+  "settings.gaugePerHarness": "Une grande jauge par outil",
   "settings.alwaysOnTop": "Toujours au premier plan",
   "settings.showInTray": "Afficher dans la zone de notification",
   "settings.showInTaskbar": "Afficher dans la barre des tâches",
@@ -71,6 +72,9 @@ export const fr: PartialDict = {
   "settings.budgetHint": "Utilisé uniquement quand le modèle d'une session n'est pas reconnu.",
   "settings.resetAll": "Tout réinitialiser",
   "settings.resetAllTip": "Réinitialiser tous les paramètres à leurs valeurs par défaut",
+  "settings.clearCache": "Vider le cache",
+  "settings.clearCacheTip": "Supprime l'index inter-sessions et le cache des dépenses (reconstruit au prochain balayage)",
+  "settings.clearCacheDone": "Cache vidé",
 
   "bold.lightest": "Très fine",
   "bold.lighter": "Fine",

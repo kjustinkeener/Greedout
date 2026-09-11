@@ -46,6 +46,7 @@ export const pl: PartialDict = {
 
   "settings.title": "Ustawienia",
   "settings.followFocus": "Podążaj za aktywną sesją",
+  "settings.gaugePerHarness": "Jeden duży wskaźnik na narzędzie",
   "settings.alwaysOnTop": "Zawsze na wierzchu",
   "settings.showInTray": "Pokaż w zasobniku systemowym",
   "settings.showInTaskbar": "Pokaż na pasku zadań",
@@ -71,6 +72,9 @@ export const pl: PartialDict = {
   "settings.budgetHint": "Używane tylko wtedy, gdy model sesji jest nierozpoznany.",
   "settings.resetAll": "Przywróć wszystko",
   "settings.resetAllTip": "Przywróć każde ustawienie do wartości domyślnej",
+  "settings.clearCache": "Wyczyść pamięć podręczną",
+  "settings.clearCacheTip": "Usuwa indeks międzysesyjny i pamięć podręczną wydatków (odbudowywane przy następnym skanowaniu)",
+  "settings.clearCacheDone": "Pamięć podręczna wyczyszczona",
 
   "bold.lightest": "Najcieńsza",
   "bold.lighter": "Cieńsza",

@@ -46,6 +46,7 @@ export const tr: PartialDict = {
 
   "settings.title": "Ayarlar",
   "settings.followFocus": "Odaktaki oturumu izle",
+  "settings.gaugePerHarness": "Her araç için tek büyük gösterge",
   "settings.alwaysOnTop": "Her zaman üstte",
   "settings.showInTray": "Sistem tepsisinde göster",
   "settings.showInTaskbar": "Görev çubuğunda göster",
@@ -71,6 +72,9 @@ export const tr: PartialDict = {
   "settings.budgetHint": "Yalnızca bir oturumun modeli tanınmadığında kullanılır.",
   "settings.resetAll": "Tümünü sıfırla",
   "settings.resetAllTip": "Her ayarı varsayılana döndür",
+  "settings.clearCache": "Önbelleği temizle",
+  "settings.clearCacheTip": "Oturumlar arası dizini ve harcama önbelleğini siler (sonraki taramada yeniden oluşturulur)",
+  "settings.clearCacheDone": "Önbellek temizlendi",
 
   "bold.lightest": "En İnce",
   "bold.lighter": "İnce",

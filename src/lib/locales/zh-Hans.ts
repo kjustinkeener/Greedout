@@ -45,6 +45,7 @@ export const zhHans: PartialDict = {
 
   "settings.title": "设置",
   "settings.followFocus": "跟随当前聚焦的会话",
+  "settings.gaugePerHarness": "每个工具显示一个大仪表",
   "settings.alwaysOnTop": "始终置顶",
   "settings.showInTray": "在托盘中显示",
   "settings.showInTaskbar": "在任务栏中显示",
@@ -70,6 +71,9 @@ export const zhHans: PartialDict = {
   "settings.budgetHint": "仅当无法识别会话所用模型时使用。",
   "settings.resetAll": "全部重置",
   "settings.resetAllTip": "将所有设置恢复为默认值",
+  "settings.clearCache": "清除缓存",
+  "settings.clearCacheTip": "删除跨会话索引和花费缓存（下次扫描时重建）",
+  "settings.clearCacheDone": "缓存已清除",
 
   "bold.lightest": "最细",
   "bold.lighter": "较细",

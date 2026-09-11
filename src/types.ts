@@ -173,10 +173,10 @@ export interface SearchHit {
 
 // Mirror of the Rust `Config` (note the `N` key for max sessions).
 export interface Config {
-  N: number; // max sessions shown (candidate-pool ceiling; window height decides shown count)
   poll_seconds: number; // refresh interval
   target_tokens: number; // fallback gauge budget when the model is unknown
   follow_focus: boolean; // pin the session open in the Claude app to the top
+  gauge_per_harness: boolean; // one large gauge per harness vs one total
   show_in_tray: boolean;
   show_in_taskbar: boolean;
   minimize_to_tray: boolean;

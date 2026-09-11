@@ -46,6 +46,7 @@ export const de: PartialDict = {
 
   "settings.title": "Einstellungen",
   "settings.followFocus": "Der Sitzung im Fokus folgen",
+  "settings.gaugePerHarness": "Eine große Anzeige pro Tool",
   "settings.alwaysOnTop": "Immer im Vordergrund",
   "settings.showInTray": "Im Infobereich anzeigen",
   "settings.showInTaskbar": "In der Taskleiste anzeigen",
@@ -71,6 +72,9 @@ export const de: PartialDict = {
   "settings.budgetHint": "Wird nur verwendet, wenn das Modell einer Sitzung nicht erkannt wird.",
   "settings.resetAll": "Alles zurücksetzen",
   "settings.resetAllTip": "Alle Einstellungen auf Standardwerte zurücksetzen",
+  "settings.clearCache": "Cache leeren",
+  "settings.clearCacheTip": "Löscht den sitzungsübergreifenden Index und den Ausgaben-Cache (wird beim nächsten Scan neu aufgebaut)",
+  "settings.clearCacheDone": "Cache geleert",
 
   "bold.lightest": "Am dünnsten",
   "bold.lighter": "Dünner",

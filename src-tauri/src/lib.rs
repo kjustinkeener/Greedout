@@ -232,6 +232,27 @@ fn browse_scan(app: tauri::AppHandle, deep: bool) {
     browse::run_scan(app, deep);
 }
 
+/// Delete the cross-session cache (`cache.sqlite` + its WAL/SHM sidecars) so the
+/// index and per-turn spend history rebuild from scratch on the next scan. The
+/// live gauge list is unaffected (it reads transcripts directly, not the cache).
+/// Best-effort per file; only a still-present main DB after the attempt is an error.
+#[tauri::command]
+fn clear_cache() -> Result<(), String> {
+    let db = config::cache_db_path();
+    for suffix in ["", "-wal", "-shm"] {
+        let p = if suffix.is_empty() {
+            db.clone()
+        } else {
+            db.with_extension(format!("sqlite{suffix}"))
+        };
+        let _ = std::fs::remove_file(&p);
+    }
+    if db.exists() {
+        return Err("Could not clear the cache (it may be in use).".into());
+    }
+    Ok(())
+}
+
 /// Cancel an in-flight scan; the partial index stays usable.
 #[tauri::command]
 fn browse_cancel() {
@@ -414,6 +435,7 @@ pub fn run() {
             browse_status,
             browse_enable,
             browse_scan,
+            clear_cache,
             browse_cancel,
             browse_harnesses,
             browse_projects,

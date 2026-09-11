@@ -46,6 +46,7 @@ export const nl: PartialDict = {
 
   "settings.title": "Instellingen",
   "settings.followFocus": "Volg de sessie met focus",
+  "settings.gaugePerHarness": "Eén grote meter per tool",
   "settings.alwaysOnTop": "Altijd op voorgrond",
   "settings.showInTray": "Weergeven in systeemvak",
   "settings.showInTaskbar": "Weergeven op taakbalk",
@@ -71,6 +72,9 @@ export const nl: PartialDict = {
   "settings.budgetHint": "Wordt alleen gebruikt als het model van een sessie niet wordt herkend.",
   "settings.resetAll": "Alles resetten",
   "settings.resetAllTip": "Elke instelling terugzetten naar de standaardwaarde",
+  "settings.clearCache": "Cache wissen",
+  "settings.clearCacheTip": "Verwijdert de sessie-overschrijdende index en de uitgavencache (wordt opnieuw opgebouwd bij de volgende scan)",
+  "settings.clearCacheDone": "Cache gewist",
 
   "bold.lightest": "Lichtst",
   "bold.lighter": "Lichter",

@@ -79,6 +79,7 @@ export const en = {
   // Settings window
   "settings.title": "Settings",
   "settings.followFocus": "Follow the focused session",
+  "settings.gaugePerHarness": "One large gauge per harness",
   "settings.alwaysOnTop": "Always on top",
   "settings.showInTray": "Show in tray",
   "settings.showInTaskbar": "Show in taskbar",
@@ -104,6 +105,9 @@ export const en = {
   "settings.budgetHint": "Used only when a session's model isn't recognized.",
   "settings.resetAll": "Reset all",
   "settings.resetAllTip": "Reset every setting to its default",
+  "settings.clearCache": "Clear cache",
+  "settings.clearCacheTip": "Delete the cross-session index and spend cache (rebuilds on next scan)",
+  "settings.clearCacheDone": "Cache cleared",
 
   // The five rungs of the boldness slider, lightest to boldest.
   "bold.lightest": "Lightest",

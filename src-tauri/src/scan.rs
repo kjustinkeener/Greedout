@@ -188,7 +188,15 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     // `lastFocusedAt`, Codex's desktop-log mtime, both ms), then keep only the more
     // recent -- that's the session the user is actually looking at right now. The
     // loser is dropped so with n=1 the single gauge tracks true focus across apps.
-    let (focused, codex_focused) = if cfg.follow_focus {
+    let (focused, codex_focused) = if cfg.follow_focus && cfg.gauge_per_harness {
+        // One gauge PER HARNESS: pin each harness's own focused session to the top
+        // independently, so both a Claude and a Codex panel can show at once. No
+        // cross-harness tiebreak -- both winners are kept.
+        (
+            focused_session_id().map(|(id, _)| id),
+            crate::codex::focused_session_id().map(|(id, _)| id),
+        )
+    } else if cfg.follow_focus {
         let claude = focused_session_id();
         let codex = crate::codex::focused_session_id();
         // A bare alt-tab between the two apps writes nothing to either's logs
@@ -274,7 +282,12 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
         }
     };
     candidates.sort_by(|a, b| sort_key(&b.0, b.1, b.2).cmp(&sort_key(&a.0, a.1, a.2)));
-    candidates.truncate(cfg.n);
+    // The window's own height decides how many rows actually render (App.svelte's
+    // `fit()` grows to the pool then trims to fit), so there is no user-facing count.
+    // This is only a safety ceiling so a machine with hundreds of transcripts doesn't
+    // build every one each poll; no realistic window shows this many rows.
+    const MAX_POOL: usize = 50;
+    candidates.truncate(MAX_POOL);
 
     let mut sessions: Vec<Session> = candidates
         .into_iter()

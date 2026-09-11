@@ -46,6 +46,7 @@ export const ru: PartialDict = {
 
   "settings.title": "Настройки",
   "settings.followFocus": "Следовать за активной сессией",
+  "settings.gaugePerHarness": "Один большой индикатор на инструмент",
   "settings.alwaysOnTop": "Поверх остальных окон",
   "settings.showInTray": "Показывать в трее",
   "settings.showInTaskbar": "Показывать на панели задач",
@@ -71,6 +72,9 @@ export const ru: PartialDict = {
   "settings.budgetHint": "Используется, только если модель сессии не распознана.",
   "settings.resetAll": "Сбросить всё",
   "settings.resetAllTip": "Сбросить все настройки к значениям по умолчанию",
+  "settings.clearCache": "Очистить кэш",
+  "settings.clearCacheTip": "Удаляет межсессионный индекс и кэш расходов (перестраиваются при следующем сканировании)",
+  "settings.clearCacheDone": "Кэш очищен",
 
   "bold.lightest": "Самый тонкий",
   "bold.lighter": "Тоньше",

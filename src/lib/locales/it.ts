@@ -46,6 +46,7 @@ export const it: PartialDict = {
 
   "settings.title": "Impostazioni",
   "settings.followFocus": "Segui la sessione attiva",
+  "settings.gaugePerHarness": "Un grande indicatore per strumento",
   "settings.alwaysOnTop": "Sempre in primo piano",
   "settings.showInTray": "Mostra nell'area di notifica",
   "settings.showInTaskbar": "Mostra nella barra delle applicazioni",
@@ -71,6 +72,9 @@ export const it: PartialDict = {
   "settings.budgetHint": "Usato solo quando il modello di una sessione non è riconosciuto.",
   "settings.resetAll": "Reimposta tutto",
   "settings.resetAllTip": "Ripristina tutte le impostazioni ai valori predefiniti",
+  "settings.clearCache": "Svuota cache",
+  "settings.clearCacheTip": "Elimina l'indice tra sessioni e la cache della spesa (ricostruita alla prossima scansione)",
+  "settings.clearCacheDone": "Cache svuotata",
 
   "bold.lightest": "Sottilissimo",
   "bold.lighter": "Più sottile",

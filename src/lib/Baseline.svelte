@@ -253,7 +253,13 @@
         scanning = s.scanning;
         if (openOnFirst && !inited) {
           inited = true;
-          const haveIndex = s.enabled || (s.dbExists && s.indexed > 0);
+          // "enabled" alone is NOT an index: after Clear cache the DB is gone but
+          // the pref stays on, so require real rows. Enabled-but-empty (fresh
+          // install or just-cleared cache) auto-rebuilds instead of showing an
+          // empty graph or the enable gate; the browse-progress "done" handler
+          // repaints the level when the scan finishes.
+          const haveIndex = s.dbExists && s.indexed > 0;
+          const enabledEmpty = s.enabled && !haveIndex;
           if (initView === "session") {
             // Land straight on the target session's breakdown.
             if (initProject) curProject = initProject;
@@ -261,11 +267,16 @@
             zoom = "session";
           } else if (initView === "project" && initProject) {
             if (haveIndex) openProject(initProject);
-            else showEnable = true;
+            else if (enabledEmpty) {
+              openRoot();
+              startScan(true);
+            } else showEnable = true;
           } else if (haveIndex) {
-            // Show the all-projects graph whenever an index already exists; only
-            // fall back to the enable gate when there's genuinely nothing indexed.
+            // Show the all-projects graph whenever an index already exists.
             openRoot();
+          } else if (enabledEmpty) {
+            openRoot();
+            startScan(true);
           } else {
             showEnable = true;
           }

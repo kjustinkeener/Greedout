@@ -21,6 +21,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json && node scripts/check-locales.mjs",
     "tauri": "tauri",
     "check:locales": "node scripts/check-locales.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "release": "tauri build --no-bundle"
   },
   "dependencies": {
@@ -76,11 +78,15 @@
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@tauri-apps/cli": "^2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/svelte": "^5.4.2",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^24.13.3",
+    "jsdom": "^30.0.1",
     "svelte": "^5.56.4",
     "svelte-check": "^4.7.1",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vitest": "^4.1.11"
   }
 }

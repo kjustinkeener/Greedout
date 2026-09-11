@@ -694,3 +694,221 @@ fn string_array(v: Option<&Value>) -> String {
         })
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    // --- test helpers ---
+
+    fn close(a: f64, b: f64) {
+        assert!((a - b).abs() < 1e-9, "expected {b}, got {a}");
+    }
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    /// Write a fixture to a unique temp path so parallel tests never collide.
+    fn tmp_write(content: &str) -> PathBuf {
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let mut p = std::env::temp_dir();
+        // Keep the stem <36 chars so id_from_path yields the whole stem and
+        // session_title() never accidentally matches a real session_index.jsonl row.
+        p.push(format!("gxc_{}_{n}.jsonl", std::process::id()));
+        std::fs::write(&p, content).unwrap();
+        p
+    }
+
+    // --- scan_tail_buf: compaction semantics (session bug-fixes) ---
+
+    #[test]
+    fn tail_compacted_newer_than_usage_leaves_ctx_none_but_keeps_spend() {
+        // Oldest -> newest: a usage record, then a compaction with nothing after.
+        // Scanning backward the compaction is hit first: ctx must be UNKNOWN (None),
+        // NOT Some(0), yet the pre-compact thread spend must still be captured.
+        let usage = r#"{"type":"token_usage_record","payload":{"usage":{"input_tokens":5000,"cached_input_tokens":1000,"cache_write_input_tokens":0,"output_tokens":300},"thread_token_usage":{"input_tokens":40000,"cached_input_tokens":8000,"cache_write_input_tokens":0,"output_tokens":2000}}}"#;
+        let compacted = r#"{"type":"compacted","payload":{"message":""}}"#;
+        let buf = format!("{usage}\n{compacted}\n");
+        let out = scan_tail_buf(buf.as_bytes(), false);
+        assert!(out.ctx.is_none(), "ctx must be None after a trailing compaction");
+        let thread = out.thread.expect("thread spend must survive compaction");
+        assert_eq!(thread.input, 40000);
+        assert_eq!(thread.cached, 8000);
+        assert_eq!(thread.output, 2000);
+    }
+
+    #[test]
+    fn tail_post_compact_usage_sets_ctx_and_ignores_older_compaction() {
+        // A post-compact usage record sits nearer EOF than the compaction, so the
+        // backward scan finds it first: ctx = its input_tokens, the older compaction
+        // has no effect, and thread comes from that newest record.
+        let old_usage = r#"{"type":"token_usage_record","payload":{"usage":{"input_tokens":180000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100},"thread_token_usage":{"input_tokens":180000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
+        let compacted = r#"{"type":"compacted","payload":{"message":""}}"#;
+        let new_usage = r#"{"type":"token_usage_record","payload":{"usage":{"input_tokens":3000,"cached_input_tokens":500,"cache_write_input_tokens":0,"output_tokens":50},"thread_token_usage":{"input_tokens":183000,"cached_input_tokens":500,"cache_write_input_tokens":0,"output_tokens":150}}}"#;
+        let buf = format!("{old_usage}\n{compacted}\n{new_usage}\n");
+        let out = scan_tail_buf(buf.as_bytes(), false);
+        assert_eq!(out.ctx, Some(3000), "post-compact usage input_tokens wins");
+        assert_eq!(out.thread.expect("thread").input, 183000);
+    }
+
+    // --- window_from ---
+
+    #[test]
+    fn window_from_reads_both_shapes_and_rejects_absent() {
+        let flat = r#"{"type":"event_msg","payload":{"type":"task_started","model_context_window":258400}}"#;
+        assert_eq!(window_from(flat), Some(258400));
+        let nested = r#"{"type":"token_count","payload":{"info":{"model_context_window":258400}}}"#;
+        assert_eq!(window_from(nested), Some(258400));
+        let absent = r#"{"type":"event_msg","payload":{"type":"task_started"}}"#;
+        assert_eq!(window_from(absent), None);
+        // Zero is treated as "not a real window".
+        let zero = r#"{"type":"event_msg","payload":{"model_context_window":0}}"#;
+        assert_eq!(window_from(zero), None);
+    }
+
+    // --- usage_from ---
+
+    #[test]
+    fn usage_from_ctx_is_input_tokens_and_reads_thread() {
+        let line = r#"{"type":"token_usage_record","payload":{"usage":{"input_tokens":24022,"cached_input_tokens":16128,"cache_write_input_tokens":0,"output_tokens":98},"thread_token_usage":{"input_tokens":50000,"cached_input_tokens":16128,"cache_write_input_tokens":0,"output_tokens":2000}}}"#;
+        let (ctx, thread) = usage_from(line).expect("parses");
+        assert_eq!(ctx, 24022, "ctx == usage.input_tokens (already includes cached)");
+        assert_eq!(thread.input, 50000);
+        assert_eq!(thread.cached, 16128);
+    }
+
+    #[test]
+    fn usage_from_falls_back_to_usage_when_no_thread_block() {
+        let line = r#"{"type":"token_usage_record","payload":{"usage":{"input_tokens":500,"cached_input_tokens":100,"cache_write_input_tokens":0,"output_tokens":50}}}"#;
+        let (ctx, thread) = usage_from(line).expect("parses");
+        assert_eq!(ctx, 500);
+        assert_eq!(thread.input, 500, "thread falls back to this response's usage");
+        assert_eq!(thread.cached, 100);
+    }
+
+    #[test]
+    fn usage_from_rejects_non_usage_record() {
+        assert!(usage_from(r#"{"type":"compacted","payload":{}}"#).is_none());
+    }
+
+    // --- price + model_info per codename ---
+
+    #[test]
+    fn price_matches_published_rates_per_codename() {
+        let c = Counts { input: 1000, cached: 400, cache_write: 100, output: 200 };
+        // non_cached=600, cached=400, cache_write=100, output=200.
+        close(price(&c, Some("gpt-6-astra")), 0.017650);
+        close(price(&c, Some("gpt-5.6-terra")), 0.003880);
+        close(price(&c, Some("gpt-5.6-sol")), 0.006960);
+        close(price(&c, Some("gpt-5.6-luna")), 0.000388);
+        close(price(&c, Some("gpt-5.5")), 0.009700);
+        // Unknown model id falls back to the safe "?" (Opus-like) row: 15/1.5/18.75/75.
+        assert_eq!(model_info("mysterymodel").label, "?");
+        close(price(&c, Some("mysterymodel")), 0.026475);
+        // No model at all prices at the base gpt-5 tier (1.25/0.125/1.25/10).
+        close(price(&c, None), 0.002925);
+    }
+
+    #[test]
+    fn price_applies_cache_read_rate_not_input_rate_for_cached_tokens() {
+        // If cached tokens were billed at the input rate this would be strictly higher.
+        let c = Counts { input: 1000, cached: 900, cache_write: 0, output: 0 };
+        let astra = price(&c, Some("gpt-6-astra"));
+        // Expected: 100*10 + 900*1.0 = 1900 / 1e6.
+        close(astra, 0.001900);
+        // Sanity: pricing all input at the input rate would be much larger.
+        let all_input = 1000.0 * 10.0 / 1_000_000.0;
+        assert!(astra < all_input);
+    }
+
+    // --- model_name ---
+
+    #[test]
+    fn model_name_maps_id_to_label_and_codename() {
+        assert_eq!(model_name("gpt-6-astra"), ("GPT-6".into(), "Astra".into()));
+        assert_eq!(model_name("gpt-5.6-luna"), ("GPT-5.6".into(), "Luna".into()));
+        assert_eq!(model_name("gpt-5.6-sol"), ("GPT-5.6".into(), "Sol".into()));
+        assert_eq!(model_name("gpt-5.6-terra"), ("GPT-5.6".into(), "Terra".into()));
+        assert_eq!(model_name("gpt-5.5"), ("GPT-5.5".into(), "".into()));
+    }
+
+    // --- id_from_path ---
+
+    #[test]
+    fn id_from_path_slices_trailing_uuid() {
+        let p = Path::new(
+            "C:/x/sessions/2026/09/09/rollout-2026-09-09T18-18-13-01a088e4-d77f-72e1-b87f-f1460ccdbe2e.jsonl",
+        );
+        assert_eq!(id_from_path(p), "01a088e4-d77f-72e1-b87f-f1460ccdbe2e");
+        // A short stem (no embedded uuid) is returned whole.
+        let short = Path::new("C:/x/tiny.jsonl");
+        assert_eq!(id_from_path(short), "tiny");
+    }
+
+    // --- enrich_meta (path-based) ---
+
+    #[test]
+    fn enrich_meta_last_write_wins_compaction_none_and_spend_survives() {
+        let model_line = r#"{"type":"turn_context","payload":{"model":"gpt-5.6-luna","cwd":"C:\\x\\proj"}}"#;
+        let window_line = r#"{"type":"event_msg","payload":{"type":"task_started","model_context_window":258400}}"#;
+        let u1 = r#"{"timestamp":"2026-09-10T01:20:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":1000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100},"thread_token_usage":{"input_tokens":1000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
+        let u2 = r#"{"timestamp":"2026-09-10T01:21:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":2000,"cached_input_tokens":500,"cache_write_input_tokens":0,"output_tokens":100},"thread_token_usage":{"input_tokens":3000,"cached_input_tokens":500,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
+        let compacted = r#"{"type":"compacted","payload":{"message":""}}"#;
+        let content = format!("{model_line}\n{window_line}\n{u1}\n{u2}\n{compacted}\n");
+        let path = tmp_write(&content);
+        let out = enrich_meta(&path);
+        let _ = std::fs::remove_file(&path);
+
+        // Trailing compaction => ctx unknown, not a misleading 0.
+        assert!(out.ctx.is_none(), "trailing compaction leaves ctx None");
+        // Two priced turns, each with no dedupe key (Codex rows are unique).
+        assert_eq!(out.turns.len(), 2);
+        assert!(out.turns.iter().all(|(id, _, _)| id.is_none()));
+        assert_eq!(out.turn_count, 2);
+        // Cumulative spend is priced off the NEWEST thread_token_usage (u2) and must
+        // survive the trailing compaction (non-zero).
+        let expected = price(
+            &Counts { input: 3000, cached: 500, cache_write: 0, output: 100 },
+            Some("gpt-5.6-luna"),
+        );
+        close(out.cost_usd, expected);
+        assert!(out.cost_usd > 0.0, "spend survives a trailing compaction");
+        // Window read off disk becomes the hard limit.
+        assert_eq!(out.limit, 258400);
+        assert_eq!(out.cwd.as_deref(), Some("C:\\x\\proj"));
+        assert_eq!(out.model_version, "Luna");
+    }
+
+    #[test]
+    fn enrich_meta_ctx_self_heals_when_a_turn_follows_compaction() {
+        let model_line = r#"{"type":"turn_context","payload":{"model":"gpt-5.6-luna","cwd":"C:\\x\\proj"}}"#;
+        let u1 = r#"{"timestamp":"2026-09-10T01:20:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":9000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100},"thread_token_usage":{"input_tokens":9000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
+        let compacted = r#"{"type":"compacted","payload":{"message":""}}"#;
+        let u2 = r#"{"timestamp":"2026-09-10T01:22:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":1500,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100},"thread_token_usage":{"input_tokens":10500,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":200}}}"#;
+        let content = format!("{model_line}\n{u1}\n{compacted}\n{u2}\n");
+        let path = tmp_write(&content);
+        let out = enrich_meta(&path);
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(out.ctx, Some(1500), "a turn after the compaction restores ctx");
+    }
+
+    // --- read_chat_doc ---
+
+    #[test]
+    fn read_chat_doc_pulls_user_agent_and_reasoning_text_with_span() {
+        let u = r#"{"timestamp":"2026-09-10T01:20:20.901Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"UserMessage","content":[{"type":"text","text":"hello from user"}]}}}"#;
+        let r = r#"{"timestamp":"2026-09-10T01:20:23.256Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"Reasoning","summary_text":["my reasoning summary"]}}}"#;
+        let a = r#"{"timestamp":"2026-09-10T01:20:23.637Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"AgentMessage","content":[{"type":"Text","text":"agent replies here"}]}}}"#;
+        let raw = format!("{u}\n{r}\n{a}\n");
+        let path = tmp_write(&raw);
+        let doc = read_chat_doc(&path, &raw);
+        let _ = std::fs::remove_file(&path);
+        assert!(doc.text.contains("hello from user"));
+        assert!(doc.text.contains("my reasoning summary"));
+        assert!(doc.text.contains("agent replies here"));
+        assert_eq!(doc.first_user.as_deref(), Some("hello from user"));
+        assert_eq!(doc.first_ts.as_deref(), Some("2026-09-10T01:20:20.901Z"));
+        assert_eq!(doc.last_ts.as_deref(), Some("2026-09-10T01:20:23.637Z"));
+    }
+}

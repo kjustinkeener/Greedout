@@ -36,6 +36,11 @@ jobs:
       # which fails on a renamed key and warns on a missing one.
       - run: npm run check
 
+      # Frontend unit + component tests (vitest/jsdom). Includes render guards
+      # that fail if a keyed {#each} regresses to a non-unique key
+      # (the each_key_duplicate crash that has bitten Daily Spend and the treemap).
+      - run: npm run test
+
       # The frontend is built before Rust is checked because the Tauri build
       # script embeds the built interface: without dist/ the crate cannot compile.
       - run: npm run build
@@ -49,3 +54,7 @@ jobs:
       # --locked so a dependency that quietly floats to a new version fails here
       # rather than on someone's machine.
       - run: cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets
+
+      # Backend unit tests: transcript parsers, cost dedupe, compaction handling,
+      # pricing, and FTS/search helpers, against handcrafted fixtures.
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked

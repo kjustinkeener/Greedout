@@ -1257,3 +1257,262 @@ fn truncate(s: &str, max: usize) -> String {
         out
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    fn close(a: f64, b: f64) {
+        assert!((a - b).abs() < 1e-9, "expected {b}, got {a}");
+    }
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn tmp_write(content: &str) -> PathBuf {
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let mut p = std::env::temp_dir();
+        p.push(format!("gxs_{}_{n}.jsonl", std::process::id()));
+        std::fs::write(&p, content).unwrap();
+        p
+    }
+
+    /// One Claude assistant usage record with a given id/model/input/output.
+    fn assistant(id: &str, model: &str, ts: &str, input: u64, output: u64) -> String {
+        format!(
+            r#"{{"type":"assistant","timestamp":"{ts}","message":{{"id":"{id}","model":"{model}","usage":{{"input_tokens":{input},"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":{output}}}}}}}"#
+        )
+    }
+
+    // --- model_info: prices, windows, and the "?" fallback ---
+
+    #[test]
+    fn model_info_fable_branch_has_preferential_cache_read() {
+        let f = model_info("claude-fable-5-1");
+        assert_eq!(f.label, "Fable");
+        close(f.price_in, 10.0);
+        close(f.price_out, 50.0);
+        // The Fable-exclusive 0.025x cache-read rate (not the usual 0.1x).
+        close(f.price_cache_read, 0.25);
+        close(f.price_cache_read, f.price_in * 0.025);
+        assert_eq!(f.context_max, 1_000_000);
+        assert_eq!(f.target, 200_000);
+        // Fable must NOT fall into the "?" Opus fallback (the old bug).
+        assert!(f.price_cache_read < model_info("claude-opus-4-8").price_cache_read);
+    }
+
+    #[test]
+    fn model_info_claude_family_rows() {
+        let o = model_info("claude-opus-4-8");
+        assert_eq!(o.label, "Opus");
+        close(o.price_in, 15.0);
+        close(o.price_out, 75.0);
+        close(o.price_cache_read, 1.50);
+        assert_eq!(o.context_max, 1_000_000);
+
+        let s = model_info("claude-sonnet-5");
+        assert_eq!(s.label, "Sonnet");
+        close(s.price_in, 3.0);
+        close(s.price_out, 15.0);
+
+        let h = model_info("claude-haiku-4");
+        assert_eq!(h.label, "Haiku");
+        close(h.price_in, 1.0);
+        close(h.price_out, 5.0);
+        assert_eq!(h.context_max, 200_000);
+    }
+
+    #[test]
+    fn model_info_unknown_falls_back_to_question_mark() {
+        let q = model_info("some-brand-new-model");
+        assert_eq!(q.label, "?");
+        close(q.price_in, 15.0);
+        close(q.price_out, 75.0);
+    }
+
+    #[test]
+    fn model_info_gpt6_and_gpt_base() {
+        let g6 = model_info("gpt-6-astra");
+        assert_eq!(g6.label, "GPT");
+        close(g6.price_in, 10.0);
+        assert_eq!(g6.context_max, 1_050_000);
+        assert_eq!(g6.target, 272_000);
+        // Base gpt-5 tier when no specific codename matches.
+        let g5 = model_info("gpt-5");
+        close(g5.price_in, 1.25);
+        close(g5.price_out, 10.0);
+        assert_eq!(g5.context_max, 400_000);
+    }
+
+    // --- cumulative_cost: the resume 8x-overstatement dedupe bug ---
+
+    #[test]
+    fn cumulative_cost_counts_each_message_id_once() {
+        // msgA appears twice (a resume re-append); it must be billed once.
+        let a1 = assistant("msgA", "claude-opus-4-8", "2026-09-10T01:00:00.000Z", 1000, 100);
+        let a1_dup = a1.clone();
+        let b = assistant("msgB", "claude-opus-4-8", "2026-09-10T01:01:00.000Z", 1000, 100);
+        let content = format!("{a1}\n{a1_dup}\n{b}\n");
+        let path = tmp_write(&content);
+        // Unique id per test run so the process-global cost cache can't leak between tests.
+        let id = format!("dedup-{}-{}", std::process::id(), COUNTER.fetch_add(1, Ordering::Relaxed));
+        let cost = cumulative_cost(&id, &path);
+        let _ = std::fs::remove_file(&path);
+        // Per turn: (1000*15 + 100*75)/1e6 = 0.0225. Two distinct ids => 0.045.
+        // If the duplicate were counted it would be 0.0675.
+        close(cost, 0.045);
+    }
+
+    #[test]
+    fn cumulative_cost_resets_seen_set_on_file_shrink() {
+        let id = format!("shrink-{}-{}", std::process::id(), COUNTER.fetch_add(1, Ordering::Relaxed));
+        let a = assistant("m1", "claude-opus-4-8", "2026-09-10T01:00:00.000Z", 1000, 100);
+        let b = assistant("m2", "claude-opus-4-8", "2026-09-10T01:01:00.000Z", 1000, 100);
+        let big = format!("{a}\n{b}\n");
+        let path = tmp_write(&big);
+        let first = cumulative_cost(&id, &path);
+        close(first, 0.045);
+        // Rewrite the SAME path shorter (rotation/clear): fewer bytes than the offset
+        // already consumed => the tally (and the seen set) must reset.
+        std::fs::write(&path, format!("{a}\n")).unwrap();
+        let second = cumulative_cost(&id, &path);
+        let _ = std::fs::remove_file(&path);
+        // A single turn again, freshly counted (m1 not suppressed by a stale seen set).
+        close(second, 0.0225);
+    }
+
+    // --- scan_tail_buf + compact_boundary fix ---
+
+    #[test]
+    fn tail_scan_buf_compact_boundary_wins_over_stale_pre_compact_usage() {
+        // A large pre-compact usage, then a compact_boundary nearer EOF with no newer
+        // usage: ctx must be postTokens, NOT the phantom-full pre-compact number.
+        let stale = assistant("old", "claude-opus-4-8", "2026-09-10T01:00:00.000Z", 174000, 100);
+        let boundary = r#"{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual","postTokens":12052}}"#;
+        let buf = format!("{stale}\n{boundary}\n");
+        let out = scan_tail_buf(buf.as_bytes(), false);
+        assert_eq!(out.ctx, Some(12052));
+    }
+
+    #[test]
+    fn tail_scan_buf_post_compact_usage_wins_over_boundary() {
+        // A fresh usage landed after the boundary: it is nearer EOF, so ctx follows it.
+        let boundary = r#"{"type":"system","subtype":"compact_boundary","compactMetadata":{"postTokens":12052}}"#;
+        let fresh = assistant("new", "claude-opus-4-8", "2026-09-10T01:05:00.000Z", 20000, 100);
+        let buf = format!("{boundary}\n{fresh}\n");
+        let out = scan_tail_buf(buf.as_bytes(), false);
+        // ctx = input + cache_creation + cache_read = 20000.
+        assert_eq!(out.ctx, Some(20000));
+    }
+
+    #[test]
+    fn parse_post_tokens_only_on_compact_boundary() {
+        let good = r#"{"type":"system","subtype":"compact_boundary","compactMetadata":{"postTokens":5000}}"#;
+        assert_eq!(parse_post_tokens(good), Some(5000));
+        let not_boundary = r#"{"type":"system","subtype":"other","compactMetadata":{"postTokens":5000}}"#;
+        assert_eq!(parse_post_tokens(not_boundary), None);
+    }
+
+    #[test]
+    fn tail_scan_grows_window_to_reach_ctx_far_from_eof() {
+        // The newest assistant usage sits well beyond a 64KB tail because a single
+        // huge non-usage record trails it. A non-growing tail would miss the usage
+        // and (finding no ctx, no boundary) return None; the grow-until must reach it.
+        let prompt = r#"{"type":"last-prompt","lastPrompt":"do the thing"}"#;
+        let usage = assistant("far", "claude-opus-4-8", "2026-09-10T01:00:00.000Z", 160000, 100);
+        let filler = format!(r#"{{"type":"user","blob":"{}"}}"#, "x".repeat(80 * 1024));
+        let content = format!("{prompt}\n{usage}\n{filler}\n");
+        let path = tmp_write(&content);
+        let out = tail_scan(&path).expect("tail_scan");
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(out.ctx, Some(160000), "grow-until must reach the far usage record");
+        assert_eq!(out.subtitle.as_deref(), Some("do the thing"));
+    }
+
+    // --- enrich_meta (whole-file, Claude) ---
+
+    #[test]
+    fn enrich_meta_dedupes_cost_keeps_raw_turns_and_compact_ctx() {
+        let a1 = assistant("mA", "claude-opus-4-8", "2026-09-10T01:00:00.000Z", 1000, 100);
+        let a1_dup = a1.clone();
+        let b = assistant("mB", "claude-opus-4-8", "2026-09-10T01:01:00.000Z", 1000, 100);
+        // A compact_boundary as the final record sets the current ctx to postTokens.
+        let boundary = r#"{"type":"system","subtype":"compact_boundary","compactMetadata":{"postTokens":5000}}"#;
+        let content = format!("{a1}\n{a1_dup}\n{b}\n{boundary}\n");
+        let path = tmp_write(&content);
+        let out = enrich_meta(&path);
+        let _ = std::fs::remove_file(&path);
+
+        // cost/turn_count are DEDUPED by message id: mA once + mB once.
+        close(out.cost_usd, 0.045);
+        assert_eq!(out.turn_count, 2);
+        // turns stay RAW (undeduped) for the Daily Spend global dedupe: 3 rows.
+        assert_eq!(out.turns.len(), 3);
+        // ctx follows the trailing compact_boundary.
+        assert_eq!(out.ctx, Some(5000));
+        assert_eq!(out.model_label, "Opus");
+        assert_eq!(out.target, 200_000);
+        assert_eq!(out.limit, 1_000_000);
+        assert!(!out.has_context_usage);
+    }
+
+    #[test]
+    fn enrich_meta_flags_context_usage() {
+        let a = assistant("mA", "claude-opus-4-8", "2026-09-10T01:00:00.000Z", 1000, 100);
+        let ctx_line = r#"{"type":"user","contextUsage":{"foo":1}}"#;
+        let content = format!("{a}\n{ctx_line}\n");
+        let path = tmp_write(&content);
+        let out = enrich_meta(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(out.has_context_usage, "a contextUsage record sets the flag");
+    }
+
+    // --- pure helpers underpinning history/grouping ---
+
+    #[test]
+    fn iso_to_millis_known_instants() {
+        assert_eq!(iso_to_millis("1970-01-01T00:00:00.000Z"), Some(0));
+        assert_eq!(iso_to_millis("1970-01-01T00:00:01.500Z"), Some(1500));
+        // Fractionless still parses (millis default 0).
+        assert_eq!(iso_to_millis("1970-01-01T00:00:02"), Some(2000));
+        // Too short => None.
+        assert_eq!(iso_to_millis("2026-01-01"), None);
+        // One full day past the epoch.
+        assert_eq!(iso_to_millis("1970-01-02T00:00:00.000Z"), Some(86_400_000));
+    }
+
+    #[test]
+    fn downsample_thins_and_always_keeps_last() {
+        let v: Vec<Sample> = (0..10)
+            .map(|i| Sample { t: i as i64, ctx: i as u64, cost: i as f64 })
+            .collect();
+        let out = downsample(v.clone(), 5);
+        assert_eq!(out.len(), 5);
+        assert_eq!(out.first().unwrap().t, 0);
+        assert_eq!(out.last().unwrap().t, 9, "the last point is always retained");
+        // n <= max returns the series unchanged.
+        assert_eq!(downsample(v.clone(), 20).len(), 10);
+        // max == 0 is a no-op passthrough.
+        assert_eq!(downsample(v, 0).len(), 10);
+    }
+
+    #[test]
+    fn last_component_handles_mixed_separators() {
+        assert_eq!(last_component("C:/foo/bar"), "bar");
+        assert_eq!(last_component(r"C:\foo\bar"), "bar");
+        assert_eq!(last_component(r"C:\foo\bar\"), "bar");
+        assert_eq!(last_component("C:\\foo/bar"), "bar");
+    }
+
+    #[test]
+    fn decode_project_dir_drive_and_dashes() {
+        assert_eq!(decode_project_dir("C--claude-local-Greedout"), r"C:\claude\local\Greedout");
+        assert_eq!(decode_project_dir("home-j-code"), r"home\j\code");
+    }
+
+    #[test]
+    fn parse_model_version_extracts_dotted_numbers() {
+        assert_eq!(parse_model_version("claude-opus-4-8-20250101"), "4.8");
+        assert_eq!(parse_model_version("claude-sonnet-5"), "5");
+    }
+}

@@ -1563,3 +1563,136 @@ fn short_title(s: &str) -> String {
         flat
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn terms(ws: &[&str]) -> Vec<String> {
+        ws.iter().map(|s| s.to_string()).collect()
+    }
+
+    // --- fts_match_expr ---
+
+    #[test]
+    fn fts_match_expr_drops_short_terms_and_ands_the_rest() {
+        // "ab" is below the 3-char trigram floor and is dropped; "grep" survives.
+        assert_eq!(fts_match_expr(&terms(&["ab", "grep"])), Some("\"grep\"".to_string()));
+        assert_eq!(
+            fts_match_expr(&terms(&["foo", "bar"])),
+            Some("\"foo\" AND \"bar\"".to_string())
+        );
+    }
+
+    #[test]
+    fn fts_match_expr_none_when_no_term_qualifies() {
+        assert_eq!(fts_match_expr(&terms(&["ab", "cd"])), None);
+        assert_eq!(fts_match_expr(&terms(&[])), None);
+    }
+
+    #[test]
+    fn fts_match_expr_doubles_embedded_quotes() {
+        // An embedded double-quote is escaped by doubling so it stays literal in MATCH.
+        assert_eq!(
+            fts_match_expr(&terms(&["he\"llo"])),
+            Some("\"he\"\"llo\"".to_string())
+        );
+    }
+
+    // --- score_text ---
+
+    #[test]
+    fn score_text_phrase_outranks_fuzzy() {
+        let phrase = score_text("ripgrep is a grep tool", "grep", &terms(&["grep"]))
+            .expect("phrase match");
+        let fuzzy = score_text("foo then bar", "", &terms(&["foo", "bar"])).expect("fuzzy match");
+        assert!(phrase >= 1_000_000, "phrase tier is >= 1,000,000");
+        assert!(fuzzy < 1_000_000, "fuzzy tier is below the phrase tier");
+        assert!(phrase > fuzzy);
+    }
+
+    #[test]
+    fn score_text_word_bounded_outranks_buried_substring() {
+        // Standalone "grep" (word-bounded) must outrank "grep" buried inside "ripgrepx".
+        let bounded = score_text("grep", "grep", &terms(&["grep"])).unwrap();
+        let buried = score_text("ripgrepx", "grep", &terms(&["grep"])).unwrap();
+        assert!(bounded > buried, "bounded {bounded} should beat buried {buried}");
+    }
+
+    #[test]
+    fn score_text_none_when_absent() {
+        assert!(score_text("nothing relevant here", "xyz", &terms(&["xyz"])).is_none());
+        // Single fuzzy term that isn't present, no phrase: None.
+        assert!(score_text("alpha beta", "", &terms(&["gamma"])).is_none());
+    }
+
+    #[test]
+    fn word_bounded_count_ignores_substring_hits() {
+        // "grep" standalone twice; the one inside "ripgrep" does not count.
+        assert_eq!(word_bounded_count("grep ripgrep grep", "grep"), 2);
+        assert_eq!(word_bounded_count("", "grep"), 0);
+        assert_eq!(word_bounded_count("anything", ""), 0);
+    }
+
+    // --- make_snippet ---
+
+    #[test]
+    fn make_snippet_includes_the_match() {
+        let orig = "hello world grep here";
+        let lower = orig.to_lowercase();
+        let snip = make_snippet(orig, &lower, "grep", &terms(&["grep"]));
+        assert!(snip.contains("grep"), "snippet must contain the matched term: {snip}");
+    }
+
+    #[test]
+    fn make_snippet_marks_leading_ellipsis_when_match_is_deep() {
+        let prefix = "a".repeat(120);
+        let orig = format!("{prefix} grep tail");
+        let lower = orig.to_lowercase();
+        let snip = make_snippet(&orig, &lower, "grep", &terms(&["grep"]));
+        assert!(snip.starts_with('…'), "a deep match gets a leading ellipsis: {snip}");
+        assert!(snip.contains("grep"));
+    }
+
+    // --- small pure helpers ---
+
+    #[test]
+    fn placeholders_are_one_indexed_from_two() {
+        assert_eq!(placeholders(1), "?2");
+        assert_eq!(placeholders(3), "?2,?3,?4");
+    }
+
+    #[test]
+    fn harness_label_maps_known_harnesses() {
+        assert_eq!(harness_label("claude-code"), "Claude Code");
+        assert_eq!(harness_label("codex"), "Codex");
+        assert_eq!(harness_label("weird"), "weird");
+    }
+
+    #[test]
+    fn short_title_flattens_and_truncates() {
+        assert_eq!(short_title("  hello   world  "), "hello world");
+        let long = "word ".repeat(40);
+        let t = short_title(&long);
+        assert!(t.ends_with('…'));
+        assert_eq!(t.chars().count(), 61); // 60 chars + ellipsis
+    }
+
+    // --- read_chat_doc (Claude) ---
+
+    #[test]
+    fn read_chat_doc_collects_chat_text_but_skips_tool_results() {
+        let user = r#"{"type":"user","timestamp":"2026-09-10T01:00:00.000Z","message":{"content":"find the bug"}}"#;
+        let asst = r#"{"type":"assistant","timestamp":"2026-09-10T01:00:05.000Z","message":{"content":[{"type":"text","text":"here is the fix"},{"type":"thinking","thinking":"pondering deeply"}]}}"#;
+        let tool = r#"{"type":"user","timestamp":"2026-09-10T01:00:06.000Z","message":{"content":[{"type":"tool_result","content":"SECRETTOOLOUTPUT"}]}}"#;
+        let raw = format!("{user}\n{asst}\n{tool}\n");
+        let doc = read_chat_doc(std::path::Path::new("x.jsonl"), &raw);
+        assert!(doc.text.contains("find the bug"));
+        assert!(doc.text.contains("here is the fix"));
+        assert!(doc.text.contains("pondering deeply"));
+        assert!(!doc.text.contains("SECRETTOOLOUTPUT"), "tool_result content must be excluded");
+        assert_eq!(doc.first_user.as_deref(), Some("find the bug"));
+        assert_eq!(doc.first_ts.as_deref(), Some("2026-09-10T01:00:00.000Z"));
+        assert_eq!(doc.last_ts.as_deref(), Some("2026-09-10T01:00:06.000Z"));
+    }
+}

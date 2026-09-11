@@ -213,11 +213,19 @@ fn init_db(conn: &Connection) -> rusqlite::Result<()> {
             turn_count INTEGER,
             title TEXT,
             has_context_usage INTEGER,
+            first_ms INTEGER,
+            last_ms INTEGER,
             updated_at INTEGER
          );
          CREATE INDEX IF NOT EXISTS idx_hp ON sessions(harness, project);
          CREATE INDEX IF NOT EXISTS idx_sid ON sessions(session_id);
          CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+         -- Full-text chat index (chat-only text, not tool i/o), one row per session
+         -- keyed to its sessions.rowid. tokenize='trigram' gives case-insensitive
+         -- substring matching (partial words, e.g. \"grep\" inside \"ripgrep\") at
+         -- query time. Content-owning (stores the text) so scoring + snippets need
+         -- no file reads and deletes are by rowid alone. Populated during enrich.
+         CREATE VIRTUAL TABLE IF NOT EXISTS chat_fts USING fts5(text, tokenize='trigram');
          -- Per-turn billed rows for Daily Spend, written during the enrich pass so
          -- the tree is parsed once for both windows. Rows are raw (undeduped): the
          -- Daily Spend read dedups by msg_id globally. One row set per session_path,
@@ -231,21 +239,30 @@ fn init_db(conn: &Connection) -> rusqlite::Result<()> {
          CREATE INDEX IF NOT EXISTS idx_turns_path ON turns(session_path);
          CREATE INDEX IF NOT EXISTS idx_turns_ts ON turns(ts);",
     )?;
-    // One-time migration: sessions enriched before the turns table existed carry a
-    // valid scanned_mtime but have no turn rows, so a normal (staleness-based) scan
-    // would skip them and Daily Spend would see nothing. Clear scanned_mtime once to
-    // force a single full re-enrich that populates turns; the flag makes it idempotent.
-    let migrated: bool = conn
-        .query_row("SELECT value FROM meta WHERE key='turns_ready'", [], |r| r.get::<_, String>(0))
-        .map(|s| s == "1")
-        .unwrap_or(false);
-    if !migrated {
-        conn.execute("UPDATE sessions SET scanned_mtime=NULL", [])?;
-        conn.execute(
-            "INSERT INTO meta (key, value) VALUES ('turns_ready', '1')
-             ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-            [],
-        )?;
+    // Add the search-span columns to DBs created before they existed (fresh DBs get
+    // them from the CREATE above). A duplicate-column error is expected + ignored.
+    let _ = conn.execute("ALTER TABLE sessions ADD COLUMN first_ms INTEGER", []);
+    let _ = conn.execute("ALTER TABLE sessions ADD COLUMN last_ms INTEGER", []);
+    // One-time migrations that force a single full re-enrich by clearing scanned_mtime
+    // (a normal staleness scan would skip already-enriched rows). Each is gated by its
+    // own meta flag so it runs exactly once:
+    //   turns_ready - populate the per-turn `turns` table (added after first ship).
+    //   fts_ready   - populate `chat_fts` + the first_ms/last_ms columns (added now);
+    //                 without this, rows enriched before FTS existed would be neither
+    //                 in the index nor re-scanned, so unsearchable.
+    for flag in ["turns_ready", "fts_ready"] {
+        let done: bool = conn
+            .query_row("SELECT value FROM meta WHERE key=?1", [flag], |r| r.get::<_, String>(0))
+            .map(|s| s == "1")
+            .unwrap_or(false);
+        if !done {
+            conn.execute("UPDATE sessions SET scanned_mtime=NULL", [])?;
+            conn.execute(
+                "INSERT INTO meta (key, value) VALUES (?1, '1')
+                 ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                [flag],
+            )?;
+        }
     }
     Ok(())
 }
@@ -470,17 +487,22 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
                 rusqlite::params![path_str, "codex", id, project, project_path, mtime, size, title],
             )?;
         }
-        // Drop rows whose transcript vanished.
+        // Drop rows whose transcript vanished (and their turns + FTS entry). The FTS
+        // row is keyed by sessions.rowid, so grab the rowid before deleting the row.
         {
-            let mut stmt = tx.prepare("SELECT path FROM sessions")?;
-            let existing: Vec<String> =
-                stmt.query_map([], |r| r.get::<_, String>(0))?.flatten().collect();
+            let mut stmt = tx.prepare("SELECT rowid, path FROM sessions")?;
+            let existing: Vec<(i64, String)> = stmt
+                .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?
+                .flatten()
+                .collect();
             let mut del = tx.prepare("DELETE FROM sessions WHERE path=?1")?;
             let mut del_turns = tx.prepare("DELETE FROM turns WHERE session_path=?1")?;
-            for p in existing {
+            let mut del_fts = tx.prepare("DELETE FROM chat_fts WHERE rowid=?1")?;
+            for (rowid, p) in existing {
                 if !seen.contains(&p) {
                     del.execute([&p])?;
                     del_turns.execute([&p])?;
+                    del_fts.execute([rowid])?;
                 }
             }
         }
@@ -521,6 +543,30 @@ struct EnrichRow {
     meta: scan::EnrichMeta,
     mtime: i64,
     size: u64,
+    /// Chat-only text for the FTS index, plus the session's activity span, read in
+    /// the same parallel stage (the file is already hot in the OS cache from the
+    /// enrich read, so this second read is effectively free).
+    chat_text: String,
+    first_ms: Option<i64>,
+    last_ms: Option<i64>,
+}
+
+/// Read a transcript's chat-only text (for `chat_fts`) and its activity span,
+/// dispatching to the Codex or Claude reader by path. Separate from `enrich_for`
+/// so the enrich metadata pipeline stays untouched; the OS page cache makes the
+/// re-read cheap since enrich just read the same bytes.
+fn chat_doc_for(path: &Path) -> (String, Option<i64>, Option<i64>) {
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return (String::new(), None, None);
+    };
+    let doc = if path.starts_with(codex_dir()) {
+        codex::read_chat_doc(path, &raw)
+    } else {
+        read_chat_doc(path, &raw)
+    };
+    let last = doc.last_ts.as_deref().and_then(scan::iso_to_millis);
+    let first = doc.first_ts.as_deref().and_then(scan::iso_to_millis).or(last);
+    (doc.text, first, last)
 }
 
 /// Read + parse every stale transcript IN PARALLEL (std threads, no dep), then
@@ -557,7 +603,16 @@ fn enrich_parallel(
                         let p = Path::new(path);
                         let (mtime, size) = file_stat(p).unwrap_or((0, 0));
                         let meta = enrich_for(p);
-                        out.push(EnrichRow { path: path.clone(), meta, mtime, size });
+                        let (chat_text, first_ms, last_ms) = chat_doc_for(p);
+                        out.push(EnrichRow {
+                            path: path.clone(),
+                            meta,
+                            mtime,
+                            size,
+                            chat_text,
+                            first_ms,
+                            last_ms,
+                        });
                         let d = done.fetch_add(1, Ordering::Relaxed) + 1;
                         if throttle <= 1 || d % throttle == 0 || d == etotal {
                             emit_progress(app, "enrich", d, etotal, id);
@@ -573,7 +628,7 @@ fn enrich_parallel(
     let mut n = 0u64;
     let mut tx = conn.transaction()?;
     for r in &results {
-        write_enrich(&tx, &r.path, &r.meta, r.mtime, r.size)?;
+        write_enrich(&tx, &r.path, &r.meta, r.mtime, r.size, &r.chat_text, r.first_ms, r.last_ms)?;
         n += 1;
         if n % 200 == 0 {
             tx.commit()?;
@@ -584,13 +639,17 @@ fn enrich_parallel(
     Ok(n)
 }
 
-/// Write one transcript's Pass-2 columns from its already-parsed metadata.
+/// Write one transcript's Pass-2 columns from its already-parsed metadata, plus its
+/// chat-only text into the FTS index and its activity span.
 fn write_enrich(
     conn: &Connection,
     path_str: &str,
     m: &scan::EnrichMeta,
     mtime: i64,
     size: u64,
+    chat_text: &str,
+    first_ms: Option<i64>,
+    last_ms: Option<i64>,
 ) -> rusqlite::Result<()> {
     // Refine project from the real cwd when the transcript recorded one.
     let (project, project_path) = match &m.cwd {
@@ -602,7 +661,8 @@ fn write_enrich(
             scanned_mtime=?1, scanned_size=?2,
             ctx_tokens=?3, cost_usd=?4, model=?5, turn_count=?6,
             title=?7, has_context_usage=?8, updated_at=?9,
-            project=COALESCE(?10, project), project_path=COALESCE(?11, project_path)
+            project=COALESCE(?10, project), project_path=COALESCE(?11, project_path),
+            first_ms=?13, last_ms=?14
          WHERE path=?12",
         rusqlite::params![
             mtime,
@@ -617,8 +677,21 @@ fn write_enrich(
             project,
             project_path,
             path_str,
+            first_ms,
+            last_ms,
         ],
     )?;
+    // Refresh this session's FTS entry, keyed to its sessions.rowid (delete-then-insert;
+    // a content-owning FTS5 table deletes by rowid alone, no old text needed).
+    if let Ok(rowid) =
+        conn.query_row("SELECT rowid FROM sessions WHERE path=?1", [path_str], |r| r.get::<_, i64>(0))
+    {
+        conn.execute("DELETE FROM chat_fts WHERE rowid=?1", [rowid])?;
+        conn.execute(
+            "INSERT INTO chat_fts (rowid, text) VALUES (?1, ?2)",
+            rusqlite::params![rowid, chat_text],
+        )?;
+    }
     // Replace this transcript's per-turn rows wholesale (raw, undeduped).
     conn.execute("DELETE FROM turns WHERE session_path=?1", [path_str])?;
     if !m.turns.is_empty() {
@@ -917,7 +990,8 @@ pub fn session(id: &str) -> Option<SessionMeta> {
     let (path, project, harness) = row?;
     let p = Path::new(&path);
     let (mtime, size) = file_stat(p).unwrap_or((0, 0));
-    let _ = write_enrich(&conn, &path, &enrich_for(p), mtime, size);
+    let (chat_text, first_ms, last_ms) = chat_doc_for(p);
+    let _ = write_enrich(&conn, &path, &enrich_for(p), mtime, size, &chat_text, first_ms, last_ms);
     read_sessions(&conn, &harness, &project)
         .into_iter()
         .find(|s| s.id == id)
@@ -1198,19 +1272,7 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
     search_cancel().store(false, Ordering::SeqCst);
     std::thread::spawn(move || {
         let is_current = || search_gen().load(Ordering::SeqCst) == my_gen;
-        let pattern = claude_dir()
-            .join("projects")
-            .join("*")
-            .join("*.jsonl")
-            .to_string_lossy()
-            .replace('\\', "/");
-        let mut paths: Vec<std::path::PathBuf> =
-            glob::glob(&pattern).map(|g| g.flatten().collect()).unwrap_or_default();
-        // Codex rollouts too: same search over their plaintext chat (see
-        // codex::read_chat_doc). Dispatched per-path below by the codex_dir prefix.
-        paths.extend(codex::candidates().into_iter().map(|(p, _)| p));
         let cdir = codex_dir();
-        let total = paths.len() as u64;
         // Hits are labeled with the project a session belongs to, not the folder
         // it ran in, so a subdirectory session reads the same here as in the tree.
         let hit_groups: HashMap<String, grouping::Group> =
@@ -1218,9 +1280,54 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
                 .into_iter()
                 .map(|(dir, g)| (dir.to_string_lossy().to_string(), g))
                 .collect();
-        let done = AtomicU64::new(0);
+
+        // Fast path: any session already indexed in chat_fts (enriched + up to date)
+        // is served instantly from the index. The set of "fresh" paths is exactly the
+        // rows whose stored data still matches the file, and (post the fts_ready
+        // migration) exactly the rows that have an FTS entry, so we can partition:
+        // fresh -> FTS, everything else -> the disk scan below. If the query has no
+        // >=3-char term the trigram index can't help, so FTS is skipped and every
+        // file is disk-scanned (fresh not excluded) to keep coverage.
+        let fts_expr = fts_match_expr(&terms);
+        let conn = open_db().ok();
+        let mut fresh: std::collections::HashSet<String> = std::collections::HashSet::new();
         let hits = AtomicU64::new(0);
-        emit_search(&app, "search", 0, total, 0);
+        if let (Some(conn), Some(expr)) = (&conn, &fts_expr) {
+            if let Ok(mut stmt) = conn.prepare(
+                "SELECT path FROM sessions
+                 WHERE scanned_mtime = mtime AND scanned_size = size_bytes",
+            ) {
+                if let Ok(rows) = stmt.query_map([], |r| r.get::<_, String>(0)) {
+                    fresh = rows.flatten().collect();
+                }
+            }
+            if !fresh.is_empty() {
+                let n = run_fts_hits(&app, conn, expr, &full, &terms, &hit_groups, my_gen);
+                hits.fetch_add(n, Ordering::Relaxed);
+            }
+        }
+        drop(conn);
+
+        // Slow path: disk-scan every transcript NOT served by the FTS fast path (all
+        // of them when the index is empty or unusable -> the original full scan).
+        let pattern = claude_dir()
+            .join("projects")
+            .join("*")
+            .join("*.jsonl")
+            .to_string_lossy()
+            .replace('\\', "/");
+        let mut all_paths: Vec<std::path::PathBuf> =
+            glob::glob(&pattern).map(|g| g.flatten().collect()).unwrap_or_default();
+        // Codex rollouts too: same search over their plaintext chat (see
+        // codex::read_chat_doc). Dispatched per-path below by the codex_dir prefix.
+        all_paths.extend(codex::candidates().into_iter().map(|(p, _)| p));
+        let paths: Vec<std::path::PathBuf> = all_paths
+            .into_iter()
+            .filter(|p| !fresh.contains(&p.to_string_lossy().to_string()))
+            .collect();
+        let total = paths.len() as u64;
+        let done = AtomicU64::new(0);
+        emit_search(&app, "search", 0, total, hits.load(Ordering::Relaxed));
         // Read + score every transcript IN PARALLEL (std threads, no dep), streaming
         // each hit as it's found. Reads are the bottleneck (I/O + the JSON parse), so
         // chunk the paths across the cores; hits and progress emit straight from the
@@ -1265,6 +1372,100 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
         }
         search_running().store(false, Ordering::SeqCst);
     });
+}
+
+/// Build an FTS5 MATCH expression from the query terms: each term of >=3 chars
+/// (the trigram floor) quoted (so operators/quotes in the term are literal) and
+/// AND-ed. Returns None if no term is long enough to index by trigram, in which
+/// case the caller must fall back to a full disk scan for coverage.
+fn fts_match_expr(terms: &[String]) -> Option<String> {
+    let parts: Vec<String> = terms
+        .iter()
+        .filter(|t| t.chars().count() >= 3)
+        .map(|t| format!("\"{}\"", t.replace('"', "\"\"")))
+        .collect();
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(" AND "))
+    }
+}
+
+/// Stream hits for the already-indexed ("fresh") sessions straight from `chat_fts`:
+/// the trigram MATCH narrows to candidates instantly, then the SAME scorer/snippet
+/// as the disk path runs over the stored text (no file reads). Only fresh rows are
+/// returned (stale/never-enriched sessions are covered by the disk scan), so hits
+/// never double up. Returns the number emitted.
+#[allow(clippy::too_many_arguments)]
+fn run_fts_hits(
+    app: &tauri::AppHandle,
+    conn: &Connection,
+    expr: &str,
+    full: &str,
+    terms: &[String],
+    hit_groups: &HashMap<String, grouping::Group>,
+    my_gen: u64,
+) -> u64 {
+    let mut stmt = match conn.prepare(
+        "SELECT s.session_id, s.project_path, s.harness, s.title, s.mtime, s.size_bytes,
+                s.first_ms, s.last_ms, f.text
+         FROM chat_fts f JOIN sessions s ON s.rowid = f.rowid
+         WHERE f.text MATCH ?1
+           AND s.scanned_mtime = s.mtime AND s.scanned_size = s.size_bytes",
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            blog!("fts prepare failed: {e}");
+            return 0;
+        }
+    };
+    let rows = stmt.query_map([expr], |r| {
+        Ok((
+            r.get::<_, Option<String>>(0)?.unwrap_or_default(),
+            r.get::<_, Option<String>>(1)?.unwrap_or_default(),
+            r.get::<_, Option<String>>(2)?.unwrap_or_default(),
+            r.get::<_, Option<String>>(3)?.unwrap_or_default(),
+            r.get::<_, i64>(4)?,
+            r.get::<_, i64>(5)? as u64,
+            r.get::<_, Option<i64>>(6)?,
+            r.get::<_, Option<i64>>(7)?,
+            r.get::<_, String>(8)?,
+        ))
+    });
+    let Ok(rows) = rows else { return 0 };
+    let mut n = 0u64;
+    for row in rows.flatten() {
+        if search_cancel().load(Ordering::Relaxed) || search_gen().load(Ordering::SeqCst) != my_gen {
+            break;
+        }
+        let (id, project_path, harness, title, mtime, size_bytes, first_ms, last_ms, text) = row;
+        let lower = text.to_lowercase();
+        let Some(score) = score_text(&lower, full, terms) else { continue };
+        let project = hit_groups
+            .get(&project_path)
+            .map(|g| g.label.clone())
+            .unwrap_or_else(|| scan::last_component(&project_path));
+        let title = if title.is_empty() { project.clone() } else { title };
+        let snippet = make_snippet(&text, &lower, full, terms);
+        let hit = SearchHit {
+            id,
+            title,
+            project,
+            project_path,
+            size_bytes,
+            mtime,
+            first_ms: first_ms.unwrap_or(mtime),
+            last_ms: last_ms.unwrap_or(mtime),
+            score,
+            snippet,
+            harness,
+        };
+        if search_gen().load(Ordering::SeqCst) == my_gen {
+            let _ = app.emit("search-hit", hit);
+            n += 1;
+        }
+    }
+    n
 }
 
 /// Read one transcript, cheaply pre-filter it, and (on a match) build its hit. The

@@ -18,7 +18,7 @@
 
 use crate::config::{codex_dir, Config};
 use crate::scan::{
-    downsample, iso_to_millis, last_component, model_info, parse_model_version, Sample, Session,
+    downsample, iso_to_millis, last_component, model_info, Sample, Session,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -77,6 +77,31 @@ pub(crate) fn id_from_path(path: &Path) -> String {
     }
 }
 
+/// Human model name for a Codex id, matching the labels Codex's own model picker
+/// shows: the version keeps its full decimal and the internal codename is surfaced
+/// rather than dropped. Returns `(label, version)`, rendered by the UI as
+/// "label version" -- e.g. "gpt-6-astra" -> ("GPT-6","Astra") => "GPT-6 Astra",
+/// "gpt-5.6-sol" -> ("GPT-5.6","Sol"), "gpt-5.5" -> ("GPT-5.5",""). (The generic
+/// `parse_model_version` drops both the dotted minor and the codename, collapsing
+/// terra/sol/luna to a bare "GPT".)
+pub(crate) fn model_name(id: &str) -> (String, String) {
+    let lower = id.to_ascii_lowercase();
+    let rest = lower.strip_prefix("gpt-").unwrap_or(&lower);
+    // "5.6-sol" -> ver "5.6", codename "sol"; "5.5" -> ver "5.5", codename "".
+    let mut parts = rest.splitn(2, '-');
+    let ver = parts.next().unwrap_or("");
+    let codename = parts.next().unwrap_or("");
+    let label = if ver.is_empty() { "GPT".to_string() } else { format!("GPT-{ver}") };
+    let version = {
+        let mut ch = codename.chars();
+        match ch.next() {
+            Some(f) => f.to_uppercase().collect::<String>() + ch.as_str(),
+            None => String::new(),
+        }
+    };
+    (label, version)
+}
+
 /// One Codex usage block's raw counts (`input_tokens` already includes the cached
 /// part). Priced later, once the session's model is known.
 #[derive(Default, Clone, Copy)]
@@ -128,8 +153,7 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, focused: O
     let max = mi.as_ref().map(|i| i.context_max).unwrap_or(cfg.target_tokens);
     let limit = t.window.unwrap_or(max);
     let target = t.window.map(|w| target0.min(w)).unwrap_or(target0);
-    let model = mi.as_ref().map(|i| i.label.to_string()).unwrap_or_default();
-    let model_version = t.model.as_deref().map(parse_model_version).unwrap_or_default();
+    let (model, model_version) = t.model.as_deref().map(model_name).unwrap_or_default();
     let cost_usd = t.thread.map(|c| price(&c, t.model.as_deref())).unwrap_or(0.0);
 
     let title = session_title(&id).unwrap_or_else(|| project.clone());
@@ -550,8 +574,9 @@ pub fn enrich_meta(path: &Path) -> crate::scan::EnrichMeta {
     out.has_context_usage = false;
     if let Some(m) = &model {
         let mi = model_info(m);
-        out.model_label = mi.label.to_string();
-        out.model_version = parse_model_version(m);
+        let (label, version) = model_name(m);
+        out.model_label = label;
+        out.model_version = version;
         out.target = mi.target;
         out.limit = window.unwrap_or(mi.context_max);
     } else {

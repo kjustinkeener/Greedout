@@ -85,6 +85,16 @@ pub(crate) fn model_info(model: &str) -> ModelInfo {
     }
     // --- Anthropic Claude ---
     // Sweet spot 200k, hard window 1M (per our own findings).
+    // Fable 5.1 ($10 in / $50 out): cache-read is a preferential 0.025x (not the
+    // usual 0.1x), a rate the pricing table footnotes as exclusive to Fable 5.1 /
+    // Mythos 5.1 (verified against Anthropic pricing docs 2026-09-10). Must precede
+    // no branch in particular (a fable id matches none of opus/sonnet/haiku), but
+    // listed first so the label/price are obvious.
+    if m.contains("fable") {
+        return ModelInfo { label: "Fable", price_in: 10.0, price_out: 50.0,
+            price_cache_write: 12.50, price_cache_read: 0.25,
+            context_max: 1_000_000, target: 200_000 };
+    }
     if m.contains("opus") {
         return ModelInfo { label: "Opus", price_in: 15.0, price_out: 75.0,
             price_cache_write: 18.75, price_cache_read: 1.50,

@@ -591,7 +591,7 @@ pub fn enrich_meta(path: &Path) -> crate::scan::EnrichMeta {
 /// never persisted in the clear, so it can't be searched) -- and skips tool i/o, to
 /// match the chat-only scope of the Claude side. Whole file (no compaction cut):
 /// search covers all history, not just the live window.
-pub fn read_chat_doc(path: &Path) -> crate::browse::ChatDoc {
+pub fn read_chat_doc(path: &Path, raw: &str) -> crate::browse::ChatDoc {
     let mut doc = crate::browse::ChatDoc {
         text: String::new(),
         title: session_title(&id_from_path(path)),
@@ -600,7 +600,6 @@ pub fn read_chat_doc(path: &Path) -> crate::browse::ChatDoc {
         first_ts: None,
         last_ts: None,
     };
-    let Ok(raw) = std::fs::read_to_string(path) else { return doc };
     for line in raw.lines() {
         if doc.cwd.is_none() && line.contains("\"cwd\"") {
             if let Some(c) = payload_str(line, "cwd") {

@@ -995,7 +995,7 @@ pub(crate) struct ChatDoc {
     pub last_ts: Option<String>,
 }
 
-fn read_chat_doc(path: &Path) -> ChatDoc {
+fn read_chat_doc(_path: &Path, raw: &str) -> ChatDoc {
     use serde_json::Value;
     let mut doc = ChatDoc {
         text: String::new(),
@@ -1005,7 +1005,6 @@ fn read_chat_doc(path: &Path) -> ChatDoc {
         first_ts: None,
         last_ts: None,
     };
-    let Ok(raw) = std::fs::read_to_string(path) else { return doc };
     for line in raw.lines() {
         if line.contains("custom-title") {
             if let Ok(v) = serde_json::from_str::<Value>(line) {
@@ -1219,84 +1218,130 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
                 .into_iter()
                 .map(|(dir, g)| (dir.to_string_lossy().to_string(), g))
                 .collect();
-        let mut done = 0u64;
-        let mut hits = 0u64;
+        let done = AtomicU64::new(0);
+        let hits = AtomicU64::new(0);
         emit_search(&app, "search", 0, total, 0);
-        for path in &paths {
-            if search_cancel().load(Ordering::Relaxed) || !is_current() {
-                break;
-            }
-            done += 1;
-            let is_codex = path.starts_with(&cdir);
-            let doc = if is_codex { codex::read_chat_doc(path) } else { read_chat_doc(path) };
-            let lower = doc.text.to_lowercase();
-            if let Some(score) = score_text(&lower, &full, &terms) {
-                hits += 1;
-                let id = if is_codex {
-                    codex::id_from_path(path)
-                } else {
-                    path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default()
-                };
-                let (mtime, size) = file_stat(path).unwrap_or((0, 0));
-                let mtime_ms = mtime; // file_stat already returns millis
-                let last_ms = doc
-                    .last_ts
-                    .as_deref()
-                    .and_then(scan::iso_to_millis)
-                    .unwrap_or(mtime_ms);
-                let first_ms = doc
-                    .first_ts
-                    .as_deref()
-                    .and_then(scan::iso_to_millis)
-                    .unwrap_or(last_ms);
-                let project_path = doc.cwd.clone().unwrap_or_else(|| {
-                    let dir = path
-                        .parent()
-                        .and_then(|p| p.file_name())
-                        .map(|s| s.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    scan::decode_project_dir(&dir)
+        // Read + score every transcript IN PARALLEL (std threads, no dep), streaming
+        // each hit as it's found. Reads are the bottleneck (I/O + the JSON parse), so
+        // chunk the paths across the cores; hits and progress emit straight from the
+        // worker threads (AppHandle::emit is Send+Sync; the UI sorts hits by score).
+        let nthreads =
+            std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8);
+        let chunk = paths.len().div_ceil(nthreads).max(1);
+        std::thread::scope(|s| {
+            for part in paths.chunks(chunk) {
+                let (app, full, terms, cdir, hit_groups, done, hits) =
+                    (&app, &full, &terms, &cdir, &hit_groups, &done, &hits);
+                s.spawn(move || {
+                    for path in part {
+                        // A superseded or canceled run stops emitting and quits early.
+                        if search_cancel().load(Ordering::Relaxed)
+                            || search_gen().load(Ordering::SeqCst) != my_gen
+                        {
+                            break;
+                        }
+                        if let Some(hit) = search_one(path, cdir, full, terms, hit_groups) {
+                            hits.fetch_add(1, Ordering::Relaxed);
+                            if search_gen().load(Ordering::SeqCst) == my_gen {
+                                let _ = app.emit("search-hit", hit);
+                            }
+                        }
+                        let d = done.fetch_add(1, Ordering::Relaxed) + 1;
+                        if (d % 16 == 0 || d == total)
+                            && search_gen().load(Ordering::SeqCst) == my_gen
+                        {
+                            emit_search(app, "search", d, total, hits.load(Ordering::Relaxed));
+                        }
+                    }
                 });
-                // Codex rollouts sit under a dated folder, not an encoded project dir,
-                // so group by the session's own cwd (its real project) instead.
-                let decoded = if is_codex {
-                    project_path.clone()
-                } else {
-                    path.parent()
-                        .and_then(|p| p.file_name())
-                        .map(|s| scan::decode_project_dir(&s.to_string_lossy()))
-                        .unwrap_or_default()
-                };
-                let project = hit_groups
-                    .get(&decoded)
-                    .map(|g| g.label.clone())
-                    .unwrap_or_else(|| scan::last_component(&project_path));
-                let title = doc
-                    .title
-                    .clone()
-                    .or_else(|| doc.first_user.as_deref().map(short_title))
-                    .filter(|t| !t.is_empty())
-                    .unwrap_or_else(|| project.clone());
-                let snippet = make_snippet(&doc.text, &lower, &full, &terms);
-                if is_current() {
-                    let _ = app.emit(
-                        "search-hit",
-                        SearchHit { id, title, project, project_path, size_bytes: size, mtime, first_ms, last_ms, score, snippet, harness: if is_codex { "codex".into() } else { HARNESS.into() } },
-                    );
-                }
             }
-            if (done % 10 == 0 || done == total) && is_current() {
-                emit_search(&app, "search", done, total, hits);
-            }
-        }
+        });
         // Only report terminal state if we're still the current run: a superseded
         // thread must not flip the new run's progress to done/canceled.
         if is_current() {
+            let d = done.load(Ordering::Relaxed);
             let canceled = search_cancel().load(Ordering::Relaxed);
-            emit_search(&app, if canceled { "canceled" } else { "done" }, done, total, hits);
+            emit_search(&app, if canceled { "canceled" } else { "done" }, d, total, hits.load(Ordering::Relaxed));
         }
         search_running().store(false, Ordering::SeqCst);
     });
+}
+
+/// Read one transcript, cheaply pre-filter it, and (on a match) build its hit. The
+/// pre-filter is the speed win: if not one query term appears anywhere in the raw
+/// file bytes, the chat text (a subset) can't match, so we skip the per-line JSON
+/// parse entirely. Only surviving files get parsed to chat-only text and scored.
+fn search_one(
+    path: &Path,
+    cdir: &Path,
+    full: &str,
+    terms: &[String],
+    hit_groups: &HashMap<String, grouping::Group>,
+) -> Option<SearchHit> {
+    let raw = std::fs::read_to_string(path).ok()?;
+    let raw_lower = raw.to_lowercase();
+    let present = if !full.is_empty() && raw_lower.contains(full) {
+        true
+    } else {
+        terms.iter().any(|t| raw_lower.contains(t))
+    };
+    if !present {
+        return None;
+    }
+    let is_codex = path.starts_with(cdir);
+    let doc = if is_codex { codex::read_chat_doc(path, &raw) } else { read_chat_doc(path, &raw) };
+    let lower = doc.text.to_lowercase();
+    let score = score_text(&lower, full, terms)?;
+    let id = if is_codex {
+        codex::id_from_path(path)
+    } else {
+        path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default()
+    };
+    let (mtime, size) = file_stat(path).unwrap_or((0, 0));
+    let last_ms = doc.last_ts.as_deref().and_then(scan::iso_to_millis).unwrap_or(mtime);
+    let first_ms = doc.first_ts.as_deref().and_then(scan::iso_to_millis).unwrap_or(last_ms);
+    let project_path = doc.cwd.clone().unwrap_or_else(|| {
+        let dir = path
+            .parent()
+            .and_then(|p| p.file_name())
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        scan::decode_project_dir(&dir)
+    });
+    // Codex rollouts sit under a dated folder, not an encoded project dir, so group by
+    // the session's own cwd (its real project) instead.
+    let decoded = if is_codex {
+        project_path.clone()
+    } else {
+        path.parent()
+            .and_then(|p| p.file_name())
+            .map(|s| scan::decode_project_dir(&s.to_string_lossy()))
+            .unwrap_or_default()
+    };
+    let project = hit_groups
+        .get(&decoded)
+        .map(|g| g.label.clone())
+        .unwrap_or_else(|| scan::last_component(&project_path));
+    let title = doc
+        .title
+        .clone()
+        .or_else(|| doc.first_user.as_deref().map(short_title))
+        .filter(|t| !t.is_empty())
+        .unwrap_or_else(|| project.clone());
+    let snippet = make_snippet(&doc.text, &lower, full, terms);
+    Some(SearchHit {
+        id,
+        title,
+        project,
+        project_path,
+        size_bytes: size,
+        mtime,
+        first_ms,
+        last_ms,
+        score,
+        snippet,
+        harness: if is_codex { "codex".into() } else { HARNESS.into() },
+    })
 }
 
 fn emit_search(app: &tauri::AppHandle, phase: &'static str, done: u64, total: u64, hits: u64) {

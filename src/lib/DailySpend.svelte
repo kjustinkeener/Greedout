@@ -283,6 +283,7 @@
   // Short harness label for the chooser badge (mirrors Baseline.svelte).
   const harnessLabel = (h: string): string => (h === "codex" ? "Codex" : "Claude");
   interface Lane {
+    key: string; // full project path (unique); `project` is only the leaf label
     project: string;
     spans: Span[];
     total: number;
@@ -307,7 +308,7 @@
       byProject.set(key, arr);
     }
     const out: Lane[] = [];
-    for (const [, evs] of byProject) {
+    for (const [laneKey, evs] of byProject) {
       const project = evs[0].project; // leaf name, shown as the lane label
       evs.sort((a, b) => a.t - b.t);
       const spans: Span[] = [];
@@ -334,6 +335,7 @@
         bySession.set(e.session, o);
       }
       out.push({
+        key: laneKey,
         project,
         spans,
         total: spans.reduce((a, b) => a + b.cost, 0),
@@ -590,7 +592,7 @@
               <span class="grid" style:left={`${(h / 24) * 100}%`}></span>
             {/each}
           </div>
-          {#each lanes as l, i (l.project)}
+          {#each lanes as l, i (l.key)}
             <div class="lane">
               <div class="track">
                 {#each l.spans as sp}

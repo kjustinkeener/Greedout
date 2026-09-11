@@ -214,28 +214,33 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
     }
 
     let mut out = Tailed::default();
+    // Set once we reach a `compacted` record newer than any usage record. The real
+    // post-compact size isn't written until the next turn, and the record beyond it
+    // is the stale pre-compact value (226k → 27k in practice). So leave ctx UNKNOWN
+    // (None): the gauge renders a neutral "--" placeholder, neither a phantom-full
+    // pre-compact bar nor a misleading 0%, and self-heals on the next turn. A
+    // post-compact usage record nearer EOF is found first, so this only fires in the
+    // brief just-compacted gap. Analog of scan.rs's Claude `compact_boundary` fix
+    // (Claude has `postTokens`; Codex's `compacted` record carries no post count).
+    let mut compacted = false;
     for line in lines.iter().rev() {
-        // Compaction resets the window: scanning backward, if we reach a `compacted`
-        // record before any `token_usage_record`, compaction is the newest context
-        // event and the pre-compact record beyond it is stale (226k → 27k in
-        // practice). Report 0 (empty) until the next turn writes a real usage record,
-        // rather than showing a phantom-full gauge -- the analog of scan.rs's Claude
-        // `compact_boundary` fix. A post-compact usage record nearer EOF is found
-        // first, so this guard only fires in the brief just-compacted gap.
-        if out.ctx.is_none()
+        if !compacted
+            && out.ctx.is_none()
             && line.contains("\"compacted\"")
             && is_record_type(line, "compacted")
         {
-            out.ctx = Some(0);
+            compacted = true;
         }
-        // ctx and cumulative spend are DECOUPLED: a compaction zeroes ctx (above),
+        // ctx and cumulative spend are DECOUPLED: a compaction leaves ctx unknown,
         // but `thread_token_usage` is money already spent and must survive it, so
-        // keep reading the newest usage record for `thread` even once ctx is set.
-        // Otherwise the just-compacted gap shows a phantom $0 spend on the live
-        // gauge (the enrich path already tracks thread independently).
-        if (out.ctx.is_none() || out.thread.is_none()) && line.contains("\"token_usage_record\"") {
+        // keep reading the newest usage record for `thread` regardless. Otherwise
+        // the just-compacted gap shows a phantom $0 spend on the live gauge (the
+        // enrich path already tracks thread independently).
+        if ((out.ctx.is_none() && !compacted) || out.thread.is_none())
+            && line.contains("\"token_usage_record\"")
+        {
             if let Some((ctx, thread)) = usage_from(line) {
-                if out.ctx.is_none() {
+                if out.ctx.is_none() && !compacted {
                     out.ctx = Some(ctx);
                 }
                 if out.thread.is_none() {
@@ -252,7 +257,12 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
         if out.window.is_none() && line.contains("model_context_window") {
             out.window = window_from(line);
         }
-        if out.ctx.is_some() && out.thread.is_some() && out.model.is_some() && out.cwd.is_some() && out.window.is_some() {
+        if (out.ctx.is_some() || compacted)
+            && out.thread.is_some()
+            && out.model.is_some()
+            && out.cwd.is_some()
+            && out.window.is_some()
+        {
             break;
         }
     }
@@ -558,9 +568,12 @@ pub fn enrich_meta(path: &Path) -> crate::scan::EnrichMeta {
                 }
             }
         } else if is_compacted && rtype == Some("compacted") {
-            // Newest context event is a compaction: window is empty until the next
-            // real usage record, same as the backward tail scan.
-            ctx = Some(0);
+            // A compaction leaves ctx UNKNOWN until the next real usage record (see
+            // scan_tail_buf). Forward walk = last write wins, so a following turn
+            // overwrites this None with the real post-compact size; if the session
+            // ends on the compaction, it stays None -> a neutral "--" placeholder,
+            // not a misleading 0.
+            ctx = None;
         }
         if is_window {
             if let Some(w) = window_from(line) {

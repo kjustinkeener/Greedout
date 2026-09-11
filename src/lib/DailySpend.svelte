@@ -276,9 +276,12 @@
   interface SessionSlice {
     id: string;
     title: string;
+    harness: string; // "claude-code" or "codex", for the chooser badge
     cost: number;
     last: number; // session's overall last-activity time (mtime), epoch ms
   }
+  // Short harness label for the chooser badge (mirrors Baseline.svelte).
+  const harnessLabel = (h: string): string => (h === "codex" ? "Codex" : "Claude");
   interface Lane {
     project: string;
     spans: Span[];
@@ -291,15 +294,21 @@
   // wherever there's a gap of an hour or more.
   const lanes = $derived.by<Lane[]>(() => {
     if (!curDay) return [];
+    // Group by FULL project path, not the leaf name: two unrelated folders that
+    // share a basename must not collapse, and a folder worked by both Claude and
+    // Codex stays ONE lane (the chooser's harness badges tell its sessions apart).
+    // Fall back to the leaf name for rows with no path (e.g. Codex without a cwd).
     const byProject = new Map<string, SpendEvent[]>();
     for (const e of events) {
       if (dayKey(e.t) !== curDay) continue;
-      const arr = byProject.get(e.project) ?? [];
+      const key = e.projectPath || e.project;
+      const arr = byProject.get(key) ?? [];
       arr.push(e);
-      byProject.set(e.project, arr);
+      byProject.set(key, arr);
     }
     const out: Lane[] = [];
-    for (const [project, evs] of byProject) {
+    for (const [, evs] of byProject) {
+      const project = evs[0].project; // leaf name, shown as the lane label
       evs.sort((a, b) => a.t - b.t);
       const spans: Span[] = [];
       let cur: Span | null = null;
@@ -318,7 +327,7 @@
       // can offer a chooser rather than guessing which to open.
       const bySession = new Map<string, SessionSlice>();
       for (const e of evs) {
-        const o = bySession.get(e.session) ?? { id: e.session, title: e.title, cost: 0, last: e.mtime };
+        const o = bySession.get(e.session) ?? { id: e.session, title: e.title, harness: e.harness, cost: 0, last: e.mtime };
         if (!o.title && e.title) o.title = e.title;
         o.cost += e.cost;
         if (e.mtime > o.last) o.last = e.mtime;
@@ -646,7 +655,10 @@
                 }}
               >
                 <span class="chmain">
-                  <span class="chname">{s.title || s.id.slice(0, 8)}</span>
+                  <span class="chname">
+                    <span class="hbadge" class:codex={s.harness === "codex"}>{harnessLabel(s.harness)}</span>
+                    {s.title || s.id.slice(0, 8)}
+                  </span>
                   <span class="chsub">{chooser.project} · {dateAbbr(s.last)}</span>
                 </span>
                 <span class="chcost">{usd(s.cost)}</span>
@@ -1097,6 +1109,23 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .hbadge {
+    display: inline-block;
+    font-size: 9.5px;
+    font-weight: var(--w-semibold);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 999px;
+    margin-right: 5px;
+    vertical-align: baseline;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--muted) 16%, transparent);
+  }
+  .hbadge.codex {
+    color: var(--accent, #4aa3df);
+    background: color-mix(in srgb, var(--accent, #4aa3df) 18%, transparent);
   }
   .chsub {
     font-size: 11px;

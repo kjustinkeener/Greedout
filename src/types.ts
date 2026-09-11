@@ -33,7 +33,9 @@ export interface SpendEvent {
   t: number; // turn timestamp, epoch ms
   cost: number; // this turn's estimated USD cost
   session: string; // session id it was first seen in
-  project: string; // readable project name
+  project: string; // readable project name (leaf)
+  projectPath: string; // full project path (decoded dir for Claude, cwd for Codex)
+  harness: string; // "claude-code" or "codex"
   title: string; // session title (custom title/label), "" if none yet
   mtime: number; // session's overall last-activity time (transcript mtime), epoch ms
 }

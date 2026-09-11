@@ -329,7 +329,7 @@ pub fn spend_events() -> Vec<scan::SpendEvent> {
     // ORDER BY session_path makes "first occurrence wins" deterministic run to run
     // (the old file-based path sorted the globbed paths for the same reason).
     let Ok(mut stmt) = conn.prepare(
-        "SELECT t.msg_id, t.ts, t.cost, s.session_id, s.project, s.title, s.mtime
+        "SELECT t.msg_id, t.ts, t.cost, s.session_id, s.project, s.title, s.mtime, s.harness, s.project_path
          FROM turns t JOIN sessions s ON s.path = t.session_path
          ORDER BY t.session_path, t.ts",
     ) else {
@@ -344,13 +344,15 @@ pub fn spend_events() -> Vec<scan::SpendEvent> {
             r.get::<_, Option<String>>(4)?,
             r.get::<_, Option<String>>(5)?,
             r.get::<_, Option<i64>>(6)?,
+            r.get::<_, String>(7)?,
+            r.get::<_, Option<String>>(8)?,
         ))
     }) else {
         return Vec::new();
     };
     let mut out: Vec<scan::SpendEvent> = Vec::new();
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for (msg_id, ts, cost, session, project, title, mtime) in rows.flatten() {
+    for (msg_id, ts, cost, session, project, title, mtime, harness, project_path) in rows.flatten() {
         if let Some(mid) = &msg_id {
             if !seen.insert(mid.clone()) {
                 continue;
@@ -362,6 +364,8 @@ pub fn spend_events() -> Vec<scan::SpendEvent> {
                 cost,
                 session: session.unwrap_or_default(),
                 project: project.unwrap_or_default(),
+                project_path: project_path.unwrap_or_default(),
+                harness,
                 title: title.unwrap_or_default(),
                 mtime: mtime.unwrap_or(0),
             });

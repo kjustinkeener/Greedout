@@ -993,6 +993,11 @@ pub struct SpendEvent {
     pub session: String,
     /// Readable project name (leaf of the decoded transcript directory).
     pub project: String,
+    /// Full project path (decoded transcript dir for Claude, cwd for Codex).
+    /// Used to disambiguate lanes when two harnesses share a leaf name.
+    pub project_path: String,
+    /// Harness that produced the turn: "claude-code" or "codex".
+    pub harness: String,
     /// Session title (custom title or user label); empty if not yet known.
     pub title: String,
     /// Session's overall last-activity time (transcript mtime), epoch millis.

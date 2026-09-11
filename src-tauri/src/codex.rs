@@ -384,7 +384,7 @@ fn is_uuid(s: &str) -> bool {
 
 /// The session's title from `~/.codex/session_index.jsonl` (`id` -> `thread_name`).
 /// The index is small and rewritten by the app; the last matching row wins.
-fn session_title(id: &str) -> Option<String> {
+pub(crate) fn session_title(id: &str) -> Option<String> {
     let text = std::fs::read_to_string(codex_dir().join("session_index.jsonl")).ok()?;
     let mut found = None;
     for line in text.lines() {
@@ -443,4 +443,119 @@ pub fn history(id: &str) -> Vec<Sample> {
         out.push(Sample { t, ctx, cost });
     }
     downsample(out, 200)
+}
+
+/// The session's working directory, read as cheaply as possible for the browse
+/// Pass-1 project grouping: a growing backward tail that stops as soon as a `cwd`
+/// is found (or the whole file has been read). Codex encodes no cwd in the rollout
+/// filename, so unlike Claude's Pass-1 (which decodes the project dir name) this
+/// costs a small tail read; the enrich pass later confirms it from a whole-file scan.
+pub fn cwd_of(path: &Path) -> Option<String> {
+    let mut file = std::fs::File::open(path).ok()?;
+    let len = file.metadata().ok()?.len();
+    let mut win = TAIL_BYTES;
+    loop {
+        let start = len.saturating_sub(win);
+        file.seek(SeekFrom::Start(start)).ok()?;
+        let mut buf = Vec::with_capacity((len - start) as usize);
+        file.read_to_end(&mut buf).ok()?;
+        if let Some(cwd) = scan_tail_buf(&buf, start > 0).cwd {
+            return Some(cwd);
+        }
+        if start == 0 {
+            return None;
+        }
+        win = win.saturating_mul(8);
+    }
+}
+
+/// Whole-file browse-cache row for a Codex rollout: the Codex analog of
+/// `scan::enrich_meta`, producing the SAME `EnrichMeta` struct in one pass.
+///
+/// Codex records are unique and append-only (no resume re-append the way Claude
+/// transcripts get), so the per-turn Daily Spend rows carry `None` for msg_id and
+/// need no dedupe key -- each `token_usage_record` is one billed turn. Context is
+/// compaction-aware (a top-level `compacted` record newer than the last usage
+/// resets it to 0, same rule as `scan_tail_buf`), and cumulative spend is priced
+/// off the newest `thread_token_usage` to match the live gauge (see build_session).
+pub fn enrich_meta(path: &Path) -> crate::scan::EnrichMeta {
+    let mut out = crate::scan::EnrichMeta::default();
+    let Ok(text) = std::fs::read_to_string(path) else { return out };
+
+    // Resolve the session's model once (newest wins) so every per-turn row prices
+    // consistently, mirroring history().
+    let model = text.lines().rev().find_map(|l| {
+        l.contains("\"model\"").then(|| payload_str(l, "model")).flatten()
+    });
+
+    // Walk forward so "last write wins" == newest for every single-valued field.
+    let mut ctx: Option<u64> = None;
+    let mut newest_thread: Option<Counts> = None;
+    let mut window: Option<u64> = None;
+    let mut cwd: Option<String> = None;
+    let mut turn_count: u64 = 0;
+
+    for line in text.lines() {
+        let is_usage = line.contains("\"token_usage_record\"");
+        let is_compacted = line.contains("\"compacted\"");
+        let is_window = line.contains("model_context_window");
+        let is_cwd = line.contains("\"cwd\"");
+        if !(is_usage || is_compacted || is_window || is_cwd) {
+            continue;
+        }
+        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        let rtype = v.get("type").and_then(Value::as_str);
+
+        if is_usage && rtype == Some("token_usage_record") {
+            if let Some(p) = v.get("payload") {
+                if let Some(usage) = p.get("usage") {
+                    turn_count += 1;
+                    ctx = Some(usage.get("input_tokens").and_then(Value::as_u64).unwrap_or(0));
+                    // Per-turn spend from THIS response's own usage, not the thread
+                    // cumulative. msg_id None: Codex rows are unique, no dedupe key.
+                    let cost = price(&counts_of(usage), model.as_deref());
+                    if let Some(t) =
+                        v.get("timestamp").and_then(Value::as_str).and_then(iso_to_millis)
+                    {
+                        out.turns.push((None, t, cost));
+                    }
+                    // Cumulative spend tracks the newest thread_token_usage (falls
+                    // back to this response's usage when absent, as usage_from does).
+                    newest_thread = Some(counts_of(p.get("thread_token_usage").unwrap_or(usage)));
+                }
+            }
+        } else if is_compacted && rtype == Some("compacted") {
+            // Newest context event is a compaction: window is empty until the next
+            // real usage record, same as the backward tail scan.
+            ctx = Some(0);
+        }
+        if is_window {
+            if let Some(w) = window_from(line) {
+                window = Some(w);
+            }
+        }
+        if is_cwd {
+            if let Some(c) = payload_str(line, "cwd") {
+                cwd = Some(c);
+            }
+        }
+    }
+
+    out.ctx = ctx;
+    out.cost_usd = newest_thread.map(|c| price(&c, model.as_deref())).unwrap_or(0.0);
+    out.turn_count = turn_count;
+    out.cwd = cwd;
+    out.title = session_title(&id_from_path(path));
+    // No Codex analog of Claude's `/context` breakdown.
+    out.has_context_usage = false;
+    if let Some(m) = &model {
+        let mi = model_info(m);
+        out.model_label = mi.label.to_string();
+        out.model_version = parse_model_version(m);
+        out.target = mi.target;
+        out.limit = window.unwrap_or(mi.context_max);
+    } else {
+        out.limit = window.unwrap_or(0);
+    }
+    out
 }

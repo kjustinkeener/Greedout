@@ -19,7 +19,8 @@
 //! column so other providers -- Ollama, Cline, Codex -- slot in later without a
 //! schema change).
 
-use crate::config::{cache_db_path, claude_dir};
+use crate::codex;
+use crate::config::{cache_db_path, claude_dir, codex_dir};
 use crate::grouping;
 use crate::scan;
 use rusqlite::Connection;
@@ -32,6 +33,18 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::Emitter;
 
 const HARNESS: &str = "claude-code";
+
+/// Enrich one transcript with the adapter that matches its harness. A path under
+/// the Codex data dir is a rollout; everything else is a Claude transcript. Reading
+/// the path is enough at every call site (the `sessions.harness` column agrees), so
+/// no extra query is needed to dispatch.
+fn enrich_for(path: &Path) -> scan::EnrichMeta {
+    if path.starts_with(codex_dir()) {
+        codex::enrich_meta(path)
+    } else {
+        scan::enrich_meta(path)
+    }
+}
 
 /// Trace to greedout.log (gated by the Debug logging setting), prefixed so browse
 /// lines are easy to grep out of the poll-loop noise.
@@ -429,6 +442,34 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
                 emit_progress(app, "index", done, total, &project);
             }
         }
+        // Codex rollouts alongside the Claude transcripts. Codex encodes no project
+        // in the filename, so the project comes from the session's cwd (a small tail
+        // read); the enrich pass later confirms it from a whole-file scan. Rows are
+        // written the same way, only harness + discovery differ. Titles are cheap
+        // (a lookup in session_index.jsonl), so we set them here rather than waiting
+        // for enrich.
+        for (path, mtime_secs) in codex::candidates() {
+            if cancel_flag().load(Ordering::Relaxed) {
+                break;
+            }
+            let path_str = path.to_string_lossy().to_string();
+            seen.insert(path_str.clone());
+            let id = codex::id_from_path(&path);
+            let (mtime, size) =
+                file_stat(&path).unwrap_or(((mtime_secs as i64) * 1000, 0));
+            let cwd = codex::cwd_of(&path);
+            let (project, project_path) = match &cwd {
+                Some(c) if !c.is_empty() => (scan::last_component(c), c.clone()),
+                _ => (id.clone(), String::new()),
+            };
+            let title = codex::session_title(&id);
+            tx.execute(
+                "INSERT INTO sessions (path, harness, session_id, project, project_path, mtime, size_bytes, title)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT(path) DO UPDATE SET mtime=excluded.mtime, size_bytes=excluded.size_bytes",
+                rusqlite::params![path_str, "codex", id, project, project_path, mtime, size, title],
+            )?;
+        }
         // Drop rows whose transcript vanished.
         {
             let mut stmt = tx.prepare("SELECT path FROM sessions")?;
@@ -515,7 +556,7 @@ fn enrich_parallel(
                         }
                         let p = Path::new(path);
                         let (mtime, size) = file_stat(p).unwrap_or((0, 0));
-                        let meta = scan::enrich_meta(p);
+                        let meta = enrich_for(p);
                         out.push(EnrichRow { path: path.clone(), meta, mtime, size });
                         let d = done.fetch_add(1, Ordering::Relaxed) + 1;
                         if throttle <= 1 || d % throttle == 0 || d == etotal {
@@ -866,18 +907,18 @@ fn read_sessions(conn: &Connection, harness: &str, project: &str) -> Vec<Session
 /// deepest breakdown.
 pub fn session(id: &str) -> Option<SessionMeta> {
     let conn = open_db().ok()?;
-    let row: Option<(String, String)> = conn
+    let row: Option<(String, String, String)> = conn
         .query_row(
-            "SELECT path, project FROM sessions WHERE session_id=?1 LIMIT 1",
+            "SELECT path, project, harness FROM sessions WHERE session_id=?1 LIMIT 1",
             [id],
-            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)),
         )
         .ok();
-    let (path, project) = row?;
+    let (path, project, harness) = row?;
     let p = Path::new(&path);
     let (mtime, size) = file_stat(p).unwrap_or((0, 0));
-    let _ = write_enrich(&conn, &path, &scan::enrich_meta(p), mtime, size);
-    read_sessions(&conn, HARNESS, &project)
+    let _ = write_enrich(&conn, &path, &enrich_for(p), mtime, size);
+    read_sessions(&conn, &harness, &project)
         .into_iter()
         .find(|s| s.id == id)
 }
@@ -885,6 +926,7 @@ pub fn session(id: &str) -> Option<SessionMeta> {
 fn harness_label(h: &str) -> String {
     match h {
         "claude-code" => "Claude Code".to_string(),
+        "codex" => "Codex".to_string(),
         other => other.to_string(),
     }
 }

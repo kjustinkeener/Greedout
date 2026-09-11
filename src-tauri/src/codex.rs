@@ -584,3 +584,92 @@ pub fn enrich_meta(path: &Path) -> crate::scan::EnrichMeta {
     }
     out
 }
+
+/// Chat text of a Codex rollout for the browse search, in the same `ChatDoc` shape
+/// as the Claude `read_chat_doc`. Pulls the PLAINTEXT conversation the desktop app
+/// shows -- user + agent messages and reasoning SUMMARIES (the encrypted raw CoT is
+/// never persisted in the clear, so it can't be searched) -- and skips tool i/o, to
+/// match the chat-only scope of the Claude side. Whole file (no compaction cut):
+/// search covers all history, not just the live window.
+pub fn read_chat_doc(path: &Path) -> crate::browse::ChatDoc {
+    let mut doc = crate::browse::ChatDoc {
+        text: String::new(),
+        title: session_title(&id_from_path(path)),
+        cwd: None,
+        first_user: None,
+        first_ts: None,
+        last_ts: None,
+    };
+    let Ok(raw) = std::fs::read_to_string(path) else { return doc };
+    for line in raw.lines() {
+        if doc.cwd.is_none() && line.contains("\"cwd\"") {
+            if let Some(c) = payload_str(line, "cwd") {
+                doc.cwd = Some(c);
+            }
+        }
+        if !line.contains("\"item_completed\"") {
+            continue;
+        }
+        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+        let payload = v.get("payload");
+        if payload.and_then(|p| p.get("type")).and_then(Value::as_str) != Some("item_completed") {
+            continue;
+        }
+        let Some(item) = payload.and_then(|p| p.get("item")) else { continue };
+        let text = match item.get("type").and_then(Value::as_str) {
+            Some("UserMessage") => {
+                let t = content_text(item.get("content"));
+                if doc.first_user.is_none() && !t.trim().is_empty() {
+                    doc.first_user = Some(t.clone());
+                }
+                t
+            }
+            Some("AgentMessage") => content_text(item.get("content")),
+            Some("Reasoning") => string_array(item.get("summary_text")),
+            _ => continue,
+        };
+        if text.trim().is_empty() {
+            continue;
+        }
+        if let Some(ts) = v.get("timestamp").and_then(Value::as_str) {
+            if doc.first_ts.is_none() {
+                doc.first_ts = Some(ts.to_string());
+            }
+            doc.last_ts = Some(ts.to_string());
+        }
+        doc.text.push_str(&text);
+        doc.text.push('\n');
+    }
+    doc
+}
+
+/// Concatenate the `text` of a Codex message `content` array. Same shape used by the
+/// Context Explorer's Codex parse.
+fn content_text(content: Option<&Value>) -> String {
+    content
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|b| b.get("text").and_then(Value::as_str))
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_default()
+}
+
+/// Join a Codex string array (e.g. Reasoning `summary_text`), accepting bare strings
+/// or `{text}` objects.
+fn string_array(v: Option<&Value>) -> String {
+    v.and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|e| {
+                    e.as_str()
+                        .map(str::to_string)
+                        .or_else(|| e.get("text").and_then(Value::as_str).map(str::to_string))
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_default()
+}

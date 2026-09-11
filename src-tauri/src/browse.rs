@@ -980,14 +980,16 @@ struct SearchProgress {
 }
 
 /// A session's chat text (user + assistant text/thinking, NOT tool i/o) plus a
-/// title and cwd, from a single file read. Used only for search.
-struct ChatDoc {
-    text: String,
-    title: Option<String>,
-    cwd: Option<String>,
-    first_user: Option<String>,
-    first_ts: Option<String>,
-    last_ts: Option<String>,
+/// title and cwd, from a single file read. Used only for search. Filled by
+/// `read_chat_doc` for Claude transcripts and `codex::read_chat_doc` for Codex
+/// rollouts (different on-disk shapes, same struct).
+pub(crate) struct ChatDoc {
+    pub text: String,
+    pub title: Option<String>,
+    pub cwd: Option<String>,
+    pub first_user: Option<String>,
+    pub first_ts: Option<String>,
+    pub last_ts: Option<String>,
 }
 
 fn read_chat_doc(path: &Path) -> ChatDoc {
@@ -1200,8 +1202,12 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
             .join("*.jsonl")
             .to_string_lossy()
             .replace('\\', "/");
-        let paths: Vec<std::path::PathBuf> =
+        let mut paths: Vec<std::path::PathBuf> =
             glob::glob(&pattern).map(|g| g.flatten().collect()).unwrap_or_default();
+        // Codex rollouts too: same search over their plaintext chat (see
+        // codex::read_chat_doc). Dispatched per-path below by the codex_dir prefix.
+        paths.extend(codex::candidates().into_iter().map(|(p, _)| p));
+        let cdir = codex_dir();
         let total = paths.len() as u64;
         // Hits are labeled with the project a session belongs to, not the folder
         // it ran in, so a subdirectory session reads the same here as in the tree.
@@ -1218,11 +1224,16 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
                 break;
             }
             done += 1;
-            let doc = read_chat_doc(path);
+            let is_codex = path.starts_with(&cdir);
+            let doc = if is_codex { codex::read_chat_doc(path) } else { read_chat_doc(path) };
             let lower = doc.text.to_lowercase();
             if let Some(score) = score_text(&lower, &full, &terms) {
                 hits += 1;
-                let id = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                let id = if is_codex {
+                    codex::id_from_path(path)
+                } else {
+                    path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default()
+                };
                 let (mtime, size) = file_stat(path).unwrap_or((0, 0));
                 let mtime_ms = mtime; // file_stat already returns millis
                 let last_ms = doc
@@ -1243,11 +1254,16 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
                         .unwrap_or_default();
                     scan::decode_project_dir(&dir)
                 });
-                let decoded = path
-                    .parent()
-                    .and_then(|p| p.file_name())
-                    .map(|s| scan::decode_project_dir(&s.to_string_lossy()))
-                    .unwrap_or_default();
+                // Codex rollouts sit under a dated folder, not an encoded project dir,
+                // so group by the session's own cwd (its real project) instead.
+                let decoded = if is_codex {
+                    project_path.clone()
+                } else {
+                    path.parent()
+                        .and_then(|p| p.file_name())
+                        .map(|s| scan::decode_project_dir(&s.to_string_lossy()))
+                        .unwrap_or_default()
+                };
                 let project = hit_groups
                     .get(&decoded)
                     .map(|g| g.label.clone())

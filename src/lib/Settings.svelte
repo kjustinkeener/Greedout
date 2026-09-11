@@ -287,19 +287,19 @@
   {:else}
     <div class="cols">
     <div class="col">
-    <label class="check" oncontextmenu={(e) => resetField("follow_focus", e)}>
+    <label class="check" title={t("settings.followFocusTip")} oncontextmenu={(e) => resetField("follow_focus", e)}>
       <input type="checkbox" bind:checked={cfg.follow_focus} />
       {t("settings.followFocus")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("gauge_per_harness", e)}>
+    <label class="check" title={t("settings.gaugePerHarnessTip")} oncontextmenu={(e) => resetField("gauge_per_harness", e)}>
       <input type="checkbox" bind:checked={cfg.gauge_per_harness} disabled={!cfg.follow_focus} />
       {t("settings.gaugePerHarness")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("always_on_top", e)}>
+    <label class="check" title={t("settings.alwaysOnTopTip")} oncontextmenu={(e) => resetField("always_on_top", e)}>
       <input type="checkbox" bind:checked={cfg.always_on_top} />
       {t("settings.alwaysOnTop")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("show_in_tray", e)}>
+    <label class="check" title={t("settings.showInTrayTip")} oncontextmenu={(e) => resetField("show_in_tray", e)}>
       <input
         type="checkbox"
         bind:checked={cfg.show_in_tray}
@@ -308,7 +308,7 @@
       />
       {t("settings.showInTray")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("show_in_taskbar", e)}>
+    <label class="check" title={t("settings.showInTaskbarTip")} oncontextmenu={(e) => resetField("show_in_taskbar", e)}>
       <input
         type="checkbox"
         bind:checked={cfg.show_in_taskbar}
@@ -317,38 +317,38 @@
       />
       {t("settings.showInTaskbar")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("minimize_to_tray", e)}>
+    <label class="check" title={t("settings.minimizeToTrayTip")} oncontextmenu={(e) => resetField("minimize_to_tray", e)}>
       <input type="checkbox" bind:checked={cfg.minimize_to_tray} />
       {t("settings.minimizeToTray")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("close_to_tray", e)}>
+    <label class="check" title={t("settings.closeToTrayTip")} oncontextmenu={(e) => resetField("close_to_tray", e)}>
       <input type="checkbox" bind:checked={cfg.close_to_tray} />
       {t("settings.closeToTray")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("show_statusbar", e)}>
+    <label class="check" title={t("settings.showStatusbarTip")} oncontextmenu={(e) => resetField("show_statusbar", e)}>
       <input type="checkbox" bind:checked={cfg.show_statusbar} />
       {t("settings.showStatusbar")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("show_prompt", e)}>
+    <label class="check" title={t("settings.showPromptTip")} oncontextmenu={(e) => resetField("show_prompt", e)}>
       <input type="checkbox" bind:checked={cfg.show_prompt} />
       {t("settings.showPrompt")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("clickable_titles", e)}>
+    <label class="check" title={t("settings.clickableTitlesTip")} oncontextmenu={(e) => resetField("clickable_titles", e)}>
       <input type="checkbox" bind:checked={cfg.clickable_titles} />
       {t("settings.clickableTitles")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("check_updates", e)}>
+    <label class="check" title={t("settings.checkUpdatesTip")} oncontextmenu={(e) => resetField("check_updates", e)}>
       <input type="checkbox" bind:checked={cfg.check_updates} />
       {t("settings.checkUpdates")}
     </label>
-    <label class="check" oncontextmenu={(e) => resetField("debug_logging", e)}>
+    <label class="check" title={t("settings.debugLoggingTip")} oncontextmenu={(e) => resetField("debug_logging", e)}>
       <input type="checkbox" bind:checked={cfg.debug_logging} />
       {t("settings.debugLogging")}
     </label>
     </div>
 
     <div class="col">
-    <label class="field">
+    <label class="field" title={t("settings.languageTip")}>
       <span>{t("settings.language")}</span>
       <select
         class="sel"
@@ -362,7 +362,7 @@
       </select>
     </label>
 
-    <label class="field" oncontextmenu={(e) => resetField("theme", e)}>
+    <label class="field" title={t("settings.themeTip")} oncontextmenu={(e) => resetField("theme", e)}>
       <span>{t("settings.theme")}</span>
       <button class="sel themebtn" onclick={openThemes}>
         {THEMES.find((th) => th.id === cfg!.theme)?.label ?? cfg.theme}
@@ -370,7 +370,7 @@
       </button>
     </label>
 
-    <label class="field">
+    <label class="field" title={t("settings.fontsTip")}>
       <span>{t("settings.fonts")}</span>
       <button class="sel themebtn" onclick={openFonts}>
         {fontById(cfg.font_ui, "ui").label} / {fontById(cfg.font_num, "num").label}
@@ -378,7 +378,7 @@
       </button>
     </label>
 
-    <label class="field" oncontextmenu={(e) => resetField("font_weight", e)}>
+    <label class="field" title={t("settings.boldnessTip")} oncontextmenu={(e) => resetField("font_weight", e)}>
       <span>{t("settings.boldness")}</span>
       <input
         type="range"
@@ -394,7 +394,7 @@
       <span class="pctval">{t(BOLD_KEYS[cfg.font_weight + 2])}</span>
     </label>
 
-    <label class="field" oncontextmenu={(e) => resetField("opacity", e)}>
+    <label class="field" title={t("settings.opacityTip")} oncontextmenu={(e) => resetField("opacity", e)}>
       <span>{t("settings.opacity")}</span>
       <input
         type="range"
@@ -410,7 +410,7 @@
       <span class="pctval">{Math.round(cfg.opacity * 100)}%</span>
     </label>
 
-    <label class="field" oncontextmenu={(e) => resetField("poll_seconds", e)}>
+    <label class="field" title={t("settings.refreshEveryTip")} oncontextmenu={(e) => resetField("poll_seconds", e)}>
       <span>{t("settings.refreshEvery")}</span>
       <span class="numwrap">
         <input type="number" min="0.1" step="0.1" bind:value={cfg.poll_seconds} />
@@ -418,7 +418,7 @@
       </span>
     </label>
 
-    <label class="field" oncontextmenu={(e) => resetField("dim_hours", e)}>
+    <label class="field" title={t("settings.dimAfterTip")} oncontextmenu={(e) => resetField("dim_hours", e)}>
       <span>{t("settings.dimAfter")}</span>
       <span class="numwrap">
         <input type="number" min="1" step="1" bind:value={cfg.dim_hours} />
@@ -426,7 +426,7 @@
       </span>
     </label>
 
-    <label class="field" oncontextmenu={(e) => resetField("target_tokens", e)}>
+    <label class="field" title={t("settings.budgetHint")} oncontextmenu={(e) => resetField("target_tokens", e)}>
       <span>{t("settings.budget")}</span>
       <span class="numwrap">
         <input

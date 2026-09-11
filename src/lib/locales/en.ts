@@ -103,6 +103,33 @@ export const en = {
   "settings.dimAfter": "Fully dimmed after",
   "settings.budget": "Gauge budget (k tokens)",
   "settings.budgetHint": "The context each gauge treats as full, for every session and tool.",
+  // Hover tips (native title=) for every control. Missing translations fall back to
+  // English, so these ship immediately in all languages; the locale gate treats a
+  // missing key as a soft warning, not a failure.
+  "settings.followFocusTip":
+    "Keep the session you're currently working in pinned to the top of the list.",
+  "settings.gaugePerHarnessTip":
+    "Show one big gauge for the focused session's harness instead of a row per session. Needs Follow the focused session.",
+  "settings.alwaysOnTopTip": "Keep the Greedout window above other windows so it stays visible.",
+  "settings.showInTrayTip": "Show a Greedout icon in the system tray; right-click it for quick actions.",
+  "settings.showInTaskbarTip": "Show Greedout as a button on the taskbar.",
+  "settings.minimizeToTrayTip": "Minimizing hides the window to the tray instead of the taskbar.",
+  "settings.closeToTrayTip": "Closing the window hides it to the tray instead of quitting Greedout.",
+  "settings.showStatusbarTip": "Show a bottom bar with live CPU and memory usage.",
+  "settings.showPromptTip": "Show each session's latest prompt text beneath its title.",
+  "settings.clickableTitlesTip":
+    "Make session and project titles in the main window clickable links that open the Context Explorer.",
+  "settings.checkUpdatesTip":
+    "Check for a new version each time Greedout launches. About can always check on demand.",
+  "settings.debugLoggingTip":
+    "Write diagnostic logs to a file for troubleshooting. Leave off for normal use.",
+  "settings.languageTip": "Interface language. Auto follows your system setting.",
+  "settings.themeTip": "Open the theme browser to change the color scheme.",
+  "settings.fontsTip": "Open the font picker to change the interface, number, and monospace fonts.",
+  "settings.boldnessTip": "Overall font weight across the interface, from lightest to boldest.",
+  "settings.opacityTip": "Window transparency. Lower is more see-through.",
+  "settings.refreshEveryTip": "How often Greedout re-reads sessions to update the gauges.",
+  "settings.dimAfterTip": "How long an idle session waits before it is fully dimmed in the list.",
   "settings.resetAll": "Reset all",
   "settings.resetAllTip": "Reset every setting to its default",
   "settings.clearCache": "Clear cache",

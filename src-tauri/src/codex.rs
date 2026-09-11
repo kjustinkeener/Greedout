@@ -121,9 +121,10 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, focused: O
     // Prefer the session's own enforced window over the model's API ceiling: the
     // desktop app caps context well below `context_max` (astra bills a 1.05M API
     // window but the app enforces 258400). If we found it, it's also the hard
-    // `limit`, and the gauge's `target` sweet spot must sit at/under it -- the
-    // API-derived 272k target would otherwise exceed a 258400 window and never fill.
-    let target0 = mi.as_ref().map(|i| i.target).unwrap_or(cfg.target_tokens);
+    // `limit`, and the gauge's `target` sweet spot must sit at/under it.
+    // One user-set target drives the budget across harnesses, clamped to the real
+    // window so it can never exceed a session's enforced 258400 and never fill.
+    let target0 = cfg.target_tokens;
     let max = mi.as_ref().map(|i| i.context_max).unwrap_or(cfg.target_tokens);
     let limit = t.window.unwrap_or(max);
     let target = t.window.map(|w| target0.min(w)).unwrap_or(target0);

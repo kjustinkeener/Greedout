@@ -401,10 +401,11 @@ fn build_session(
         .or(native_title)
         .unwrap_or_else(|| project.clone());
 
-    // Model drives the gauge budget, the hard window, and the label. Unknown /
-    // not-yet-seen model falls back to the configured global target.
+    // One user-set target drives the gauge budget for every session/harness
+    // (comparable across Claude and Codex); the model still sets the hard window
+    // and label. Unknown model falls back to that same target for the window.
     let mi = t.model.as_deref().map(model_info);
-    let target = mi.as_ref().map(|i| i.target).unwrap_or(cfg.target_tokens);
+    let target = cfg.target_tokens;
     let limit = mi.as_ref().map(|i| i.context_max).unwrap_or(cfg.target_tokens);
     let model = mi.as_ref().map(|i| i.label.to_string()).unwrap_or_default();
     let model_version = t.model.as_deref().map(parse_model_version).unwrap_or_default();

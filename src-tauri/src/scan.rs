@@ -1004,6 +1004,20 @@ pub struct SpendEvent {
     pub mtime: i64,
 }
 
+/// One aggregated bucket for the Daily Spend months/days overview: total cost for
+/// one local calendar day and one project leaf. The window sums these directly, so
+/// it never has to load the ~100k per-turn events just to draw the bar charts.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpendSummary {
+    /// Local calendar day, "YYYY-MM-DD".
+    pub day: String,
+    /// Readable project name (leaf); empty for rows with no project.
+    pub project: String,
+    /// Summed estimated USD cost for this day + project.
+    pub cost: f64,
+}
+
 /// Full per-session metadata for the browse cache (see browse.rs). Unlike the
 /// poll-time `Session`, this is computed from a single WHOLE-file read, so it can
 /// report the deduped cumulative cost, the turn count, and whether the session
@@ -1035,8 +1049,15 @@ pub struct EnrichMeta {
 /// rule as the backward tail scan). Cost and turn count are deduped by assistant
 /// message id, since resumed/compacted transcripts re-append whole turns.
 pub fn enrich_meta(path: &Path) -> EnrichMeta {
+    let Ok(text) = std::fs::read_to_string(path) else { return EnrichMeta::default() };
+    enrich_meta_from(path, &text)
+}
+
+/// Parse-only half of `enrich_meta`: the caller already holds the file bytes, so
+/// this does zero IO. Split out so the scan can read once and time read vs parse
+/// separately (and feed the same bytes to the chat-doc parser).
+pub fn enrich_meta_from(_path: &Path, text: &str) -> EnrichMeta {
     let mut out = EnrichMeta::default();
-    let Ok(text) = std::fs::read_to_string(path) else { return out };
     let mut seen: HashSet<String> = HashSet::new();
     let mut last_model: Option<String> = None;
     for line in text.lines() {

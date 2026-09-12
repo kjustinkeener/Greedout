@@ -1,16 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/svelte";
-import type { SpendEvent } from "../../types";
+import type { SpendEvent, SpendSummary } from "../../types";
 
 // --- Backend + window stubs -------------------------------------------------
-// DailySpend pulls its data from the `get_spend_events` invoke and listens on the
-// "browse-progress" event stream. `spend_scan` / `browse_cancel` are fire-and-
-// forget. We hand back a fixture and swallow the rest.
-const state = vi.hoisted(() => ({ events: [] as unknown[] }));
+// DailySpend now pulls the months/days overview from the tiny `get_spend_summary`
+// aggregate, and lazily fetches one day's turns via `get_spend_day` only when a day
+// is opened (for the swim lanes). `browse_scan` / `browse_cancel` are fire-and-
+// forget. We hand back fixtures keyed by command name and swallow the rest.
+const state = vi.hoisted(() => ({ summary: [] as unknown[], day: [] as unknown[] }));
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (cmd: string) => {
-    if (cmd === "get_spend_events") return state.events;
+    if (cmd === "get_spend_summary") return state.summary;
+    if (cmd === "get_spend_day") return state.day;
     return undefined;
   }),
 }));
@@ -28,9 +30,17 @@ import DailySpend from "../DailySpend.svelte";
 // populated day bar, then the swim lanes we actually want to exercise.
 const DAY = new Date(2026, 8, 8, 12, 0, 0).getTime(); // Sep 8 2026, local noon
 
-// The historical crash fixture: TWO different project *paths* that share the same
-// leaf name ("MoonPool"), plus one project worked by BOTH harnesses.
-const FIXTURE: SpendEvent[] = [
+// Overview aggregate for that day. Two project leaves ("MoonPool" merged across
+// its two paths, and "Greedout"): drives the month/day bars.
+const SUMMARY: SpendSummary[] = [
+  { day: "2026-09-08", project: "MoonPool", cost: 1.5 },
+  { day: "2026-09-08", project: "Greedout", cost: 0.5 },
+];
+
+// The historical crash fixture (the day's raw turns): TWO different project *paths*
+// that share the same leaf name ("MoonPool"), plus one project worked by BOTH
+// harnesses. Returned by get_spend_day when the day is opened.
+const DAY_EVENTS: SpendEvent[] = [
   { t: DAY, cost: 1.0, session: "s1", project: "MoonPool", projectPath: "C:/dev/alpha/MoonPool", harness: "claude-code", title: "Alpha", mtime: DAY },
   { t: DAY + 60_000, cost: 0.5, session: "s2", project: "MoonPool", projectPath: "C:/other/beta/MoonPool", harness: "claude-code", title: "Beta", mtime: DAY + 60_000 },
   { t: DAY + 120_000, cost: 0.3, session: "s3", project: "Greedout", projectPath: "C:/dev/greedout", harness: "claude-code", title: "Claude sess", mtime: DAY + 120_000 },
@@ -58,7 +68,8 @@ async function drillToDay(container: HTMLElement) {
 
 describe("DailySpend", () => {
   beforeEach(() => {
-    state.events = FIXTURE;
+    state.summary = SUMMARY;
+    state.day = DAY_EVENTS;
   });
 
   it("renders the months view without throwing and merges same-leaf projects into one segment", async () => {
@@ -66,9 +77,9 @@ describe("DailySpend", () => {
     await waitFor(() => expect(container.querySelector(".chart")).toBeTruthy());
     const monthBars = container.querySelectorAll(".bcol");
     expect(monthBars.length).toBe(1); // all fixture spend is in one month
-    // Month bar segments are keyed by leaf project name; the two "MoonPool" paths
-    // share a leaf and MUST collapse into a single segment (else the segs `{#each
-    // (s.project)}` would carry a duplicate key). 2 distinct leaves => 2 segs.
+    // Month bar segments are keyed by leaf project name; the summary already merges
+    // the two "MoonPool" paths into one row, so there are exactly 2 distinct
+    // leaves => 2 segs, and the segs `{#each (s.project)}` key stays unique.
     const segs = monthBars[0].querySelectorAll(".seg");
     expect(segs.length).toBe(2); // MoonPool (merged) + Greedout
   });
@@ -104,7 +115,7 @@ describe("DailySpend", () => {
   });
 
   it("shows the empty-state message when there is no spend", async () => {
-    state.events = [];
+    state.summary = [];
     const { container } = render(DailySpend);
     await waitFor(() => expect(container.querySelector(".msg")).toBeTruthy());
     expect(container.querySelector(".chart")).toBeNull();

@@ -5,6 +5,8 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { gaugeColor, themeTick, applyTheme, type Theme } from "./theme";
   import Brand from "./Brand.svelte";
+  import ScanProgress from "./ScanProgress.svelte";
+  import { scanState, startScan as startCacheScan, cancelScan, onScanDone } from "./scanControl";
   import type {
     BaselineReport,
     BaselineNode,
@@ -13,7 +15,6 @@
     ProjectAgg,
     SessionMeta,
     BrowseStatus,
-    BrowseProgress,
     SearchHit,
     SearchProgress,
   } from "../types";
@@ -85,7 +86,6 @@
   let showEnable = $state(false); // the opt-in gate panel
   let deepScan = $state(false); // "deluxe" full-scan checkbox
   let scanning = $state(false);
-  let progress = $state<BrowseProgress | null>(null);
 
   // --- Full-text search (chat text only) ---
   let searchQuery = $state("");
@@ -259,12 +259,11 @@
         if (openOnFirst && !inited) {
           inited = true;
           // "enabled" alone is NOT an index: after Clear cache the DB is gone but
-          // the pref stays on, so require real rows. Enabled-but-empty (fresh
-          // install or just-cleared cache) auto-rebuilds instead of showing an
-          // empty graph or the enable gate; the browse-progress "done" handler
-          // repaints the level when the scan finishes.
+          // the pref stays on, so require real rows. Opening the window with no
+          // data ALWAYS auto-rebuilds (no enable gate): the shared cache is built
+          // unconditionally by Daily Spend anyway, so gating here just showed an
+          // empty graph. The browse-progress "done" handler repaints when it lands.
           const haveIndex = s.dbExists && s.indexed > 0;
-          const enabledEmpty = s.enabled && !haveIndex;
           if (initView === "session") {
             // Land straight on the target session's breakdown.
             if (initProject) curProject = initProject;
@@ -272,18 +271,13 @@
             zoom = "session";
           } else if (initView === "project" && initProject) {
             if (haveIndex) openProject(initProject);
-            else if (enabledEmpty) {
+            else {
               openRoot();
               startScan(true);
-            } else showEnable = true;
-          } else if (haveIndex) {
-            // Show the all-projects graph whenever an index already exists.
-            openRoot();
-          } else if (enabledEmpty) {
-            openRoot();
-            startScan(true);
+            }
           } else {
-            showEnable = true;
+            openRoot();
+            if (!haveIndex) startScan(true);
           }
         }
       })
@@ -294,23 +288,20 @@
     loadBrowseStatus(true);
   });
 
+  // Full rescan: resets the shared scanControl store and fires browse_scan. The
+  // store's running flag flows back into `scanning` via the subscription below.
   function startScan(deep: boolean) {
     scanning = true;
-    progress = null;
-    invoke("browse_scan", { deep }).catch((e) => dbg("browse_scan failed", e));
+    startCacheScan(deep);
   }
   function enableAndScan() {
     scanning = true;
-    progress = null;
     invoke("browse_enable", { deep: deepScan })
       .then(() => loadBrowseStatus())
       .catch((e) => {
         dbg("browse_enable failed", e);
         scanning = false;
       });
-  }
-  function cancelScan() {
-    invoke("browse_cancel").catch(() => {});
   }
 
   // Top level: every harness as a tile (only Claude Code today).
@@ -375,7 +366,6 @@
     // the user can close this window while it keeps running.
     dbg("enrich project (bg)", project);
     scanning = true;
-    progress = null;
     invoke("browse_enrich_project", { harness: curHarness, project }).catch((e) => {
       dbg("browse_enrich_project failed", e);
       scanning = false;
@@ -408,33 +398,38 @@
     else report = null; // different id: the effect fires and re-analyzes
   }
 
-  // Follow scan progress; on completion refresh whatever level is showing.
+  // Follow scan progress via the shared scanControl store (the bars/log render in
+  // <ScanProgress> off the same store). Mirror running into our local `scanning`
+  // and throttle tile refreshes while enrichment lands; onScanDone does the final
+  // authoritative refresh of whatever level is showing.
   $effect(() => {
-    let un: (() => void) | undefined;
-    listen<BrowseProgress>("browse-progress", (e) => {
-      progress = e.payload;
-      if (e.payload.phase === "done" || e.payload.phase === "canceled") {
-        scanning = false;
-        loadBrowseStatus();
-        // Refresh the current level READ-ONLY. Never re-open a project here: that
-        // would re-trigger enrichment and loop.
-        if (showEnable) openRoot();
-        else if (zoom === "project" && selProject) refreshSessions(selProject);
-        else if (zoom === "harness") openHarness();
-        else if (zoom === "root") openRoot();
-      } else {
-        scanning = true;
-        // Live-update the project tiles as rows are enriched. Coalesce: each
-        // enriched row emits a progress event, and a naive refresh here re-reads
-        // every row from SQLite AND re-lays-out the whole treemap per row (dozens
-        // of times a second). Throttle to ~300ms; the "done" branch does the final
-        // authoritative refresh.
-        if (zoom === "project" && selProject && e.payload.phase === "enrich") {
-          scheduleRefresh(selProject);
-        }
+    const unSub = scanState.subscribe((s) => {
+      if (!s.running) return;
+      scanning = true;
+      // Live-update the project tiles as rows are enriched. Coalesce: each
+      // enriched row emits a progress event, and a naive refresh here re-reads
+      // every row from SQLite AND re-lays-out the whole treemap per row (dozens
+      // of times a second). Throttle to ~300ms; onScanDone does the final
+      // authoritative refresh. `enrich.t0 && !enrich.end` = the enrich phase is
+      // the one currently running.
+      if (zoom === "project" && selProject && s.enrich.t0 && !s.enrich.end) {
+        scheduleRefresh(selProject);
       }
-    }).then((f) => (un = f));
-    return () => un?.();
+    });
+    const unDone = onScanDone(() => {
+      scanning = false;
+      loadBrowseStatus();
+      // Refresh the current level READ-ONLY. Never re-open a project here: that
+      // would re-trigger enrichment and loop.
+      if (showEnable) openRoot();
+      else if (zoom === "project" && selProject) refreshSessions(selProject);
+      else if (zoom === "harness") openHarness();
+      else if (zoom === "root") openRoot();
+    });
+    return () => {
+      unSub();
+      unDone();
+    };
   });
 
   function fmtBytes(n: number): string {
@@ -1363,21 +1358,7 @@
 {/snippet}
 
 {#snippet scanBar()}
-  <div class="scan">
-    <div class="ptrack">
-      <div
-        class="pfill"
-        style="width:{progress && progress.total ? (progress.done / progress.total) * 100 : 0}%"
-      ></div>
-    </div>
-    <div class="pmeta">
-      <span
-        >{progress?.phase === "enrich" ? "Reading transcripts" : "Indexing"}
-        {#if progress?.total}{progress.done} / {progress.total}{/if}</span
-      >
-      <button class="crumb back" onclick={cancelScan}>Cancel</button>
-    </div>
-  </div>
+  <ScanProgress oncancel={cancelScan} />
 {/snippet}
 
 <svelte:window
@@ -2632,36 +2613,5 @@
   }
   .scanwrap {
     padding: 4px 10px 0;
-  }
-  .scan {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    width: min(88%, 900px);
-  }
-  .empty .scan {
-    margin-top: 6px;
-  }
-  .ptrack {
-    height: 8px;
-    border-radius: 4px;
-    background: var(--hover);
-    overflow: hidden;
-  }
-  .pfill {
-    height: 100%;
-    background: var(--accent, #4aa3df);
-    border-radius: 4px;
-    transition: width 0.15s ease;
-  }
-  .pmeta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: calc(11px * var(--size-num));
-    color: var(--muted);
-    font-family: var(--font-num);
-    font-size-adjust: var(--font-num-adj);
-    font-variant-numeric: tabular-nums;
   }
 </style>

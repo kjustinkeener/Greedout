@@ -3,24 +3,31 @@
   // sessions. Months -> days-in-month -> a 24-hour swim-lane of that day, one lane
   // per session, spans merged across activity gaps shorter than an hour.
   //
-  // The backend hands us already-deduped per-turn (t, cost, session, project)
-  // events (get_spend_events), so every sum here is safe to take directly -- the
-  // resume/compaction double-counting is handled before it reaches us.
+  // The months + days overviews run off a tiny per-day/per-project AGGREGATE
+  // (get_spend_summary): the backend has already deduped resume/compaction copies
+  // and summed by local day, so every bar total here is safe to take directly. The
+  // swim lanes need the individual turns, so one day's events are fetched lazily
+  // (get_spend_day) only when a day is opened, and cached per day.
   import { onMount, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { listen } from "@tauri-apps/api/event";
-  import type { SpendEvent } from "../types";
+  import type { SpendEvent, SpendSummary } from "../types";
   import Brand from "./Brand.svelte";
   import Icon from "./Icon.svelte";
+  import ScanProgress from "./ScanProgress.svelte";
+  import { scanState, startScan, cancelScan, onScanDone } from "./scanControl";
   import { openExplorer } from "./explorerWindow";
   import { t, watchLocale, activeLocale } from "./i18n.svelte";
 
-  let events = $state<SpendEvent[]>([]);
+  let summary = $state<SpendSummary[]>([]);
+  // The open day's individual turns (for the swim lanes), fetched on demand.
+  let dayEvents = $state<SpendEvent[]>([]);
+  // Per-day cache of fetched turns, keyed by "YYYY-MM-DD".
+  const dayCache = new Map<string, SpendEvent[]>();
   let loading = $state(true);
-  // Scan state (the shared cache build, reused from the Context Explorer scan).
-  let scanning = $state(false);
-  let progress = $state<{ phase: string; done: number; total: number; current: string } | null>(null);
-  let scanLog = $state<string[]>([]); // rolling tail of files being read
+  // Scan state (the shared cache build, reused from the Context Explorer scan)
+  // lives in the shared scanControl store; `running` gates the empty-state
+  // "Building the spend cache…" message and the rescan button here.
+  const scanning = $derived($scanState.running);
   let level = $state<"months" | "days" | "day">("months");
   let curMonth = $state(""); // "YYYY-MM"
   let curDay = $state(""); // "YYYY-MM-DD"
@@ -36,75 +43,58 @@
   const unlistenLocale = watchLocale();
   onDestroy(() => void unlistenLocale.then((u) => u()));
 
-  async function fetchEvents() {
+  async function fetchSummary() {
     try {
-      events = await invoke<SpendEvent[]>("get_spend_events");
+      summary = await invoke<SpendSummary[]>("get_spend_summary");
     } catch {
-      events = [];
+      summary = [];
     }
   }
-  function startScan() {
-    scanning = true;
-    progress = null;
-    scanLog = [];
-    invoke("spend_scan").catch(() => {
-      scanning = false;
-    });
+  // Fetch (or reuse a cached) one day's turns for the swim lanes. A later
+  // openDay/stepDay wins: a response whose key is no longer the open day is ignored.
+  async function loadDay(key: string) {
+    if (!key) return;
+    const cached = dayCache.get(key);
+    if (cached) {
+      if (curDay === key) dayEvents = cached;
+      return;
+    }
+    const lo = dayStartMs(key);
+    const hi = lo + DAY;
+    try {
+      const evs = await invoke<SpendEvent[]>("get_spend_day", { lo, hi });
+      dayCache.set(key, evs);
+      if (curDay === key) dayEvents = evs;
+    } catch {
+      if (curDay === key) dayEvents = [];
+    }
   }
-  function cancelScan() {
-    invoke("browse_cancel").catch(() => {});
-  }
-  // Remaining fraction, as a width for the mask that obscures the unfilled part of
-  // the (statically full) gradient track. 100% at rest = fully masked/empty.
-  const progressRemaining = $derived(
-    progress && progress.total ? `${100 - (progress.done / progress.total) * 100}%` : "100%",
-  );
-  const progressLabel = $derived.by(() => {
-    if (!progress) return "Starting scan…";
-    const verb = progress.phase === "enrich" ? "Reading transcripts" : "Indexing";
-    return `${verb} ${progress.done}/${progress.total}`;
-  });
-
   onMount(async () => {
-    // Show whatever the persistent cache already has immediately (instant across
-    // restarts), then kick a background scan to fold in anything new.
-    await fetchEvents();
+    // Read the small summary aggregate FIRST, off the warm cache, before the scan
+    // opens its write transaction: the scan's write lock would make a concurrent
+    // read fail to empty (a blank "0 rows" flash). The summary is fast even on a
+    // large history, so the window shows real data in well under a second, then the
+    // scan folds in anything new (the onScanDone handler below refetches).
+    await fetchSummary();
     loading = false;
     startScan();
   });
 
-  // The scan reuses the Context Explorer's "browse-progress" event stream.
-  let unlistenProgress: Promise<() => void> | null = null;
-  onMount(() => {
-    unlistenProgress = listen<{ phase: string; done: number; total: number; current: string }>(
-      "browse-progress",
-      (e) => {
-        const p = e.payload;
-        progress = p;
-        if (p.current && (p.phase === "enrich" || p.phase === "index")) {
-          scanLog = [p.current, ...scanLog.filter((s) => s !== p.current)].slice(0, 8);
-        }
-        if (p.phase === "done" || p.phase === "canceled") {
-          scanning = false;
-          progress = null;
-          void fetchEvents(); // pull the freshly-written turns
-        }
-      },
-    );
+  // Scan bars/log render off the shared scanControl store (via <ScanProgress>);
+  // this only handles the DATA side-effects when a scan finishes.
+  const unScanDone = onScanDone(() => {
+    void fetchSummary(); // pull the freshly-written aggregate
+    // If a day is open, its cached turns are now stale -- drop and reload it.
+    if (level === "day" && curDay) {
+      dayCache.delete(curDay);
+      void loadDay(curDay);
+    }
   });
-  onDestroy(() => void unlistenProgress?.then((u) => u()));
+  onDestroy(unScanDone);
 
   // --- Local-time keys. Bucketing is by the user's clock, not UTC: "daily spend"
   // means the day the user was working, and a turn at 23:30 belongs to that day. ---
   const pad = (n: number) => String(n).padStart(2, "0");
-  function monthKey(ms: number): string {
-    const d = new Date(ms);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-  }
-  function dayKey(ms: number): string {
-    const d = new Date(ms);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  }
   function dayStartMs(key: string): number {
     const [y, m, d] = key.split("-").map(Number);
     return new Date(y, m - 1, d).getTime();
@@ -155,7 +145,7 @@
     );
   }
 
-  const grandTotal = $derived(events.reduce((a, e) => a + e.cost, 0));
+  const grandTotal = $derived(summary.reduce((a, r) => a + r.cost, 0));
 
   // Deterministic per-project color, stable across all three levels: same project
   // is the same hue in every stacked bar and every swim-lane span.
@@ -194,12 +184,12 @@
   }
   const months = $derived.by<MonthBar[]>(() => {
     const m = new Map<string, { total: number; count: number; byproj: Map<string, number> }>();
-    for (const e of events) {
-      const k = monthKey(e.t);
+    for (const r of summary) {
+      const k = r.day.slice(0, 7);
       const o = m.get(k) ?? { total: 0, count: 0, byproj: new Map() };
-      o.total += e.cost;
+      o.total += r.cost;
       o.count++;
-      o.byproj.set(e.project, (o.byproj.get(e.project) ?? 0) + e.cost);
+      o.byproj.set(r.project, (o.byproj.get(r.project) ?? 0) + r.cost);
       m.set(k, o);
     }
     const keys = [...m.keys()].sort();
@@ -241,12 +231,12 @@
     const totals = new Array(daysInMonth + 1).fill(0);
     const counts = new Array(daysInMonth + 1).fill(0);
     const byproj: Map<string, number>[] = Array.from({ length: daysInMonth + 1 }, () => new Map());
-    for (const e of events) {
-      if (monthKey(e.t) !== curMonth) continue;
-      const d = new Date(e.t).getDate();
-      totals[d] += e.cost;
+    for (const r of summary) {
+      if (!r.day.startsWith(curMonth)) continue;
+      const d = Number(r.day.slice(8, 10));
+      totals[d] += r.cost;
       counts[d]++;
-      byproj[d].set(e.project, (byproj[d].get(e.project) ?? 0) + e.cost);
+      byproj[d].set(r.project, (byproj[d].get(r.project) ?? 0) + r.cost);
     }
     const out: DayBar[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
@@ -261,7 +251,9 @@
     return out;
   });
   const daysMax = $derived(Math.max(1e-9, ...days.map((b) => b.total)));
-  const monthTotal = $derived(days.reduce((a, b) => a + b.total, 0));
+  const monthTotal = $derived(
+    curMonth ? summary.reduce((a, r) => a + (r.day.startsWith(curMonth) ? r.cost : 0), 0) : 0,
+  );
 
   // --- Level 3: 24-hour swim lanes for the selected day. One lane per session;
   // consecutive turns join into one span unless separated by a gap of >= 1 hour. ---
@@ -300,8 +292,7 @@
     // Codex stays ONE lane (the chooser's harness badges tell its sessions apart).
     // Fall back to the leaf name for rows with no path (e.g. Codex without a cwd).
     const byProject = new Map<string, SpendEvent[]>();
-    for (const e of events) {
-      if (dayKey(e.t) !== curDay) continue;
+    for (const e of dayEvents) {
       const key = e.projectPath || e.project;
       const arr = byProject.get(key) ?? [];
       arr.push(e);
@@ -368,6 +359,7 @@
     curDay = key;
     level = "day";
     hover = "";
+    void loadDay(key);
   }
   // Open the Context Explorer for one session of a lane. Title mirrors the main
   // window's clickable-title format ("<session> · <project>").
@@ -391,8 +383,8 @@
   // Keys that actually have spend, sorted (string order is chronological for
   // "YYYY-MM" / "YYYY-MM-DD"). Stepping walks these, so nav never lands on an
   // empty month/day and stops at the ends of the data range.
-  const monthList = $derived([...new Set(events.map((e) => monthKey(e.t)))].sort());
-  const dayList = $derived([...new Set(events.map((e) => dayKey(e.t)))].sort());
+  const monthList = $derived([...new Set(summary.map((r) => r.day.slice(0, 7)))].sort());
+  const dayList = $derived([...new Set(summary.map((r) => r.day))].sort());
   function stepIn(list: string[], cur: string, delta: number): string {
     if (!list.length) return cur;
     const idx = list.indexOf(cur);
@@ -417,6 +409,7 @@
     curDay = next;
     curMonth = next.slice(0, 7); // keep the breadcrumb month in sync
     hover = "";
+    void loadDay(next);
   }
   function toMonths() {
     level = "months";
@@ -463,6 +456,15 @@
   <header class="bar">
     <Brand size={15} font={14} />
     <span class="total" title={headerTitle}>{usd(headerTotal)}</span>
+    <button
+      class="rescan"
+      onclick={() => startScan()}
+      disabled={scanning}
+      title={scanning ? "Scanning…" : "Rescan"}
+      aria-label="Rescan"
+    >
+      <Icon name="refresh" size={13} />
+    </button>
   </header>
   <nav class="crumbs" aria-label="breadcrumb">
     <button class="crumb" class:active={level === "months"} onclick={toMonths}>
@@ -480,28 +482,11 @@
     {/if}
   </nav>
 
-  {#if scanning}
-    <div class="scanbar">
-      <div class="prow">
-        <div class="ptrack"><div class="pmask" style:width={progressRemaining}></div></div>
-        <button class="pcancel" onclick={cancelScan}>Cancel</button>
-      </div>
-      <div class="pmeta">
-        <span>{progressLabel}</span>
-      </div>
-      {#if scanLog.length}
-        <ul class="plog">
-          {#each scanLog as line (line)}
-            <li>{line}</li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
-  {/if}
+  <ScanProgress oncancel={cancelScan} />
 
   {#if loading}
     <div class="msg">{t("common.loading")}</div>
-  {:else if !events.length}
+  {:else if !summary.length}
     <div class="msg">{scanning ? "Building the spend cache…" : "No spend recorded yet."}</div>
   {:else if level === "months"}
     <div class="sub">
@@ -739,6 +724,26 @@
     color: var(--fg);
     flex: none;
   }
+  .rescan {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid var(--panel);
+    color: var(--muted);
+    border-radius: 5px;
+    padding: 3px 6px;
+    cursor: pointer;
+  }
+  .rescan:hover:not(:disabled) {
+    color: var(--fg);
+    border-color: var(--muted);
+  }
+  .rescan:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
   .msg {
     margin: auto;
     color: var(--muted);
@@ -772,76 +777,6 @@
   .nav:hover {
     background: var(--panel);
     color: var(--fg);
-  }
-
-  /* Shared-cache scan progress (mirrors the Context Explorer scan bar). */
-  .scanbar {
-    flex: none;
-    padding: 8px 14px 6px;
-    border-bottom: 1px solid var(--panel);
-  }
-  .prow {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .ptrack {
-    position: relative;
-    flex: 1;
-    height: 6px;
-    /* Full theme gauge gradient, painted statically across the whole track. */
-    background: linear-gradient(to right, var(--g0), var(--g1), var(--g2));
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  /* Obscures the unfilled (right) part; shrinking it reveals the static gradient.
-     Must be OPAQUE -- var(--panel) is semi-transparent in some themes and would
-     let the gradient show through. --bg is the solid window ground. */
-  .pmask {
-    position: absolute;
-    top: 0;
-    right: 0;
-    height: 100%;
-    background: var(--bg);
-    transition: width 0.2s;
-  }
-  .pcancel {
-    flex: none;
-    background: none;
-    border: 1px solid var(--panel);
-    color: var(--muted);
-    border-radius: 5px;
-    padding: 2px 8px;
-    font: inherit;
-    font-size: 11px;
-    cursor: pointer;
-  }
-  .pcancel:hover {
-    color: var(--fg);
-    border-color: var(--muted);
-  }
-  .pmeta {
-    margin-top: 3px;
-    font-size: 10px;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-  }
-  .plog {
-    margin: 4px 0 0;
-    padding: 0;
-    list-style: none;
-    font-size: 9px;
-    color: var(--muted);
-    opacity: 0.7;
-    font-variant-numeric: tabular-nums;
-    max-height: 44px;
-    overflow: hidden;
-  }
-  .plog li {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.35;
   }
 
   /* Bar charts (months, days) */

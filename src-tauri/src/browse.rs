@@ -46,6 +46,27 @@ fn enrich_for(path: &Path) -> scan::EnrichMeta {
     }
 }
 
+/// Parse-only enrich dispatcher: caller supplies the bytes, so this is pure CPU.
+fn enrich_from(path: &Path, raw: &str) -> scan::EnrichMeta {
+    if path.starts_with(codex_dir()) {
+        codex::enrich_meta_from(path, raw)
+    } else {
+        scan::enrich_meta_from(path, raw)
+    }
+}
+
+/// Parse-only chat-doc dispatcher (span + FTS text) from bytes the caller holds.
+fn chat_doc_from(path: &Path, raw: &str) -> (String, Option<i64>, Option<i64>) {
+    let doc = if path.starts_with(codex_dir()) {
+        codex::read_chat_doc(path, raw)
+    } else {
+        read_chat_doc(path, raw)
+    };
+    let last = doc.last_ts.as_deref().and_then(scan::iso_to_millis);
+    let first = doc.first_ts.as_deref().and_then(scan::iso_to_millis).or(last);
+    (doc.text, first, last)
+}
+
 /// Trace to greedout.log (gated by the Debug logging setting), prefixed so browse
 /// lines are easy to grep out of the poll-loop noise.
 ///
@@ -237,7 +258,11 @@ fn init_db(conn: &Connection) -> rusqlite::Result<()> {
             cost REAL NOT NULL
          );
          CREATE INDEX IF NOT EXISTS idx_turns_path ON turns(session_path);
-         CREATE INDEX IF NOT EXISTS idx_turns_ts ON turns(ts);",
+         CREATE INDEX IF NOT EXISTS idx_turns_ts ON turns(ts);
+         -- Composite for the Daily Spend read: it scans turns in (session_path, ts)
+         -- order, so this index satisfies its ORDER BY directly and removes the
+         -- whole-table sort that (session_path) alone forced.
+         CREATE INDEX IF NOT EXISTS idx_turns_path_ts ON turns(session_path, ts);",
     )?;
     // Add the search-span columns to DBs created before they existed (fresh DBs get
     // them from the CREATE above). A duplicate-column error is expected + ignored.
@@ -315,27 +340,102 @@ pub fn status(enabled: bool) -> BrowseStatus {
     }
 }
 
-/// Every billed assistant turn across all sessions, sorted by time, for the Daily
-/// Spend window. Read straight from the persistent `turns` table (populated by the
-/// enrich pass), so it survives restarts and shares the one tree walk with the
-/// Context Explorer. The message-id dedupe spans ALL files: a turn that reappears
-/// in a resumed/compacted copy is billed to its first occurrence only. Returns
-/// empty until the first enrich has run (the caller then triggers a scan).
-pub fn spend_events() -> Vec<scan::SpendEvent> {
+/// First occurrence of each `msg_id` wins; rows whose msg_id is `None` are all
+/// kept. The input MUST already be ordered so the intended winner comes first
+/// (callers order by `session_path, ts` in SQL). Pure and DB-free so a unit test
+/// can drive it with plain tuples -- the dedupe rule was previously only exercisable
+/// against the live cache.
+fn dedup_first_by_msg_id<T>(
+    rows: impl IntoIterator<Item = T>,
+    msg_id: impl Fn(&T) -> Option<&str>,
+) -> Vec<T> {
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut out: Vec<T> = Vec::new();
+    for row in rows {
+        if let Some(mid) = msg_id(&row) {
+            if !seen.insert(mid.to_string()) {
+                continue;
+            }
+        }
+        out.push(row);
+    }
+    out
+}
+
+/// Per-day, per-project spend totals for the Daily Spend overview (months + days
+/// levels). Dedupes resumed/compacted duplicates by msg_id inside SQL (first per id
+/// by session_path, ts) and buckets by the user's LOCAL calendar day, matching the
+/// frontend's `new Date` bucketing. Tiny result (a few hundred rows) versus the
+/// ~100k per-turn events the old path shipped. Returns empty until the first enrich
+/// has run (the caller then triggers a scan).
+pub fn spend_summary() -> Vec<scan::SpendSummary> {
     if !cache_db_path().exists() {
         return Vec::new();
     }
     let Ok(conn) = open_db() else { return Vec::new() };
-    // ORDER BY session_path makes "first occurrence wins" deterministic run to run
-    // (the old file-based path sorted the globbed paths for the same reason).
-    let Ok(mut stmt) = conn.prepare(
+    spend_summary_conn(&conn).unwrap_or_default()
+}
+
+fn spend_summary_conn(conn: &Connection) -> rusqlite::Result<Vec<scan::SpendSummary>> {
+    // Window dedupe (first per msg_id) + local-day bucket. The `msg_id IS NULL OR
+    // rn = 1` clause deliberately keeps ALL null-msg_id rows even though they share
+    // one window partition -- a null id can't be deduped, so every such turn counts.
+    let mut stmt = conn.prepare(
+        "WITH r AS (
+           SELECT t.msg_id, t.ts, t.cost, s.project,
+                  ROW_NUMBER() OVER (PARTITION BY t.msg_id ORDER BY t.session_path, t.ts) rn
+           FROM turns t JOIN sessions s ON s.path = t.session_path
+           WHERE t.cost > 0
+         )
+         SELECT strftime('%Y-%m-%d', ts/1000, 'unixepoch', 'localtime') AS day,
+                COALESCE(project,'') AS project, sum(cost) AS cost
+         FROM r WHERE msg_id IS NULL OR rn = 1
+         GROUP BY day, project",
+    )?;
+    let rows = stmt.query_map([], |r| {
+        Ok(scan::SpendSummary {
+            day: r.get(0)?,
+            project: r.get(1)?,
+            cost: r.get(2)?,
+        })
+    })?;
+    rows.collect()
+}
+
+/// The billed, deduped turns for a single local day, for the swim lanes. The
+/// frontend passes the local-day `[lo, hi)` millisecond range it already computes,
+/// so no timezone code is needed here -- the query is an indexed ts-range scan
+/// (idx_turns_ts). Duplicate copies of a msg_id keep their ORIGINAL ts through
+/// resume/compaction, so they all fall in the same local day: per-day dedupe here
+/// equals the global first-wins result.
+pub fn spend_day(lo_ms: i64, hi_ms: i64) -> Vec<scan::SpendEvent> {
+    if !cache_db_path().exists() {
+        return Vec::new();
+    }
+    let Ok(conn) = open_db() else { return Vec::new() };
+    spend_day_conn(&conn, lo_ms, hi_ms).unwrap_or_default()
+}
+
+type SpendRow = (
+    Option<String>, // msg_id
+    i64,            // ts
+    f64,            // cost
+    Option<String>, // session_id
+    Option<String>, // project
+    Option<String>, // title
+    Option<i64>,    // mtime
+    String,         // harness
+    Option<String>, // project_path
+);
+
+fn spend_day_conn(conn: &Connection, lo_ms: i64, hi_ms: i64) -> rusqlite::Result<Vec<scan::SpendEvent>> {
+    let mut stmt = conn.prepare(
         "SELECT t.msg_id, t.ts, t.cost, s.session_id, s.project, s.title, s.mtime, s.harness, s.project_path
          FROM turns t JOIN sessions s ON s.path = t.session_path
+         WHERE t.cost > 0 AND t.ts >= ?1 AND t.ts < ?2
          ORDER BY t.session_path, t.ts",
-    ) else {
-        return Vec::new();
-    };
-    let Ok(rows) = stmt.query_map([], |r| {
+    )?;
+    let rows = stmt.query_map([lo_ms, hi_ms], |r| {
         Ok((
             r.get::<_, Option<String>>(0)?,
             r.get::<_, i64>(1)?,
@@ -347,19 +447,15 @@ pub fn spend_events() -> Vec<scan::SpendEvent> {
             r.get::<_, String>(7)?,
             r.get::<_, Option<String>>(8)?,
         ))
-    }) else {
-        return Vec::new();
-    };
-    let mut out: Vec<scan::SpendEvent> = Vec::new();
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for (msg_id, ts, cost, session, project, title, mtime, harness, project_path) in rows.flatten() {
-        if let Some(mid) = &msg_id {
-            if !seen.insert(mid.clone()) {
-                continue;
-            }
-        }
-        if cost > 0.0 {
-            out.push(scan::SpendEvent {
+    })?;
+    let collected: Vec<SpendRow> = rows.collect::<rusqlite::Result<_>>()?;
+    // First per msg_id by the query's (session_path, ts) order, then build events.
+    let deduped = dedup_first_by_msg_id(collected, |row| row.0.as_deref());
+    let mut out: Vec<scan::SpendEvent> = deduped
+        .into_iter()
+        .filter(|r| r.2 > 0.0) // cost > 0 already SQL-filtered; belt-and-braces
+        .map(|(_msg_id, ts, cost, session, project, title, mtime, harness, project_path)| {
+            scan::SpendEvent {
                 t: ts,
                 cost,
                 session: session.unwrap_or_default(),
@@ -368,11 +464,11 @@ pub fn spend_events() -> Vec<scan::SpendEvent> {
                 harness,
                 title: title.unwrap_or_default(),
                 mtime: mtime.unwrap_or(0),
-            });
-        }
-    }
+            }
+        })
+        .collect();
     out.sort_by_key(|e| e.t);
-    out
+    Ok(out)
 }
 
 /// Kick off a scan on a background thread. Pass 1 always runs; if `deep`, every
@@ -386,6 +482,7 @@ pub fn run_scan(app: tauri::AppHandle, deep: bool) {
     cancel_flag().store(false, Ordering::SeqCst);
     blog!("scan start (deep={deep})");
     std::thread::spawn(move || {
+        let t0 = std::time::Instant::now();
         let result = scan_worker(&app, deep);
         running().store(false, Ordering::SeqCst);
         let phase = if cancel_flag().load(Ordering::Relaxed) {
@@ -394,6 +491,7 @@ pub fn run_scan(app: tauri::AppHandle, deep: bool) {
             "done"
         };
         let total = result.unwrap_or(0);
+        blog!("scan {} rows in {}ms (deep={deep})", total, t0.elapsed().as_millis());
         let _ = app.emit(
             "browse-progress",
             ScanProgress { phase, done: total, total, current: String::new() },
@@ -403,6 +501,19 @@ pub fn run_scan(app: tauri::AppHandle, deep: bool) {
 
 pub fn cancel() {
     cancel_flag().store(true, Ordering::SeqCst);
+}
+
+/// Human-readable "project - title" for a progress line, so the scan log shows what
+/// is being processed instead of an opaque session guid. Falls back to the id when
+/// there is no title, and drops the project half when there is no cwd.
+fn scan_label(id: &str, m: &scan::EnrichMeta) -> String {
+    let proj = m.cwd.as_deref().map(scan::last_component).unwrap_or_default();
+    let name = m.title.as_deref().filter(|s| !s.is_empty()).unwrap_or(id);
+    if proj.is_empty() {
+        name.to_string()
+    } else {
+        format!("{proj} \u{00b7} {name}")
+    }
 }
 
 fn emit_progress(app: &tauri::AppHandle, phase: &'static str, done: u64, total: u64, current: &str) {
@@ -430,6 +541,7 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
         .unwrap_or_default();
     let total = paths.len() as u64;
     blog!("scan_worker indexing {total} transcripts (deep={deep})");
+    let p1 = std::time::Instant::now();
 
     // --- Pass 1: stat + upsert. Project columns are set on INSERT only, so a
     // later enrich's real cwd isn't clobbered by the cheap decoded guess. ---
@@ -513,6 +625,7 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
         tx.commit()?;
     }
     emit_progress(app, "index", total, total, "");
+    blog!("index (pass 1) {} transcripts in {}ms", total, p1.elapsed().as_millis());
 
     // --- Pass 2 (deep only): enrich every stale row. ---
     if deep && !cancel_flag().load(Ordering::Relaxed) {
@@ -555,6 +668,28 @@ struct EnrichRow {
     last_ms: Option<i64>,
 }
 
+/// Accumulated per-thread timings for the enrich pass, summed across all worker
+/// threads. Lets a debug log attribute the pass to disk (`read_us`) vs CPU
+/// (`parse_us`). Microseconds; only ever written when Debug logging is on.
+#[derive(Default)]
+struct EnrichTimers {
+    read_us: u128,
+    parse_us: u128,
+    stat_us: u128,
+    bytes: u64,
+    files: u64,
+}
+
+impl EnrichTimers {
+    fn add(&mut self, o: &EnrichTimers) {
+        self.read_us += o.read_us;
+        self.parse_us += o.parse_us;
+        self.stat_us += o.stat_us;
+        self.bytes += o.bytes;
+        self.files += o.files;
+    }
+}
+
 /// Read a transcript's chat-only text (for `chat_fts`) and its activity span,
 /// dispatching to the Codex or Claude reader by path. Separate from `enrich_for`
 /// so the enrich metadata pipeline stays untouched; the OS page cache makes the
@@ -591,23 +726,42 @@ fn enrich_parallel(
     let nthreads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8);
     let chunk = stale.len().div_ceil(nthreads);
     let done = std::sync::atomic::AtomicU64::new(0);
+    let wall = std::time::Instant::now();
     // Parallel read/parse. `thread::scope` lets the threads borrow `done`/`app`
-    // without 'static bounds; each returns its enriched rows.
-    let results: Vec<EnrichRow> = std::thread::scope(|s| {
+    // without 'static bounds; each returns its enriched rows plus timers so the
+    // scan can attribute the pass to disk (read) vs CPU (parse). Reading once and
+    // feeding the same bytes to both parsers also drops the old second read.
+    let mut results: Vec<EnrichRow> = Vec::with_capacity(stale.len());
+    let mut tm = EnrichTimers::default();
+    std::thread::scope(|s| {
         let handles: Vec<_> = stale
             .chunks(chunk.max(1))
             .map(|part| {
                 let done = &done;
                 s.spawn(move || {
                     let mut out = Vec::with_capacity(part.len());
+                    let mut t = EnrichTimers::default();
                     for (path, id) in part {
                         if cancel_flag().load(Ordering::Relaxed) {
                             break;
                         }
                         let p = Path::new(path);
+                        let ts = std::time::Instant::now();
                         let (mtime, size) = file_stat(p).unwrap_or((0, 0));
-                        let meta = enrich_for(p);
-                        let (chat_text, first_ms, last_ms) = chat_doc_for(p);
+                        t.stat_us += ts.elapsed().as_micros();
+                        let tr = std::time::Instant::now();
+                        let raw = std::fs::read_to_string(p).unwrap_or_default();
+                        t.read_us += tr.elapsed().as_micros();
+                        t.bytes += raw.len() as u64;
+                        let tp = std::time::Instant::now();
+                        let meta = enrich_from(p, &raw);
+                        let (chat_text, first_ms, last_ms) = chat_doc_from(p, &raw);
+                        t.parse_us += tp.elapsed().as_micros();
+                        t.files += 1;
+                        let d = done.fetch_add(1, Ordering::Relaxed) + 1;
+                        if throttle <= 1 || d % throttle == 0 || d == etotal {
+                            emit_progress(app, "enrich", d, etotal, &scan_label(id, &meta));
+                        }
                         out.push(EnrichRow {
                             path: path.clone(),
                             meta,
@@ -617,18 +771,36 @@ fn enrich_parallel(
                             first_ms,
                             last_ms,
                         });
-                        let d = done.fetch_add(1, Ordering::Relaxed) + 1;
-                        if throttle <= 1 || d % throttle == 0 || d == etotal {
-                            emit_progress(app, "enrich", d, etotal, id);
-                        }
                     }
-                    out
+                    (out, t)
                 })
             })
             .collect();
-        handles.into_iter().flat_map(|h| h.join().unwrap_or_default()).collect()
+        for h in handles {
+            let (rows, t) = h.join().unwrap_or_default();
+            results.extend(rows);
+            tm.add(&t);
+        }
     });
-    // Serial batched write: one fsync per ~200 rows instead of per row.
+    // Per-thread totals SUM across threads, so read+parse can exceed wall time --
+    // that gap is exactly the parallel overlap. read >> parse => disk bound;
+    // parse >> read => CPU bound. `wall` is the real elapsed for the whole pass.
+    blog!(
+        "enrich {} files: read {}ms parse {}ms stat {}ms bytes {} over {} threads, wall {}ms",
+        tm.files,
+        tm.read_us / 1000,
+        tm.parse_us / 1000,
+        tm.stat_us / 1000,
+        tm.bytes,
+        nthreads,
+        wall.elapsed().as_millis(),
+    );
+    // Serial batched write: one fsync per ~200 rows instead of per row. This stage
+    // (turns inserts + the chat_fts trigram index build) is a large fraction of the
+    // pass on a big history, so it emits its own "write" progress -- otherwise the
+    // bar sits pinned at 100% here while the DB is written (was a long dead pause).
+    let wtotal = results.len() as u64;
+    let wt0 = std::time::Instant::now();
     let mut n = 0u64;
     let mut tx = conn.transaction()?;
     for r in &results {
@@ -638,8 +810,16 @@ fn enrich_parallel(
             tx.commit()?;
             tx = conn.transaction()?;
         }
+        if n % 50 == 0 || n == wtotal {
+            let id = Path::new(&r.path)
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+            emit_progress(app, "write", n, wtotal, &scan_label(&id, &r.meta));
+        }
     }
     tx.commit()?;
+    blog!("enrich write {} rows in {}ms", wtotal, wt0.elapsed().as_millis());
     Ok(n)
 }
 
@@ -1694,5 +1874,110 @@ mod tests {
         assert_eq!(doc.first_user.as_deref(), Some("find the bug"));
         assert_eq!(doc.first_ts.as_deref(), Some("2026-09-10T01:00:00.000Z"));
         assert_eq!(doc.last_ts.as_deref(), Some("2026-09-10T01:00:06.000Z"));
+    }
+
+    // --- dedup_first_by_msg_id (pure) ---
+
+    #[test]
+    fn dedup_first_by_msg_id_keeps_first_per_id() {
+        // (msg_id, tag) rows in winner-first order: first "a" wins, later "a" drops.
+        let rows = vec![
+            (Some("a".to_string()), 1),
+            (Some("b".to_string()), 2),
+            (Some("a".to_string()), 3),
+            (Some("b".to_string()), 4),
+        ];
+        let out = dedup_first_by_msg_id(rows, |r| r.0.as_deref());
+        let tags: Vec<i32> = out.iter().map(|r| r.1).collect();
+        assert_eq!(tags, vec![1, 2]); // first a, first b
+    }
+
+    #[test]
+    fn dedup_first_by_msg_id_keeps_all_none_ids() {
+        // Every None-msg_id row survives even though they collide as a group.
+        let rows = vec![
+            (None::<String>, 1),
+            (Some("a".to_string()), 2),
+            (None::<String>, 3),
+            (Some("a".to_string()), 4),
+            (None::<String>, 5),
+        ];
+        let out = dedup_first_by_msg_id(rows, |r| r.0.as_deref());
+        let tags: Vec<i32> = out.iter().map(|r| r.1).collect();
+        assert_eq!(tags, vec![1, 2, 3, 5]); // all Nones + first "a", input order preserved
+    }
+
+    // --- spend_summary_conn / spend_day_conn (temp sqlite, no new deps) ---
+
+    fn temp_db() -> (Connection, std::path::PathBuf) {
+        let mut p = std::env::temp_dir();
+        let uniq = format!(
+            "greedout-spend-test-{}-{:?}.sqlite",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        );
+        p.push(uniq);
+        let conn = Connection::open(&p).unwrap();
+        init_db(&conn).unwrap();
+        (conn, p)
+    }
+
+    fn insert_session(conn: &Connection, path: &str, sid: &str, project: &str) {
+        conn.execute(
+            "INSERT INTO sessions (path, harness, session_id, project, project_path, mtime, title)
+             VALUES (?1, 'claude-code', ?2, ?3, ?4, 0, '')",
+            rusqlite::params![path, sid, project, format!("/p/{project}")],
+        )
+        .unwrap();
+    }
+
+    fn insert_turn(conn: &Connection, path: &str, msg_id: Option<&str>, ts: i64, cost: f64) {
+        conn.execute(
+            "INSERT INTO turns (session_path, msg_id, ts, cost) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![path, msg_id, ts, cost],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn spend_summary_and_day_dedup_and_bucket() {
+        let (conn, path) = temp_db();
+        // The summary buckets by SQLite 'localtime' (depends on the OS zone), so we
+        // assert the day is a well-formed YYYY-MM-DD rather than a hard-coded value.
+        // All turns are within 30ms of `base`, so they cannot straddle midnight.
+        let base: i64 = 1_760_000_000_000; // arbitrary ms in range
+        insert_session(&conn, "sA", "sessA", "proj");
+        insert_session(&conn, "sB", "sessB", "proj");
+        // Same msg_id "m1" appears in two session_paths (a resume copy). sA sorts
+        // before sB, so sA's copy is the winner; sB's is dropped.
+        insert_turn(&conn, "sA", Some("m1"), base, 1.0);
+        insert_turn(&conn, "sB", Some("m1"), base + 5, 1.0); // duplicate, dropped
+        // A distinct billed turn and a null-msg_id turn (both kept).
+        insert_turn(&conn, "sA", Some("m2"), base + 10, 2.0);
+        insert_turn(&conn, "sB", None, base + 20, 0.5);
+        // A zero-cost row is filtered out entirely.
+        insert_turn(&conn, "sA", Some("m3"), base + 30, 0.0);
+
+        // Summary: one project, one day, cost = 1.0 (m1 once) + 2.0 (m2) + 0.5 (null) = 3.5
+        let summary = spend_summary_conn(&conn).unwrap();
+        assert_eq!(summary.len(), 1, "one (day, project) bucket");
+        assert_eq!(summary[0].project, "proj");
+        assert_eq!(summary[0].day.len(), 10, "day is YYYY-MM-DD");
+        assert_eq!(summary[0].day.matches('-').count(), 2, "day is YYYY-MM-DD");
+        assert!((summary[0].cost - 3.5).abs() < 1e-9, "cost was {}", summary[0].cost);
+
+        // Day range covering the whole thing: three deduped events (m1, m2, null),
+        // sorted by ts ascending.
+        let events = spend_day_conn(&conn, base - 100, base + 1000).unwrap();
+        let costs: Vec<f64> = events.iter().map(|e| e.cost).collect();
+        assert_eq!(costs, vec![1.0, 2.0, 0.5], "deduped + ts-sorted");
+        assert!(events.iter().all(|e| e.t >= base && e.t <= base + 20));
+
+        // A narrow range excludes turns outside it.
+        let none = spend_day_conn(&conn, base + 100, base + 1000).unwrap();
+        assert!(none.is_empty(), "range past all turns yields nothing");
+
+        drop(conn);
+        let _ = std::fs::remove_file(path);
     }
 }

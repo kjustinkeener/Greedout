@@ -103,12 +103,32 @@ fn get_history(id: String) -> Vec<scan::Sample> {
     scan::session_history(&id)
 }
 
-/// Every billed turn across all sessions, deduped, for the Daily Spend window.
-/// Reads the persistent per-turn cache (shared with the Context Explorer); returns
-/// empty until the first enrich scan has populated it.
+/// Per-day, per-project spend totals for the Daily Spend overview (months + days).
+/// A tiny aggregate read straight from the persistent per-turn cache (shared with
+/// the Context Explorer); returns empty until the first enrich scan has populated it.
 #[tauri::command]
-fn get_spend_events() -> Vec<scan::SpendEvent> {
-    browse::spend_events()
+fn get_spend_summary() -> Vec<scan::SpendSummary> {
+    let t0 = std::time::Instant::now();
+    let rows = browse::spend_summary();
+    config::debug_log(
+        &config::load_config(),
+        &format!("spend_summary: {} rows in {}ms", rows.len(), t0.elapsed().as_millis()),
+    );
+    rows
+}
+
+/// The deduped billed turns for one local day (the `[lo, hi)` epoch-ms range the
+/// window computes), for the swim lanes. Loaded lazily when a day is opened so the
+/// window never ships the whole ~100k-turn history at once.
+#[tauri::command]
+fn get_spend_day(lo: i64, hi: i64) -> Vec<scan::SpendEvent> {
+    let t0 = std::time::Instant::now();
+    let rows = browse::spend_day(lo, hi);
+    config::debug_log(
+        &config::load_config(),
+        &format!("spend_day: {} rows in {}ms", rows.len(), t0.elapsed().as_millis()),
+    );
+    rows
 }
 
 /// Ensure the shared cache exists and (re)scan so Daily Spend has per-turn data.
@@ -419,7 +439,8 @@ pub fn run() {
             update::update_apply,
             get_sessions,
             get_history,
-            get_spend_events,
+            get_spend_summary,
+            get_spend_day,
             spend_scan,
             analyze_baseline,
             chat_breakdown,
@@ -583,6 +604,15 @@ pub fn run() {
                 // `listen` handler in them keep running, and "disable the Explorer closes
                 // it" silently stops working.
                 tauri::WindowEvent::CloseRequested { api, .. } if window.label() == "main" => {
+                    // Closing the main window tears down the whole UI: close every child
+                    // window (settings/about/explorer/spend/pickers) so none is left
+                    // orphaned on screen when main goes away or hides to tray.
+                    let app = window.app_handle();
+                    for (label, w) in app.webview_windows() {
+                        if label != "main" {
+                            let _ = w.close();
+                        }
+                    }
                     if config::load_config().close_to_tray {
                         api.prevent_close();
                         let _ = window.hide();

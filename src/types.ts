@@ -40,6 +40,15 @@ export interface SpendEvent {
   mtime: number; // session's overall last-activity time (transcript mtime), epoch ms
 }
 
+// One aggregated bucket for the Daily Spend overview: total cost for a local day
+// and a project leaf. Drives the months/days bar charts without loading per-turn
+// events. Deduped + summed by the backend.
+export interface SpendSummary {
+  day: string; // local calendar day, "YYYY-MM-DD"
+  project: string; // readable project name (leaf); "" if none
+  cost: number; // summed estimated USD cost for this day + project
+}
+
 // What the history graph reports while a line is hovered; the focus panel swaps
 // its big spend readout for these values.
 export interface HistHover {
@@ -147,7 +156,7 @@ export interface BrowseStatus {
 
 // Payload of the "browse-progress" event during a scan.
 export interface BrowseProgress {
-  phase: "index" | "enrich" | "done" | "canceled";
+  phase: "index" | "enrich" | "write" | "done" | "canceled";
   done: number;
   total: number;
   current: string;

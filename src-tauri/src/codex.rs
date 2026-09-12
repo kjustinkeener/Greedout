@@ -522,8 +522,15 @@ pub fn cwd_of(path: &Path) -> Option<String> {
 /// resets it to 0, same rule as `scan_tail_buf`), and cumulative spend is priced
 /// off the newest `thread_token_usage` to match the live gauge (see build_session).
 pub fn enrich_meta(path: &Path) -> crate::scan::EnrichMeta {
+    let Ok(text) = std::fs::read_to_string(path) else { return crate::scan::EnrichMeta::default() };
+    enrich_meta_from(path, &text)
+}
+
+/// Parse-only half of `enrich_meta`: the caller already holds the file bytes, so
+/// this does zero IO. Split out so the scan can read once and time read vs parse
+/// separately (and feed the same bytes to the chat-doc parser).
+pub fn enrich_meta_from(path: &Path, text: &str) -> crate::scan::EnrichMeta {
     let mut out = crate::scan::EnrichMeta::default();
-    let Ok(text) = std::fs::read_to_string(path) else { return out };
 
     // Resolve the session's model once (newest wins) so every per-turn row prices
     // consistently, mirroring history().

@@ -114,7 +114,7 @@
     const q = searchQuery.trim();
     if (!q) return;
     // The results panel is a body view, and the turn-detail view sits ahead of it
-    // in the render chain — leave detail open and a search looks dead. Close it.
+    // in the render chain: leave detail open and a search looks dead. Close it.
     detail = null;
     searchActive = true;
     searching = true;
@@ -228,7 +228,7 @@
       // Identity is (folder, session_id), NOT session_id alone: the same session id
       // can exist in two different project folders (e.g. a workspace copied/moved to
       // another path) and those are DISTINCT sessions. Dedup only on that compound
-      // key — so a genuine re-emit collapses, but two folders' hits both survive.
+      // key, so a genuine re-emit collapses, but two folders' hits both survive.
       // (Keying the list below by id alone would throw `each_key_duplicate` and kill
       // the whole component's reactivity, freezing tiles AND the progress bar.)
       const key = (h: SearchHit) => `${h.projectPath} ${h.id}`;
@@ -385,7 +385,7 @@
   function selectSession(s: SessionMeta) {
     pinned = true;
     // Reopening the SAME session id leaves curId unchanged, so the curId-keyed
-    // re-analyze effect won't fire — analyze directly to avoid a stuck "Analyzing…".
+    // re-analyze effect won't fire, so analyze directly to avoid a stuck "Analyzing…".
     const sameId = overrideId === s.id;
     overrideId = s.id;
     overrideTitle = `${s.title} · ${s.project}`;
@@ -783,7 +783,7 @@
     if (n.name === "User" || n.name === "Agent" || n.name === "Thinking") return n.name;
     return null;
   }
-  // Block types present at the current session level, in canonical order — the
+  // Block types present at the current session level, in canonical order, the
   // pills to offer. Empty (or a single type) means no useful filtering here.
   let availableTypes = $derived.by<string[]>(() => {
     if (zoom !== "session") return [];
@@ -818,7 +818,7 @@
     if (zoom === "project") {
       const s = sessionRows.find((x) => x.id === n.detail);
       if (!s) return "";
-      if (!s.enriched) return "size only — open to load tokens";
+      if (!s.enriched) return "size only, open to load tokens";
       const parts = [`${fmt(s.ctx ?? 0)} tok`, `${s.turnCount} turns`];
       if (s.model) parts.push(s.model);
       if (s.hasContextUsage) parts.push("/context ✓");
@@ -844,7 +844,7 @@
   }
   // Hide a tile from the layout (FasterDB-style ✕); restore brings them all back.
   function hide(n: BaselineNode) {
-    // Keep at least one tile on screen — hiding the last leaves an empty map.
+    // Keep at least one tile on screen; hiding the last leaves an empty map.
     if (current.length <= 1) return;
     const h = new Set(hidden);
     h.add(nodeKey(n));
@@ -1078,7 +1078,7 @@
     return "var(--g1)"; // "Tool: X" and "Tool Result"
   }
   // Every leaf chat block across the whole session, gid-ordered, each tagged with
-  // its turn — the sequence the detail view's prev/next buttons walk.
+  // its turn, the sequence the detail view's prev/next buttons walk.
   let flatBlocks = $derived.by<{ node: BaselineNode; turn: number }[]>(() => {
     const out: { node: BaselineNode; turn: number }[] = [];
     for (const t of chatTree) {
@@ -1348,7 +1348,7 @@
           >
         {/if}
         {#if hasBreakdown(t.node) && t.w > 30 && t.h > 20}
-          <span class="tm-ctx" title="Has a /context breakdown — drill in for the baseline">
+          <span class="tm-ctx" title="Has a /context breakdown, drill in for the baseline">
             <Icon name="layout" size={10} width={2.4} />
           </span>
         {/if}
@@ -1447,7 +1447,7 @@
             ></span
           >
           <span class="mrow"><span class="mk">when</span><span class="mv"
-              >{detail.ts ? snapTime(detail.ts) : "—"}</span
+              >{detail.ts ? snapTime(detail.ts) : "-"}</span
             ></span
           >
           <span class="mrow"><span class="mk">est. tokens</span><span class="mv">≈{fmt(detail.tokens)}</span></span>
@@ -1537,7 +1537,7 @@
         </p>
         <label class="deepopt">
           <input type="checkbox" bind:checked={deepScan} />
-          Full deep scan now — read every transcript up front (slower, but tokens &amp; cost ready everywhere)
+          Full deep scan now: read every transcript up front (slower, but tokens &amp; cost ready everywhere)
         </label>
         {#if scanning}
           {@render scanBar()}
@@ -1644,7 +1644,7 @@
         <div class="etitle">Nothing to scan in this session yet</div>
         <p class="ebody">
           This session has no messages to break down and no <code>/context</code> snapshot. Run
-          <code>/context</code> in it for the exact baseline, then check again — or zoom back out above.
+          <code>/context</code> in it for the exact baseline, then check again, or zoom back out above.
         </p>
         <button class="echk" onclick={recheck} disabled={rechecking}>
           {rechecking ? "Checking…" : "Check Session for /context"}
@@ -2240,7 +2240,7 @@
   .typebar {
     padding: 2px 10px 4px;
   }
-  /* tokens | $ selector — the lit one sizes the rects. */
+  /* tokens | $ selector: the lit one sizes the rects. */
   .metricsel {
     display: inline-flex;
     gap: 2px;

@@ -270,6 +270,9 @@ fn clear_cache() -> Result<(), String> {
     if db.exists() {
         return Err("Could not clear the cache (it may be in use).".into());
     }
+    // The file is gone; reset the schema flag so the next open recreates the tables
+    // instead of opening an empty, table-less DB that fails every scan and query.
+    browse::on_cache_cleared();
     Ok(())
 }
 

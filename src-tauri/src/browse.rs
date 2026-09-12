@@ -292,6 +292,14 @@ fn init_db(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
+/// Call after the cache file has been deleted so the schema is laid down again on
+/// the next open. Without this the process-global `schema_ready` flag stays true,
+/// `open_db` skips `init_db`, and the freshly recreated file has no tables -- every
+/// later scan/query then errors and the index can never rebuild.
+pub fn on_cache_cleared() {
+    schema_ready().store(false, Ordering::Relaxed);
+}
+
 /// Create the DB if it doesn't exist yet (called when the user opts in).
 pub fn enable() -> Result<(), String> {
     if let Some(p) = cache_db_path().parent() {
@@ -556,7 +564,9 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
             let path_str = path.to_string_lossy().to_string();
             seen.insert(path_str.clone());
             let id = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+            let st = std::time::Instant::now();
             let (mtime, size) = file_stat(path).unwrap_or((0, 0));
+            let stat_ms = st.elapsed().as_millis();
             let dir = path
                 .parent()
                 .and_then(|p| p.file_name())
@@ -572,7 +582,15 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
             )?;
             done += 1;
             if done % 25 == 0 || done == total {
-                emit_progress(app, "index", done, total, &project);
+                // Same shape as the parse/save lines: file size (MB) + this file's
+                // stat time (ms) + "Locating <project middot id>".
+                let name = if project.is_empty() {
+                    id.clone()
+                } else {
+                    format!("{project} \u{00b7} {id}")
+                };
+                let line = format!("{:.2}MB  {}ms  Locating {}", size as f64 / 1_000_000.0, stat_ms, name);
+                emit_progress(app, "index", done, total, &line);
             }
         }
         // Codex rollouts alongside the Claude transcripts. Codex encodes no project
@@ -756,11 +774,20 @@ fn enrich_parallel(
                         let tp = std::time::Instant::now();
                         let meta = enrich_from(p, &raw);
                         let (chat_text, first_ms, last_ms) = chat_doc_from(p, &raw);
-                        t.parse_us += tp.elapsed().as_micros();
+                        let parse = tp.elapsed();
+                        t.parse_us += parse.as_micros();
                         t.files += 1;
                         let d = done.fetch_add(1, Ordering::Relaxed) + 1;
                         if throttle <= 1 || d % throttle == 0 || d == etotal {
-                            emit_progress(app, "enrich", d, etotal, &scan_label(id, &meta));
+                            // Each log line: file size (MB) + this file's parse time
+                            // (ms) + "Parsing <project middot title>".
+                            let line = format!(
+                                "{:.2}MB  {}ms  Parsing {}",
+                                raw.len() as f64 / 1_000_000.0,
+                                parse.as_millis(),
+                                scan_label(id, &meta),
+                            );
+                            emit_progress(app, "enrich", d, etotal, &line);
                         }
                         out.push(EnrichRow {
                             path: path.clone(),
@@ -804,7 +831,9 @@ fn enrich_parallel(
     let mut n = 0u64;
     let mut tx = conn.transaction()?;
     for r in &results {
+        let ws = std::time::Instant::now();
         write_enrich(&tx, &r.path, &r.meta, r.mtime, r.size, &r.chat_text, r.first_ms, r.last_ms)?;
+        let wms = ws.elapsed();
         n += 1;
         if n % 200 == 0 {
             tx.commit()?;
@@ -815,7 +844,15 @@ fn enrich_parallel(
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_default();
-            emit_progress(app, "write", n, wtotal, &scan_label(&id, &r.meta));
+            // Same shape as the parse lines: file size (MB) + this row's write time
+            // (ms) + "Saving <project middot title>".
+            let line = format!(
+                "{:.2}MB  {}ms  Saving {}",
+                r.size as f64 / 1_000_000.0,
+                wms.as_millis(),
+                scan_label(&id, &r.meta),
+            );
+            emit_progress(app, "write", n, wtotal, &line);
         }
     }
     tx.commit()?;

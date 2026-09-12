@@ -7,8 +7,10 @@
   // read. Each host window drives the DATA side-effects via scanControl.onScanDone.
   import { scanState, cancelScan, type PhaseState } from "./scanControl";
 
-  // Optional: when given, Cancel calls this; otherwise it cancels the scan itself.
-  let { oncancel }: { oncancel?: () => void } = $props();
+  // oncancel: when given, Cancel calls this; otherwise it cancels the scan itself.
+  // fill: grow to occupy the whole window and let the log scroll, for the empty-
+  // state build (no data yet) instead of a static "building…" placeholder.
+  let { oncancel, fill = false }: { oncancel?: () => void; fill?: boolean } = $props();
 
   // A clock that ticks only while a scan runs, so the active phase's ms updates
   // smoothly. The store stays pure data; the ticking lives here in the view.
@@ -22,8 +24,8 @@
 
   // The three phases in emission order, with their user-facing label.
   const phases = $derived([
-    { label: "Indexing", st: $scanState.index },
-    { label: "Reading transcripts", st: $scanState.enrich },
+    { label: "Locating sessions", st: $scanState.index },
+    { label: "Parsing transcripts", st: $scanState.enrich },
     { label: "Saving", st: $scanState.write },
   ]);
 
@@ -47,7 +49,7 @@
 </script>
 
 {#if $scanState.running}
-  <div class="scanbar">
+  <div class="scanbar" class:fill>
     {#each phases as ph (ph.label)}
       <div class="prow" class:inactive={ph.st.total === 0}>
         <span class="plabel">{ph.label}</span>
@@ -61,7 +63,7 @@
     </div>
     {#if $scanState.log.length}
       <ul class="plog">
-        {#each $scanState.log as line (line)}
+        {#each $scanState.log as line, i (i)}
           <li>{line}</li>
         {/each}
       </ul>
@@ -75,9 +77,27 @@
     padding: 8px 14px 6px;
     border-bottom: 1px solid var(--panel);
   }
+  /* Fill mode: own the whole window (empty-state build) so the log fills the space
+     a "building…" placeholder used to waste. The bars stay pinned at the top; the
+     log grows and scrolls. */
+  .scanbar.fill {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-bottom: none;
+  }
+  .scanbar.fill .plog {
+    flex: 1;
+    max-height: none;
+    overflow-y: auto;
+  }
   .prow {
     display: grid;
-    grid-template-columns: 118px 1fr auto auto;
+    /* Fixed label / count / ms columns so the 1fr bar is the SAME width and left
+       edge on every row (auto columns would size to each row's own text -- e.g.
+       "702/702" vs "-" -- and shift the bar). */
+    grid-template-columns: 118px 1fr 68px 60px;
     align-items: center;
     gap: 8px;
     margin-bottom: 4px;
@@ -122,7 +142,6 @@
     color: var(--muted);
     opacity: 0.75;
     text-align: right;
-    min-width: 52px;
     font-variant-numeric: tabular-nums;
   }
   .pfoot {

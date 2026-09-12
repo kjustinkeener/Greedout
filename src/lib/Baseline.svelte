@@ -1357,8 +1357,8 @@
   </div>
 {/snippet}
 
-{#snippet scanBar()}
-  <ScanProgress oncancel={cancelScan} />
+{#snippet scanBar(fill = false)}
+  <ScanProgress oncancel={cancelScan} {fill} />
 {/snippet}
 
 <svelte:window
@@ -1580,18 +1580,21 @@
         </span>
       </div>
 
-      {#if scanning}
-        <div class="scanwrap">{@render scanBar()}</div>
-      {/if}
-
-      {#if loadingBrowse && !current.length}
-        <div class="msg">Loading…</div>
-      {:else if !current.length}
-        <div class="msg">
-          {scanning ? "Indexing…" : "Nothing indexed yet — try ↻ rescan."}
-        </div>
+      {#if scanning && !current.length}
+        <!-- Building the index with nothing to show yet: fill the window with the
+             scan log instead of a static "Indexing…" placeholder. -->
+        {@render scanBar(true)}
       {:else}
-        {@render mapArea()}
+        {#if scanning}
+          <div class="scanwrap">{@render scanBar(false)}</div>
+        {/if}
+        {#if loadingBrowse && !current.length}
+          <div class="msg">Loading…</div>
+        {:else if !current.length}
+          <div class="msg">Nothing indexed yet. Try ↻ rescan.</div>
+        {:else}
+          {@render mapArea()}
+        {/if}
       {/if}
 
       {#if hidden.size}

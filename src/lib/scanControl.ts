@@ -95,9 +95,10 @@ void listen<BrowseProgress>("browse-progress", (e) => {
       write = finish(write, t);
       running = false;
     }
-    // Human-readable "project middot title" line for the active file; newest
-    // first, deduped against the current head, capped at 6.
-    if (p.current && p.current !== log[0]) log = [p.current, ...log].slice(0, 6);
+    // Human-readable line for the active file; newest first, deduped against the
+    // current head. Capped generously so the fill-mode log (empty-state build) has
+    // enough scrollback; the compact top-bar view clips it with max-height.
+    if (p.current && p.current !== log[0]) log = [p.current, ...log].slice(0, 200);
     return { running, index, enrich, write, log };
   });
   if (p.phase === "done" || p.phase === "canceled") {

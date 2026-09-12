@@ -482,12 +482,16 @@
     {/if}
   </nav>
 
-  <ScanProgress oncancel={cancelScan} />
+  <ScanProgress oncancel={cancelScan} fill={!summary.length} />
 
   {#if loading}
     <div class="msg">{t("common.loading")}</div>
   {:else if !summary.length}
-    <div class="msg">{scanning ? "Building the spend cache…" : "No spend recorded yet."}</div>
+    <!-- While the first build runs, the fill-mode ScanProgress log owns the window;
+         only show the resting empty message once the scan is done with no spend. -->
+    {#if !scanning}
+      <div class="msg">No spend recorded yet.</div>
+    {/if}
   {:else if level === "months"}
     <div class="sub">
       <span class="readout">{hover || "Click a month to break it down by day"}</span>

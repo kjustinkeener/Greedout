@@ -1258,8 +1258,11 @@ pub(crate) fn last_component(p: &str) -> String {
 /// path segment is indistinguishable from a separator, so this is a fallback
 /// only (we normally have the exact `cwd`).
 pub(crate) fn decode_project_dir(dir: &str) -> String {
-    // Leading drive letter: `C--` -> `C:\`.
-    if dir.len() >= 3 && dir.as_bytes()[0].is_ascii_alphabetic() && &dir[1..3] == "--" {
+    // Leading drive letter: `C--` -> `C:\`. Compare bytes, not a `dir[1..3]` slice:
+    // a multibyte char starting at byte 1 would make the slice split a codepoint and
+    // panic. Bytes 1 and 2 are in bounds here (len >= 3 checked).
+    let b = dir.as_bytes();
+    if dir.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b'-' && b[2] == b'-' {
         let drive = &dir[0..1];
         let rest = dir[3..].replace('-', "\\");
         format!("{drive}:\\{rest}")

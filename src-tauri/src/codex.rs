@@ -70,8 +70,11 @@ pub fn candidates() -> Vec<(PathBuf, u64)> {
 /// rather than trying to split the timestamp apart.
 pub(crate) fn id_from_path(path: &Path) -> String {
     let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-    if stem.len() >= 36 {
-        stem[stem.len() - 36..].to_string()
+    // Take the last 36 CHARS (not bytes): a non-ASCII byte in the filename would
+    // make a byte slice split a codepoint and panic. The uuid itself is ASCII.
+    let n = stem.chars().count();
+    if n >= 36 {
+        stem.chars().skip(n - 36).collect()
     } else {
         stem
     }

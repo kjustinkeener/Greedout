@@ -55,6 +55,29 @@
     if (oncancel) oncancel();
     else cancelScan();
   }
+
+  // Keep the log from yanking back to the top when a new line is prepended while
+  // the user has scrolled down to read older lines (fill mode). New lines go in at
+  // the head, which grows the content above the viewport; browsers hold scrollTop
+  // as a pixel offset, so without this the viewed line jumps. When the user is at
+  // the very top (scrollTop 0) we leave it, so it keeps tracking the newest line.
+  let logEl = $state<HTMLUListElement | null>(null);
+  let prevTop = 0;
+  let prevHeight = 0;
+  $effect.pre(() => {
+    void $scanState.log;
+    if (logEl) {
+      prevTop = logEl.scrollTop;
+      prevHeight = logEl.scrollHeight;
+    }
+  });
+  $effect(() => {
+    void $scanState.log;
+    if (logEl && prevTop > 0) {
+      const grew = logEl.scrollHeight - prevHeight;
+      if (grew > 0) logEl.scrollTop = prevTop + grew;
+    }
+  });
 </script>
 
 {#if $scanState.running}
@@ -73,7 +96,7 @@
       <button class="pcancel" onclick={cancel}>Cancel</button>
     </div>
     {#if $scanState.log.length}
-      <ul class="plog">
+      <ul class="plog" bind:this={logEl}>
         {#each $scanState.log as line, i (i)}
           <li style:color={sweepColor(line.t)}>{line.text}</li>
         {/each}

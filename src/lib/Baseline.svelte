@@ -93,6 +93,11 @@
   let searching = $state(false);
   let searchHits = $state<SearchHit[]>([]);
   let searchProg = $state<SearchProgress | null>(null);
+  // Live search debounce. Trigram FTS needs a >=3-char term, so we only fire the
+  // search live once the query reaches that floor; shorter queries can match only
+  // on the slow disk path, so they wait for an explicit Enter.
+  const LIVE_MIN = 3;
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
   // Mutually-exclusive project filter over the results (null = all projects).
   let projectFilter = $state<string | null>(null);
   // Projects present in the current results, with hit counts, most-hits first.
@@ -111,6 +116,7 @@
   );
 
   function runSearch() {
+    clearTimeout(searchTimer);
     const q = searchQuery.trim();
     if (!q) return;
     // The results panel is a body view, and the turn-detail view sits ahead of it
@@ -128,6 +134,26 @@
   }
   function cancelSearch() {
     invoke("browse_search_cancel").catch(() => {});
+  }
+  // Live search as the box changes: debounce, then fire once the query clears the
+  // trigram floor. A superseding run bumps the backend's generation, so rapid
+  // typing just cancels the previous run's emits (see run_search). When the query
+  // drops back below the floor, tear the results down but keep what's typed.
+  function onSearchInput() {
+    clearTimeout(searchTimer);
+    const q = searchQuery.trim();
+    if (q.length < LIVE_MIN) {
+      if (searchActive || searching) {
+        if (searching) cancelSearch();
+        searchActive = false;
+        searching = false;
+        searchHits = [];
+        searchProg = null;
+        projectFilter = null;
+      }
+      return;
+    }
+    searchTimer = setTimeout(runSearch, 180);
   }
   // Short harness label for a search-hit badge.
   function harnessLabel(h: string): string {
@@ -157,6 +183,7 @@
     return out + esc(snippet.slice(last));
   }
   function clearSearch() {
+    clearTimeout(searchTimer);
     if (searching) cancelSearch();
     searchQuery = "";
     searchActive = false;
@@ -1393,6 +1420,7 @@
           type="text"
           placeholder="Search chat text…"
           bind:value={searchQuery}
+          oninput={onSearchInput}
           onkeydown={(e) => {
             if (e.key === "Enter") runSearch();
             else if (e.key === "Escape" && (searchQuery || searchActive)) {

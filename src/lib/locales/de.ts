@@ -35,14 +35,14 @@ export const de: PartialDict = {
 
   "tip.money":
     "Nominal: geschätzt aus den Tokens dieser Sitzung zu den veröffentlichten Preisen pro Token, berechnet pro Turn mit dem jeweils genutzten Modell. Bei einem Pauschaltarif wird dies nicht berechnet; es zeigt, was dieselbe Arbeit über die API kosten würde.",
-  "tip.spend": "{amount} bisher. {money}",
-  "tip.ago": "Zeit seit der letzten Nachricht in dieser Sitzung",
+  "tip.spend": "Ausgaben: {amount} bisher. {money}",
+  "tip.ago": "Alter: Zeit seit der letzten Nachricht in dieser Sitzung",
   "tip.ctx":
-    "Kontext der letzten Nachricht, im Verhältnis zum Zielwert, auf den die Anzeige skaliert ist",
-  "tip.pct": "Kontext der letzten Nachricht, als Anteil am Zielwert",
-  "tip.model": "Modell, das den letzten Turn ausgeführt hat",
-  "tip.size": "Größe der Transkriptdatei dieser Sitzung auf der Festplatte",
-  "tip.limits": "Ziel ist, wo die Anzeige ins Rote geht; Max ist das harte Kontextfenster des Modells",
+    "Kontext: Kontext der letzten Nachricht, im Verhältnis zum Zielwert, auf den die Anzeige skaliert ist",
+  "tip.pct": "Kontext %: Kontext der letzten Nachricht, als Anteil am Zielwert",
+  "tip.model": "Modell: Modell, das den letzten Turn ausgeführt hat",
+  "tip.size": "Größe: Größe der Transkriptdatei dieser Sitzung auf der Festplatte",
+  "tip.limits": "Grenzen: Ziel ist, wo die Anzeige ins Rote geht; Max ist das harte Kontextfenster des Modells",
   "tip.gauge": "Kontextfüllanzeige",
   "tip.history": "Kontext und Ausgaben im Zeitverlauf",
 

@@ -35,14 +35,14 @@ export const nl: PartialDict = {
 
   "tip.money":
     "Nominaal: geschat op basis van de tokens van deze sessie tegen gepubliceerde prijzen per token, berekend per beurt op basis van het gebruikte model. Bij een vast abonnement wordt dit niet in rekening gebracht; het is wat hetzelfde werk via de API zou kosten.",
-  "tip.spend": "{amount} tot nu toe. {money}",
-  "tip.ago": "Tijd sinds het laatste bericht in deze sessie",
+  "tip.spend": "Uitgaven: {amount} tot nu toe. {money}",
+  "tip.ago": "Leeftijd: Tijd sinds het laatste bericht in deze sessie",
   "tip.ctx":
-    "Context van het meest recente bericht, ten opzichte van het doel waarop de meter is geschaald",
-  "tip.pct": "Context in het meest recente bericht, als aandeel van het doel",
-  "tip.model": "Model dat de meest recente beurt heeft uitgevoerd",
-  "tip.size": "Grootte van het transcriptbestand van deze sessie op schijf",
-  "tip.limits": "Doel is waar de meter rood uitslaat; max is het harde contextvenster van het model",
+    "Context: Context van het meest recente bericht, ten opzichte van het doel waarop de meter is geschaald",
+  "tip.pct": "Context %: Context in het meest recente bericht, als aandeel van het doel",
+  "tip.model": "Model: Model dat de meest recente beurt heeft uitgevoerd",
+  "tip.size": "Grootte: Grootte van het transcriptbestand van deze sessie op schijf",
+  "tip.limits": "Limieten: Doel is waar de meter rood uitslaat; max is het harde contextvenster van het model",
   "tip.gauge": "contextvulmeter",
   "tip.history": "context en uitgaven over tijd",
 

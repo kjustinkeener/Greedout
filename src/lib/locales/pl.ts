@@ -35,14 +35,14 @@ export const pl: PartialDict = {
 
   "tip.money":
     "Kwota orientacyjna: oszacowana na podstawie tokenów tej sesji według opublikowanych cen za token, wyceniana za turę według modelu, który ją obsłużył. W planie z opłatą ryczałtową nie jest to naliczane; to koszt tej samej pracy przez API.",
-  "tip.spend": "{amount} dotychczas. {money}",
-  "tip.ago": "Czas od ostatniej wiadomości w tej sesji",
+  "tip.spend": "Wydatki: {amount} dotychczas. {money}",
+  "tip.ago": "Wiek: Czas od ostatniej wiadomości w tej sesji",
   "tip.ctx":
-    "Kontekst niesiony przez najnowszą wiadomość, w odniesieniu do celu, do którego skalowany jest wskaźnik",
-  "tip.pct": "Kontekst w najnowszej wiadomości jako udział w celu",
-  "tip.model": "Model, który obsłużył ostatnią turę",
-  "tip.size": "Rozmiar pliku transkrypcji tej sesji na dysku",
-  "tip.limits": "Cel to miejsce, w którym wskaźnik wchodzi w czerwień; maks. to twardy limit kontekstu modelu",
+    "Kontekst: Kontekst niesiony przez najnowszą wiadomość, w odniesieniu do celu, do którego skalowany jest wskaźnik",
+  "tip.pct": "Kontekst %: Kontekst w najnowszej wiadomości jako udział w celu",
+  "tip.model": "Model: Model, który obsłużył ostatnią turę",
+  "tip.size": "Rozmiar: Rozmiar pliku transkrypcji tej sesji na dysku",
+  "tip.limits": "Limity: Cel to miejsce, w którym wskaźnik wchodzi w czerwień; maks. to twardy limit kontekstu modelu",
   "tip.gauge": "wskaźnik zapełnienia kontekstu",
   "tip.history": "kontekst i wydatki w czasie",
 

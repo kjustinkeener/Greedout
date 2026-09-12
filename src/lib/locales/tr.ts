@@ -35,14 +35,14 @@ export const tr: PartialDict = {
 
   "tip.money":
     "Nominal: bu oturumun tokenlarından, yayınlanan token başına fiyatlarla, çalıştığı modele göre her tur için hesaplanan bir tahmindir. Sabit ücretli bir planda bu tutar sizden tahsil edilmez; aynı işin API üzerinden maliyeti bu olurdu.",
-  "tip.spend": "Şimdiye kadar {amount}. {money}",
-  "tip.ago": "Bu oturumdaki son mesajdan bu yana geçen süre",
+  "tip.spend": "Harcama: Şimdiye kadar {amount}. {money}",
+  "tip.ago": "Yaş: Bu oturumdaki son mesajdan bu yana geçen süre",
   "tip.ctx":
-    "En son mesajın taşıdığı bağlam, göstergenin ölçeklendiği hedefe göre",
-  "tip.pct": "En son mesajdaki bağlam, hedefe oranla",
-  "tip.model": "En son turu çalıştıran model",
-  "tip.size": "Bu oturumun disk üzerindeki transkript dosyasının boyutu",
-  "tip.limits": "Hedef, göstergenin kırmızı çizgiye ulaştığı nokta; maks ise modelin kesin bağlam penceresidir",
+    "Bağlam: En son mesajın taşıdığı bağlam, göstergenin ölçeklendiği hedefe göre",
+  "tip.pct": "Bağlam %: En son mesajdaki bağlam, hedefe oranla",
+  "tip.model": "Model: En son turu çalıştıran model",
+  "tip.size": "Boyut: Bu oturumun disk üzerindeki transkript dosyasının boyutu",
+  "tip.limits": "Limitler: Hedef, göstergenin kırmızı çizgiye ulaştığı nokta; maks ise modelin kesin bağlam penceresidir",
   "tip.gauge": "bağlam doluluk göstergesi",
   "tip.history": "zaman içinde bağlam ve harcama",
 

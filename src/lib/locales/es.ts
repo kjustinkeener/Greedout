@@ -41,14 +41,14 @@ export const es: PartialDict = {
   // mismo dondequiera que aparezca: una fila, el panel de enfoque, el Explorador.
   "tip.money":
     "Nominal: estimado a partir de los tokens de esta sesión según los precios por token publicados, calculado por turno según el modelo que lo ejecutó. En un plan de tarifa plana no se te cobra esto; es lo que costaría el mismo trabajo a través de la API.",
-  "tip.spend": "{amount} hasta ahora. {money}",
-  "tip.ago": "Tiempo transcurrido desde el último mensaje de esta sesión",
+  "tip.spend": "Gasto: {amount} hasta ahora. {money}",
+  "tip.ago": "Antigüedad: Tiempo transcurrido desde el último mensaje de esta sesión",
   "tip.ctx":
-    "Contexto acumulado en el mensaje más reciente, respecto al objetivo al que está escalado el indicador",
-  "tip.pct": "Contexto en el mensaje más reciente, como porcentaje del objetivo",
-  "tip.model": "Modelo que ejecutó el turno más reciente",
-  "tip.size": "Tamaño en disco del archivo de transcripción de esta sesión",
-  "tip.limits": "El objetivo es donde el indicador entra en zona roja; el máximo es el límite de contexto del modelo",
+    "Contexto: Contexto acumulado en el mensaje más reciente, respecto al objetivo al que está escalado el indicador",
+  "tip.pct": "Contexto %: Contexto en el mensaje más reciente, como porcentaje del objetivo",
+  "tip.model": "Modelo: Modelo que ejecutó el turno más reciente",
+  "tip.size": "Tamaño: Tamaño en disco del archivo de transcripción de esta sesión",
+  "tip.limits": "Límites: El objetivo es donde el indicador entra en zona roja; el máximo es el límite de contexto del modelo",
   "tip.gauge": "indicador de llenado de contexto",
   "tip.history": "contexto y gasto a lo largo del tiempo",
 

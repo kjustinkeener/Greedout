@@ -35,14 +35,14 @@ export const ptBR: PartialDict = {
 
   "tip.money":
     "Nominal: estimado a partir dos tokens desta sessão, com preços por token publicados, calculado por turno pelo modelo que o executou. Em um plano de taxa fixa isso não é cobrado; é o que o mesmo trabalho custaria pela API.",
-  "tip.spend": "{amount} até agora. {money}",
-  "tip.ago": "Tempo desde a última mensagem nesta sessão",
+  "tip.spend": "Gasto: {amount} até agora. {money}",
+  "tip.ago": "Idade: Tempo desde a última mensagem nesta sessão",
   "tip.ctx":
-    "Contexto usado pela mensagem mais recente, em relação à meta para a qual o medidor está calibrado",
-  "tip.pct": "Contexto na mensagem mais recente, como fração da meta",
-  "tip.model": "Modelo que executou o turno mais recente",
-  "tip.size": "Tamanho do arquivo de transcrição desta sessão no disco",
-  "tip.limits": "A meta é onde o medidor entra na zona vermelha; o máximo é a janela de contexto máxima do modelo",
+    "Contexto: Contexto usado pela mensagem mais recente, em relação à meta para a qual o medidor está calibrado",
+  "tip.pct": "Contexto %: Contexto na mensagem mais recente, como fração da meta",
+  "tip.model": "Modelo: Modelo que executou o turno mais recente",
+  "tip.size": "Tamanho: Tamanho do arquivo de transcrição desta sessão no disco",
+  "tip.limits": "Limites: A meta é onde o medidor entra na zona vermelha; o máximo é a janela de contexto máxima do modelo",
   "tip.gauge": "medidor de preenchimento de contexto",
   "tip.history": "contexto e gasto ao longo do tempo",
 

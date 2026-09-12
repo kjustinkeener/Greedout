@@ -35,14 +35,14 @@ export const fr: PartialDict = {
 
   "tip.money":
     "Nominal : estimé à partir des jetons de cette session au tarif publié par jeton, calculé par tour selon le modèle qui l'a exécuté. Sur un forfait à tarif fixe, ce montant ne vous est pas facturé ; c'est ce que ce même travail coûterait via l'API.",
-  "tip.spend": "{amount} jusqu'ici. {money}",
-  "tip.ago": "Temps écoulé depuis le dernier message de cette session",
+  "tip.spend": "Dépenses : {amount} jusqu'ici. {money}",
+  "tip.ago": "Âge : Temps écoulé depuis le dernier message de cette session",
   "tip.ctx":
-    "Contexte porté par le message le plus récent, par rapport à la cible sur laquelle la jauge est calibrée",
-  "tip.pct": "Contexte du message le plus récent, en proportion de la cible",
-  "tip.model": "Modèle ayant exécuté le tour le plus récent",
-  "tip.size": "Taille du fichier de transcription de cette session sur le disque",
-  "tip.limits": "La cible est le seuil critique de la jauge ; le max est la limite de contexte du modèle",
+    "Contexte : Contexte porté par le message le plus récent, par rapport à la cible sur laquelle la jauge est calibrée",
+  "tip.pct": "Contexte % : Contexte du message le plus récent, en proportion de la cible",
+  "tip.model": "Modèle : Modèle ayant exécuté le tour le plus récent",
+  "tip.size": "Taille : Taille du fichier de transcription de cette session sur le disque",
+  "tip.limits": "Limites : La cible est le seuil critique de la jauge ; le max est la limite de contexte du modèle",
   "tip.gauge": "jauge de remplissage du contexte",
   "tip.history": "contexte et dépense au fil du temps",
 

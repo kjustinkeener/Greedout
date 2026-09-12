@@ -40,6 +40,9 @@ export const en = {
   "main.exploreOrRename": "Click to explore · double-click to rename",
   "main.rename": "Double-click to rename",
   "main.exploreProject": "Explore this project",
+  // Value labels prefixed to the session-title and project tooltips.
+  "main.sessionTip": "Session: {title}",
+  "main.projectTip": "Project: {path}",
   // Focus panel: the two context limits, and the labels the history graph hands
   // back when a line is hovered.
   "main.limits": "target {target} · max {max}",
@@ -48,6 +51,7 @@ export const en = {
   "main.compactRead": "read summary",
   "main.compactTip": "Context was compacted. Click to read the summary.",
   "main.compactEncrypted": "summary encrypted",
+  "main.compactEncryptedTip": "Context was compacted. Codex encrypts the compaction summary on disk, so it cannot be shown.",
   "main.context": "context",
   "main.startupFloor": "startup floor",
 

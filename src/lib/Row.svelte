@@ -97,7 +97,7 @@
   });
 </script>
 
-<div class="row" class:focused={session.focused} style:opacity title={session.projectPath}>
+<div class="row" class:focused={session.focused} style:opacity>
   <span class="dot" class:live={session.live}></span>
   <div class="body">
     <div class="line1">
@@ -106,7 +106,7 @@
         class:plain={!linksEnabled}
         onclick={titleClick}
         ondblclick={titleDbl}
-        title={linksEnabled ? t("main.exploreOrRename") : t("main.rename")}
+        title={`${t("main.sessionTip", { title: session.title })}\n${linksEnabled ? t("main.exploreOrRename") : t("main.rename")}`}
         >{session.title}</button
       >
       <span class="meta1">
@@ -115,7 +115,7 @@
         class="project"
         class:plain={!linksEnabled}
         onclick={() => { if (linksEnabled) onOpenProject(); }}
-        title={linksEnabled ? t("main.exploreProject") : undefined}
+        title={linksEnabled ? `${t("main.projectTip", { path: session.projectPath })}\n${t("main.exploreProject")}` : t("main.projectTip", { path: session.projectPath })}
         >{session.project}{#if session.subPath}<span class="sub"
             >/{session.subPath}</span
           >{/if}</button

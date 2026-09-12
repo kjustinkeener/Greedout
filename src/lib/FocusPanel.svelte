@@ -78,7 +78,7 @@
   });
 </script>
 
-<div class="panel" title={session.projectPath}>
+<div class="panel">
   <div class="head">
     <span class="dot" class:live={session.live}></span>
     <button
@@ -86,7 +86,7 @@
       class:plain={!linksEnabled}
       onclick={titleClick}
       ondblclick={titleDbl}
-      title={linksEnabled ? t("main.exploreOrRename") : t("main.rename")}
+      title={`${t("main.sessionTip", { title: session.title })}\n${linksEnabled ? t("main.exploreOrRename") : t("main.rename")}`}
       >{session.title}</button
     >
     <span class="meta1">
@@ -95,7 +95,7 @@
         class="project"
         class:plain={!linksEnabled}
         onclick={() => { if (linksEnabled) onOpenProject(); }}
-        title={linksEnabled ? t("main.exploreProject") : undefined}
+        title={linksEnabled ? `${t("main.projectTip", { path: session.projectPath })}\n${t("main.exploreProject")}` : t("main.projectTip", { path: session.projectPath })}
         >{session.project}{#if session.subPath}<span class="sub"
             >/{session.subPath}</span
           >{/if}</button
@@ -137,7 +137,7 @@
       class:static={!session.compact.hasSummary}
       role={session.compact.hasSummary ? "button" : undefined}
       onclick={session.compact.hasSummary ? () => onOpenCompact?.() : undefined}
-      title={session.compact.hasSummary ? t("main.compactTip") : undefined}
+      title={session.compact.hasSummary ? t("main.compactTip") : t("main.compactEncryptedTip")}
     >
       <span class="cico"><Icon name="compact" size={12} /></span>
       <span class="cmain"

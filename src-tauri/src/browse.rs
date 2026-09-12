@@ -1977,4 +1977,39 @@ mod tests {
         drop(conn);
         let _ = std::fs::remove_file(path);
     }
+
+    // --- enrich_from / chat_doc_from (Claude branch, parse-only from bytes) ---
+
+    /// A tiny synthetic Claude transcript. The path is NOT under codex_dir(), so both
+    /// dispatchers take the Claude branch; the bytes are supplied so no IO happens.
+    fn claude_raw() -> String {
+        let user = r#"{"type":"user","timestamp":"2026-09-10T01:00:00.000Z","cwd":"C:\\proj","message":{"content":"find the bug"}}"#;
+        let title = r#"{"type":"custom-title","customTitle":"My Chat"}"#;
+        let asst = r#"{"type":"assistant","timestamp":"2026-09-10T01:00:05.000Z","message":{"id":"m1","model":"claude-opus-4-8","usage":{"input_tokens":1000,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":100},"content":[{"type":"text","text":"here is the fix"}]}}"#;
+        format!("{user}\n{title}\n{asst}\n")
+    }
+
+    #[test]
+    fn enrich_from_claude_branch_derives_meta() {
+        let raw = claude_raw();
+        let meta = enrich_from(std::path::Path::new("plain/x.jsonl"), &raw);
+        assert_eq!(meta.ctx, Some(1000), "ctx = input + cache_creation + cache_read");
+        assert_eq!(meta.turn_count, 1);
+        // (1000*15 + 100*75)/1e6 = 0.0225.
+        assert!((meta.cost_usd - 0.0225).abs() < 1e-9, "cost was {}", meta.cost_usd);
+        assert_eq!(meta.model_version, "4.8");
+        assert_eq!(meta.title.as_deref(), Some("My Chat"));
+        assert_eq!(meta.cwd.as_deref(), Some("C:\\proj"));
+    }
+
+    #[test]
+    fn chat_doc_from_claude_branch_returns_text_and_span() {
+        let raw = claude_raw();
+        let (text, first, last) = chat_doc_from(std::path::Path::new("plain/x.jsonl"), &raw);
+        assert!(text.contains("find the bug"));
+        assert!(text.contains("here is the fix"));
+        let first = first.expect("first ts");
+        let last = last.expect("last ts");
+        assert!(first <= last, "span is ordered: first {first} last {last}");
+    }
 }

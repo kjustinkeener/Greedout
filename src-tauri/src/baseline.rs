@@ -996,3 +996,140 @@ fn pretty_server(name: &str) -> String {
 fn file_name(path: &str) -> String {
     path.rsplit(['/', '\\']).next().unwrap_or(path).to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // --- est_tokens: chars/4, rounded ---
+
+    #[test]
+    fn est_tokens_rounds_chars_over_four() {
+        assert_eq!(est_tokens(0), 0);
+        assert_eq!(est_tokens(4), 1);
+        assert_eq!(est_tokens(400), 100);
+        // 2/4 = 0.5 rounds away from zero to 1.
+        assert_eq!(est_tokens(2), 1);
+    }
+
+    // --- codex_line_type: top-level `type` ---
+
+    #[test]
+    fn codex_line_type_reads_type_or_none() {
+        assert_eq!(
+            codex_line_type(r#"{"type":"token_usage_record"}"#).as_deref(),
+            Some("token_usage_record")
+        );
+        // Missing `type` field.
+        assert_eq!(codex_line_type(r#"{"payload":{}}"#), None);
+        // Not JSON at all.
+        assert_eq!(codex_line_type("not json"), None);
+    }
+
+    // --- codex_content_text: join `text` parts of an array ---
+
+    #[test]
+    fn codex_content_text_joins_text_parts() {
+        let v = json!([{"type":"text","text":"hello"},{"type":"Text","text":"world"}]);
+        assert_eq!(codex_content_text(&v), "hello\nworld");
+        // A part with no `text` field is skipped.
+        let mixed = json!([{"text":"keep"},{"foo":"drop"}]);
+        assert_eq!(codex_content_text(&mixed), "keep");
+    }
+
+    #[test]
+    fn codex_content_text_non_array_is_empty() {
+        assert_eq!(codex_content_text(&json!({"text":"x"})), "");
+        assert_eq!(codex_content_text(&json!(null)), "");
+    }
+
+    // --- codex_string_array: bare strings or {text} objects ---
+
+    #[test]
+    fn codex_string_array_accepts_strings_and_objects() {
+        let strings = json!(["a", "b"]);
+        assert_eq!(codex_string_array(Some(&strings)), "a\nb");
+        let objs = json!([{"text":"one"}, {"text":"two"}]);
+        assert_eq!(codex_string_array(Some(&objs)), "one\ntwo");
+        let mixed = json!(["bare", {"text":"obj"}]);
+        assert_eq!(codex_string_array(Some(&mixed)), "bare\nobj");
+    }
+
+    #[test]
+    fn codex_string_array_none_or_non_array_is_empty() {
+        assert_eq!(codex_string_array(None), "");
+        assert_eq!(codex_string_array(Some(&json!("nope"))), "");
+    }
+
+    // --- pretty_component: underscores to spaces ---
+
+    #[test]
+    fn pretty_component_replaces_underscores() {
+        assert_eq!(pretty_component("host_skills"), "host skills");
+        assert_eq!(pretty_component("plain"), "plain");
+    }
+
+    // --- preview: flatten whitespace + cap at 300 chars ---
+
+    #[test]
+    fn preview_flattens_whitespace() {
+        assert_eq!(preview("  hello\n\tworld  "), "hello world");
+        assert_eq!(preview(""), "");
+    }
+
+    #[test]
+    fn preview_caps_oversized_with_ellipsis() {
+        let long = "x".repeat(400);
+        let p = preview(&long);
+        assert_eq!(p.chars().count(), 301, "300 chars + one ellipsis");
+        assert!(p.ends_with('\u{2026}'));
+    }
+
+    // --- json_text: string, array of {text}, or raw JSON fallback ---
+
+    #[test]
+    fn json_text_string_passes_through() {
+        assert_eq!(json_text(&json!("plain text")), "plain text");
+    }
+
+    #[test]
+    fn json_text_array_joins_with_trailing_space() {
+        // Each text block is pushed followed by a space.
+        assert_eq!(json_text(&json!([{"text":"a"},{"text":"b"}])), "a b ");
+    }
+
+    #[test]
+    fn json_text_falls_back_to_raw_json() {
+        // A number has no string/array shape, so the raw JSON rendering is returned.
+        assert_eq!(json_text(&json!(42)), "42");
+        // An array with no `text` fields also falls back to raw JSON.
+        assert_eq!(json_text(&json!([{"foo":"bar"}])), "[{\"foo\":\"bar\"}]");
+    }
+
+    // --- short_tool_name: strip the mcp__<server>__ prefix ---
+
+    #[test]
+    fn short_tool_name_strips_prefix() {
+        assert_eq!(short_tool_name("mcp__github__create_issue", "github"), "create_issue");
+        // No matching prefix leaves the name untouched.
+        assert_eq!(short_tool_name("Read", "github"), "Read");
+    }
+
+    // --- pretty_server: underscores to spaces ---
+
+    #[test]
+    fn pretty_server_replaces_underscores() {
+        assert_eq!(pretty_server("my_server"), "my server");
+        assert_eq!(pretty_server("opaquehash"), "opaquehash");
+    }
+
+    // --- file_name: last path component across both separators ---
+
+    #[test]
+    fn file_name_takes_last_component() {
+        assert_eq!(file_name("C:\\a\\b\\note.txt"), "note.txt");
+        assert_eq!(file_name("/x/y/z.rs"), "z.rs");
+        assert_eq!(file_name("bare"), "bare");
+    }
+}

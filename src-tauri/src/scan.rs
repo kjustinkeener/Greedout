@@ -1536,4 +1536,96 @@ mod tests {
         assert_eq!(parse_model_version("claude-opus-4-8-20250101"), "4.8");
         assert_eq!(parse_model_version("claude-sonnet-5"), "5");
     }
+
+    // --- line_id_cost ---
+
+    #[test]
+    fn line_id_cost_returns_id_and_cost_for_assistant_with_id() {
+        let line = assistant("m1", "claude-opus-4-8", "2026-09-10T01:00:00.000Z", 1000, 100);
+        let (id, cost) = line_id_cost(&line).expect("assistant with usage");
+        assert_eq!(id.as_deref(), Some("m1"));
+        // (1000*15 + 100*75)/1e6 = 0.0225.
+        close(cost, 0.0225);
+    }
+
+    #[test]
+    fn line_id_cost_returns_none_id_when_message_has_no_id() {
+        // Assistant record with usage but no message.id: cost still computed, id None.
+        let line = r#"{"type":"assistant","message":{"model":"claude-opus-4-8","usage":{"input_tokens":1000,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":100}}}"#;
+        let (id, cost) = line_id_cost(line).expect("assistant with usage");
+        assert_eq!(id, None);
+        close(cost, 0.0225);
+    }
+
+    #[test]
+    fn line_id_cost_rejects_non_assistant() {
+        assert!(line_id_cost(r#"{"type":"user","message":{"content":"hi"}}"#).is_none());
+    }
+
+    // --- head_title ---
+
+    #[test]
+    fn head_title_reads_custom_title_from_head_and_none_when_absent() {
+        let uniq = format!("{}-{}", std::process::id(), COUNTER.fetch_add(1, Ordering::Relaxed));
+        let title_line = r#"{"type":"custom-title","customTitle":"My Session"}"#;
+        let asst = assistant("m1", "claude-opus-4-8", "2026-09-10T01:00:00.000Z", 1000, 100);
+        let path = tmp_write(&format!("{title_line}\n{asst}\n"));
+        let id = format!("title-{uniq}");
+        assert_eq!(head_title(&id, &path).as_deref(), Some("My Session"));
+        let _ = std::fs::remove_file(&path);
+
+        // No custom-title record anywhere: None. Use a distinct id so the process
+        // global title cache can't leak the value cached above.
+        let path2 = tmp_write(&format!("{asst}\n"));
+        let id2 = format!("notitle-{uniq}");
+        assert_eq!(head_title(&id2, &path2), None);
+        let _ = std::fs::remove_file(&path2);
+    }
+
+    // --- truncate ---
+
+    #[test]
+    fn truncate_trims_and_caps_with_ellipsis() {
+        // Trims, and stays whole when within the cap.
+        assert_eq!(truncate("  hello  ", 10), "hello");
+        // Over the cap: first `max` chars plus an ellipsis.
+        let t = truncate("abcdef", 3);
+        assert_eq!(t, "abc\u{2026}");
+        assert_eq!(t.chars().count(), 4);
+    }
+
+    // --- parse_ctx ---
+
+    #[test]
+    fn parse_ctx_sums_input_and_cache_fields() {
+        let line = r#"{"type":"assistant","message":{"model":"claude-opus-4-8","usage":{"input_tokens":1000,"cache_creation_input_tokens":200,"cache_read_input_tokens":50,"output_tokens":10}}}"#;
+        assert_eq!(parse_ctx(line), Some(1250));
+        // Non-assistant lines are ignored.
+        assert!(parse_ctx(r#"{"type":"user","message":{}}"#).is_none());
+    }
+
+    // --- parse_field ---
+
+    #[test]
+    fn parse_field_reads_top_level_string_only() {
+        assert_eq!(parse_field(r#"{"customTitle":"Hi"}"#, "customTitle").as_deref(), Some("Hi"));
+        // Missing key.
+        assert_eq!(parse_field(r#"{"customTitle":"Hi"}"#, "other"), None);
+        // Non-string value.
+        assert_eq!(parse_field(r#"{"n":5}"#, "n"), None);
+    }
+
+    // --- context_price_rates (fallback path for an unknown id) ---
+
+    #[test]
+    fn context_price_rates_unknown_id_uses_default_model_rates() {
+        // A guaranteed-absent id resolves no transcript, so rates come from the
+        // default (empty-model) row, divided to per-token USD.
+        let id = format!("no-such-session-{}-{}", std::process::id(), COUNTER.fetch_add(1, Ordering::Relaxed));
+        let mi = model_info("");
+        let (in_r, out_r, cr_r) = context_price_rates(&id);
+        close(in_r, mi.price_in / 1_000_000.0);
+        close(out_r, mi.price_out / 1_000_000.0);
+        close(cr_r, mi.price_cache_read / 1_000_000.0);
+    }
 }

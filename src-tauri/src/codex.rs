@@ -918,4 +918,78 @@ mod tests {
         assert_eq!(doc.first_ts.as_deref(), Some("2026-09-10T01:20:20.901Z"));
         assert_eq!(doc.last_ts.as_deref(), Some("2026-09-10T01:20:23.637Z"));
     }
+
+    // --- counts_of ---
+
+    #[test]
+    fn counts_of_reads_token_fields_and_defaults_missing_to_zero() {
+        let block = serde_json::json!({
+            "input_tokens": 5000,
+            "cached_input_tokens": 1200,
+            "cache_write_input_tokens": 300,
+            "output_tokens": 80
+        });
+        let c = counts_of(&block);
+        assert_eq!(c.input, 5000);
+        assert_eq!(c.cached, 1200);
+        assert_eq!(c.cache_write, 300);
+        assert_eq!(c.output, 80);
+        // Missing fields default to 0.
+        let empty = counts_of(&serde_json::json!({}));
+        assert_eq!(empty.input, 0);
+        assert_eq!(empty.cached, 0);
+        assert_eq!(empty.cache_write, 0);
+        assert_eq!(empty.output, 0);
+    }
+
+    // --- payload_str ---
+
+    #[test]
+    fn payload_str_reads_from_payload_then_top_level() {
+        // Nested under payload.
+        assert_eq!(
+            payload_str(r#"{"payload":{"cwd":"C:\\x\\proj"}}"#, "cwd").as_deref(),
+            Some("C:\\x\\proj")
+        );
+        // No payload: falls back to the top level.
+        assert_eq!(payload_str(r#"{"model":"gpt-5.6-luna"}"#, "model").as_deref(), Some("gpt-5.6-luna"));
+    }
+
+    #[test]
+    fn payload_str_rejects_empty_and_invalid() {
+        // An empty string is filtered out.
+        assert_eq!(payload_str(r#"{"payload":{"cwd":""}}"#, "cwd"), None);
+        // Missing key.
+        assert_eq!(payload_str(r#"{"payload":{}}"#, "cwd"), None);
+        // Not JSON.
+        assert_eq!(payload_str("garbage", "cwd"), None);
+    }
+
+    // --- is_uuid ---
+
+    #[test]
+    fn is_uuid_accepts_canonical_and_rejects_malformed() {
+        assert!(is_uuid("01a088e4-d77f-72e1-b87f-f1460ccdbe2e"));
+        // Wrong length.
+        assert!(!is_uuid("01a088e4-d77f-72e1-b87f"));
+        // Dash in the wrong place / non-hex where hex is required.
+        assert!(!is_uuid("01a088e4xd77f-72e1-b87f-f1460ccdbe2e"));
+        assert!(!is_uuid("g1a088e4-d77f-72e1-b87f-f1460ccdbe2e"));
+    }
+
+    // --- cwd_of (temp fixture file) ---
+
+    #[test]
+    fn cwd_of_returns_cwd_from_tail_and_none_when_absent() {
+        let with_cwd = r#"{"type":"turn_context","payload":{"model":"gpt-5.6-luna","cwd":"C:\\x\\proj"}}"#;
+        let path = tmp_write(&format!("{with_cwd}\n"));
+        assert_eq!(cwd_of(&path).as_deref(), Some("C:\\x\\proj"));
+        let _ = std::fs::remove_file(&path);
+
+        // A transcript with no cwd anywhere yields None.
+        let no_cwd = r#"{"type":"event_msg","payload":{"type":"task_started"}}"#;
+        let path2 = tmp_write(&format!("{no_cwd}\n"));
+        assert_eq!(cwd_of(&path2), None);
+        let _ = std::fs::remove_file(&path2);
+    }
 }

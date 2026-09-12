@@ -42,6 +42,15 @@
     return `${Math.round((st.end || now) - st.t0)}ms`;
   }
 
+  // Color at fraction `t` (0..1) along the theme gauge sweep g0 -> g1 -> g2
+  // (stops at 0, 0.5, 1). Used to tint each log line to match the bar-fill color
+  // at the instant it was emitted. color-mix keeps it theme-reactive.
+  function sweepColor(t: number): string {
+    const c = Math.max(0, Math.min(1, t));
+    if (c <= 0.5) return `color-mix(in oklab, var(--g0), var(--g1) ${(c / 0.5) * 100}%)`;
+    return `color-mix(in oklab, var(--g1), var(--g2) ${((c - 0.5) / 0.5) * 100}%)`;
+  }
+
   function cancel() {
     if (oncancel) oncancel();
     else cancelScan();
@@ -50,10 +59,12 @@
 
 {#if $scanState.running}
   <div class="scanbar" class:fill>
-    {#each phases as ph (ph.label)}
+    {#each phases as ph, i (ph.label)}
       <div class="prow" class:inactive={ph.st.total === 0}>
         <span class="plabel">{ph.label}</span>
-        <div class="ptrack"><div class="pmask" style:width={remaining(ph.st)}></div></div>
+        <div class="ptrack" style:background-position="{i * 50}% 0">
+          <div class="pmask" style:width={remaining(ph.st)}></div>
+        </div>
         <span class="pcount">{count(ph.st)}</span>
         <span class="pms">{elapsed(ph.st)}</span>
       </div>
@@ -64,7 +75,7 @@
     {#if $scanState.log.length}
       <ul class="plog">
         {#each $scanState.log as line, i (i)}
-          <li>{line}</li>
+          <li style:color={sweepColor(line.t)}>{line.text}</li>
         {/each}
       </ul>
     {/if}
@@ -116,8 +127,12 @@
     height: 6px;
     border-radius: 3px;
     overflow: hidden;
-    /* Full theme gauge gradient, painted statically across the whole track. */
+    /* One continuous theme gauge gradient split across the three bars: the track
+       paints the full g0->g1->g2 sweep at 300% width, and each row shifts its
+       window (background-position 0/50/100%) so bar 1 shows the first third, bar 2
+       the middle, bar 3 the last. Together the three bars read as a single sweep. */
     background: linear-gradient(to right, var(--g0), var(--g1), var(--g2));
+    background-size: 300% 100%;
   }
   /* Obscures the unfilled (right) part; shrinking it reveals the static gradient.
      Must be OPAQUE -- var(--panel)/--hover are semi-transparent in some themes and
@@ -169,7 +184,7 @@
     list-style: none;
     font-size: 9px;
     color: var(--muted);
-    opacity: 0.7;
+    opacity: 0.9;
     font-variant-numeric: tabular-nums;
     max-height: 66px;
     overflow: hidden;

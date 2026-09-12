@@ -26,12 +26,20 @@ export interface PhaseState {
   t0: number;
   end: number;
 }
+// One log line: the file text, plus `t` = its position along the OVERALL 3-bar
+// gradient sweep (0..1) at the moment it was emitted. The view colors the line
+// by mixing the theme gauge stops (--g0/--g1/--g2) at `t`, so a line's color
+// matches the fill color of the bar it came from at that instant.
+export interface LogLine {
+  text: string;
+  t: number;
+}
 export interface ScanState {
   running: boolean;
   index: PhaseState;
   enrich: PhaseState;
   write: PhaseState;
-  log: string[];
+  log: LogLine[];
 }
 
 const zeroPhase = (): PhaseState => ({ done: 0, total: 0, t0: 0, end: 0 });
@@ -97,8 +105,15 @@ void listen<BrowseProgress>("browse-progress", (e) => {
     }
     // Human-readable line for the active file; newest first, deduped against the
     // current head. Capped generously so the fill-mode log (empty-state build) has
-    // enough scrollback; the compact top-bar view clips it with max-height.
-    if (p.current && p.current !== log[0]) log = [p.current, ...log].slice(0, 200);
+    // enough scrollback; the compact top-bar view clips it with max-height. Each
+    // line carries its overall-sweep fraction `t` = (phaseIndex + done/total)/3, so
+    // the view can color it the same as the bar's fill at emit time.
+    if (p.current && p.current !== log[0]?.text) {
+      const seg = p.phase === "enrich" ? 1 : p.phase === "write" ? 2 : 0;
+      const frac = p.total ? p.done / p.total : 0;
+      const t = (seg + frac) / 3;
+      log = [{ text: p.current, t }, ...log].slice(0, 200);
+    }
     return { running, index, enrich, write, log };
   });
   if (p.phase === "done" || p.phase === "canceled") {

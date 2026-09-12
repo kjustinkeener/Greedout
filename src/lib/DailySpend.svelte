@@ -585,6 +585,9 @@
             <div class="lane">
               <div class="track">
                 {#each l.spans as sp}
+                  <!-- svelte-ignore a11y_click_events_have_key_events -->
+                  <!-- The lane's .lmeta button below is the keyboard-accessible
+                       control for this same action; the span is a mouse shortcut. -->
                   <span
                     class="span"
                     style:left={`${frac(sp.start) * 100}%`}
@@ -620,7 +623,9 @@
   {#if chooser}
     <div
       class="chback"
-      onclick={() => (chooser = null)}
+      onclick={(e) => {
+        if (e.target === e.currentTarget) chooser = null;
+      }}
       oncontextmenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -628,7 +633,7 @@
       }}
       role="presentation"
     >
-      <div class="chpanel" role="dialog" aria-label="Choose a session" onclick={(e) => e.stopPropagation()}>
+      <div class="chpanel" role="dialog" aria-label="Choose a session" tabindex="-1">
         <div class="chhead">
           <span class="chtitle" title={chooser.project}>{chooser.project}</span>
           <button class="chclose" onclick={() => (chooser = null)} aria-label={t("common.close")}>

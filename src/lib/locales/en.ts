@@ -67,14 +67,14 @@ export const en = {
   // appears: a row, the focus panel, the Explorer.
   "tip.money":
     "Nominal: estimated from this session's tokens at published per-token prices, priced per turn by the model that ran it. On a flat-rate plan you are not charged this; it is what the same work would cost through the API.",
-  "tip.spend": "{amount} so far. {money}",
-  "tip.ago": "Time since the last message in this session",
+  "tip.spend": "Spend: {amount} so far. {money}",
+  "tip.ago": "Age: time since the last message in this session",
   "tip.ctx":
-    "Context carried by the most recent message, against the target the gauge is scaled to",
-  "tip.pct": "Context in the most recent message, as a share of the target",
-  "tip.model": "Model that ran the most recent turn",
-  "tip.size": "Size of this session's transcript file on disk",
-  "tip.limits": "Target is where the gauge redlines; max is the model's hard context window",
+    "Context: carried by the most recent message, against the target the gauge is scaled to",
+  "tip.pct": "Context %: the most recent message's context as a share of the target",
+  "tip.model": "Model: ran the most recent turn",
+  "tip.size": "Size: this session's transcript file on disk",
+  "tip.limits": "Limits: target is where the gauge redlines; max is the model's hard context window",
   "tip.gauge": "context fill gauge",
   "tip.history": "context and spend over time",
 

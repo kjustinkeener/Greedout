@@ -98,6 +98,13 @@
   // on the slow disk path, so they wait for an explicit Enter.
   const LIVE_MIN = 3;
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  // Adaptive debounce: never fire the next live search faster than the slowest
+  // roundtrip seen so far, so a fast index stays snappy while a slow cache backs
+  // off on its own. Ratchets up only (never down); clamped to a usable range.
+  const DEBOUNCE_MIN = 120;
+  const DEBOUNCE_MAX = 1500;
+  let liveDebounce = $state(DEBOUNCE_MIN);
+  let searchStart = 0;
   // Mutually-exclusive project filter over the results (null = all projects).
   let projectFilter = $state<string | null>(null);
   // Projects present in the current results, with hit counts, most-hits first.
@@ -127,6 +134,7 @@
     searchHits = [];
     searchProg = null;
     projectFilter = null;
+    searchStart = performance.now();
     invoke("browse_search", { query: q }).catch((e) => {
       dbg("browse_search failed", e);
       searching = false;
@@ -153,7 +161,7 @@
       }
       return;
     }
-    searchTimer = setTimeout(runSearch, 180);
+    searchTimer = setTimeout(runSearch, liveDebounce);
   }
   // Short harness label for a search-hit badge.
   function harnessLabel(h: string): string {
@@ -267,6 +275,12 @@
     listen<SearchProgress>("search-progress", (e) => {
       searchProg = e.payload;
       if (e.payload.phase === "done" || e.payload.phase === "canceled") searching = false;
+      // Ratchet the live debounce toward the slowest completed roundtrip. Only a
+      // full "done" counts; a canceled run was cut short and isn't a real timing.
+      if (e.payload.phase === "done") {
+        const rt = performance.now() - searchStart;
+        if (rt > liveDebounce) liveDebounce = Math.min(rt, DEBOUNCE_MAX);
+      }
     }).then((f) => (un2 = f));
     return () => {
       un1?.();

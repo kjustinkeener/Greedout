@@ -1,3 +1,7 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { injectUserThemes, type ThemeData } from "./themeCss";
+
 // Only the background alpha is user-adjustable (opacity slider); the base RGB
 // comes from the active theme's palette in app.css.
 export function applyOpacity(o: number) {
@@ -119,8 +123,14 @@ export const themeTick = writable(0);
 // anything unrecognized falls back to "auto".
 const KNOWN = new Set(THEMES.map((t) => t.id));
 
+// Ids of the user's own themes, loaded from the config-folder sidecar. A valid
+// custom id must resolve to itself, not get bounced to auto, so it is folded in
+// alongside the built-ins. Seeded synchronously from the localStorage mirror in
+// initTheme (before the first resolve) and reconciled with the backend after.
+const userThemeIds = new Set<string>();
+
 export function resolveTheme(t: string | null | undefined): Theme {
-  return t && KNOWN.has(t) ? t : "auto";
+  return t && (KNOWN.has(t) || userThemeIds.has(t)) ? t : "auto";
 }
 
 // The chosen theme lives in the backend config, which is an async read, so the
@@ -128,6 +138,78 @@ export function resolveTheme(t: string | null | undefined): Theme {
 // users) before that read returns. Mirror the choice into localStorage, which IS
 // synchronous, so every entry module can stamp the palette before mount.
 const THEME_LS_KEY = "greedout:theme";
+
+// A synchronous mirror of the user themes, so a cold start can inject their
+// palettes before first paint (the backend read is async and lands too late to
+// stop a flash for a selected custom theme). Written whenever the set is known.
+const USER_THEMES_LS_KEY = "greedout:userThemes";
+
+function readUserThemesMirror(): ThemeData[] {
+  try {
+    const raw = localStorage.getItem(USER_THEMES_LS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+// Inject the user palettes as a <style>, register their ids so they resolve like
+// built-ins, and refresh the localStorage mirror. The backend is authoritative:
+// passing its current set here also removes palettes the user deleted.
+export function applyUserThemes(themes: ThemeData[]) {
+  injectUserThemes(themes);
+  userThemeIds.clear();
+  for (const t of themes) userThemeIds.add(t.id);
+  try {
+    localStorage.setItem(USER_THEMES_LS_KEY, JSON.stringify(themes));
+  } catch {
+    // Private / blocked storage: the palettes are still injected for this
+    // session; only the next cold start loses its head start (async read
+    // recovers it, at the cost of a possible one-frame flash for a custom theme).
+  }
+}
+
+// Re-resolve the current selection against the now-known user ids and repaint.
+// After the backend answers, a selected custom theme that booted as "auto"
+// (its id was not yet known) can settle onto its real palette; the tick makes
+// the gauge samplers re-read whatever the palette values now are.
+function reconcileSelection() {
+  const cur = document.documentElement.getAttribute("data-theme");
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(THEME_LS_KEY);
+  } catch {
+    // ignore
+  }
+  const want = resolveTheme(stored);
+  if (want !== cur) document.documentElement.setAttribute("data-theme", want);
+  themeTick.update((n) => n + 1);
+}
+
+// Reconcile with the backend (the source of truth) once per window, then keep
+// this window's injected palettes in sync when the set changes elsewhere. Fired
+// (not awaited) from initTheme; a non-Tauri context or a failed call just leaves
+// the mirror-injected palettes standing.
+let hydratedUserThemes = false;
+async function hydrateUserThemes() {
+  if (hydratedUserThemes) return;
+  hydratedUserThemes = true;
+  try {
+    applyUserThemes(await invoke<ThemeData[]>("get_user_themes"));
+    reconcileSelection();
+  } catch {
+    // ignore; mirror-injected palettes stand
+  }
+  try {
+    await listen<ThemeData[]>("user-themes", (e) => {
+      applyUserThemes(e.payload ?? []);
+      reconcileSelection();
+    });
+  } catch {
+    // ignore
+  }
+}
 
 // Select the color palette. "auto" follows the OS via prefers-color-scheme.
 // Stores the raw id (including "auto") so a reload re-resolves against the
@@ -160,6 +242,14 @@ export function previewTheme(t: Theme) {
 // localStorage mirror; the async config load re-applies the authoritative value
 // a moment later (a no-op when they agree). Call at the top of every entry module.
 export function initTheme() {
+  // Inject the user palettes from the mirror and register their ids FIRST, so a
+  // selected custom theme both resolves to itself (not auto) and has a palette
+  // to paint on this very first frame. Then reconcile with the backend async.
+  const mirror = readUserThemesMirror();
+  injectUserThemes(mirror);
+  userThemeIds.clear();
+  for (const t of mirror) userThemeIds.add(t.id);
+
   let stored: string | null = null;
   try {
     stored = localStorage.getItem(THEME_LS_KEY);
@@ -167,6 +257,8 @@ export function initTheme() {
     // ignore; fall through to the default palette until config loads
   }
   document.documentElement.setAttribute("data-theme", resolveTheme(stored));
+
+  void hydrateUserThemes();
 }
 
 // Under "auto" the OS flipping light/dark swaps every CSS variable without

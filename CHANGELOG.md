@@ -4,7 +4,7 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
-## [0.2.4] - Unreleased
+## [0.2.4] - 2026-09-11
 
 ### Added
 - Codex (OpenAI) session support alongside Claude Code. Codex sessions appear in

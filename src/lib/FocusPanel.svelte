@@ -12,6 +12,7 @@
     onRename,
     onOpenSession,
     onOpenProject,
+    onOpenCompact,
     showPrompt = true,
     linksEnabled = true,
   }: {
@@ -20,6 +21,8 @@
     onRename: () => void;
     onOpenSession: () => void;
     onOpenProject: () => void;
+    /** Open the compaction summary reader for this session. */
+    onOpenCompact?: () => void;
     /** Show the session's latest prompt under its title. */
     showPrompt?: boolean;
     /** Titles open the Explorer on click. Off: plain text (dbl-click still renames). */
@@ -119,6 +122,21 @@
       >
     </div>
   </div>
+
+  {#if session.compact}
+    <button
+      class="compact"
+      onclick={() => onOpenCompact?.()}
+      title={t("main.compactTip")}
+    >
+      <span class="cico">⟳</span>
+      <span class="cmain"
+        >{t("main.compacted")} <span class="csz">{fmtK(session.compact.pre)}<span class="carr">&rarr;</span>{fmtK(session.compact.post)}</span></span
+      >
+      <span class="cago">{fmtAgo(Math.floor(session.compact.tsMs / 1000))}</span>
+      <span class="cread">{t("main.compactRead")}</span>
+    </button>
+  {/if}
 
   <History {samples} target={session.target} onHover={(h) => (hov = h)} />
 
@@ -344,6 +362,66 @@
     font-family: var(--font-num);
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;
+  }
+  /* Recent-compaction strip: a full-width bar under the gauge, present for ~3
+     turns after a /compact. Click opens the summary reader. */
+  .compact {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    width: 100%;
+    margin: 2px 0 3px;
+    padding: 3px 6px;
+    background: var(--panel-2, rgba(127, 127, 127, 0.1));
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    color: var(--fg);
+    font: inherit;
+    font-size-adjust: var(--font-ui-adj);
+    font-size: calc(10px * var(--size-ui));
+    text-align: left;
+    cursor: pointer;
+  }
+  .compact:hover {
+    border-color: var(--muted);
+  }
+  .compact .cico {
+    flex: 0 0 auto;
+    color: var(--g1);
+    font-weight: var(--w-bold);
+  }
+  .compact .cmain {
+    flex: 0 1 auto;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .compact .csz {
+    color: var(--fg);
+    font-weight: var(--w-semibold);
+    font-family: var(--font-num);
+    font-size-adjust: var(--font-num-adj);
+    font-variant-numeric: tabular-nums;
+  }
+  .compact .carr {
+    margin: 0 2px;
+    color: var(--muted);
+  }
+  .compact .cago {
+    flex: 0 0 auto;
+    margin-left: auto;
+    color: var(--muted);
+    opacity: 0.8;
+    font-family: var(--font-num);
+    font-size-adjust: var(--font-num-adj);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .compact .cread {
+    flex: 0 0 auto;
+    color: var(--g1);
+    white-space: nowrap;
   }
   .subtitle {
     margin-top: 4px;

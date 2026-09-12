@@ -103,6 +103,15 @@ fn get_history(id: String) -> Vec<scan::Sample> {
     scan::session_history(&id)
 }
 
+/// The latest compaction's summary text + boundary metadata for one session, shown
+/// when the user clicks the "just compacted" banner. Reads more of the transcript
+/// than the poll path, so it is fetched only on demand. None for Codex or when the
+/// session has no compaction/summary.
+#[tauri::command]
+fn get_compact_summary(id: String) -> Option<scan::CompactSummary> {
+    scan::compact_summary(&id)
+}
+
 /// Per-day, per-project spend totals for the Daily Spend overview (months + days).
 /// A tiny aggregate read straight from the persistent per-turn cache (shared with
 /// the Context Explorer); returns empty until the first enrich scan has populated it.
@@ -442,6 +451,7 @@ pub fn run() {
             update::update_apply,
             get_sessions,
             get_history,
+            get_compact_summary,
             get_spend_summary,
             get_spend_day,
             spend_scan,

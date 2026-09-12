@@ -44,6 +44,9 @@ export const en = {
   // back when a line is hovered.
   "main.limits": "target {target} · max {max}",
   "main.spend": "spend",
+  "main.compacted": "Compacted",
+  "main.compactRead": "read summary",
+  "main.compactTip": "Context was compacted. Click to read the summary.",
   "main.context": "context",
   "main.startupFloor": "startup floor",
 
@@ -184,6 +187,11 @@ export const en = {
 
   "common.close": "Close",
   "common.loading": "Loading…",
+
+  "compact.title": "Compaction Summary",
+  "compact.loading": "Loading summary…",
+  "compact.none": "No compaction summary available for this session.",
+  "compact.tokens": "tokens",
 } as const;
 
 // `Record<keyof typeof en, Msg>` rather than `typeof en`: `as const` makes the

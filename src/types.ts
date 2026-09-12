@@ -18,6 +18,24 @@ export interface Session {
   sizeBytes: number; // transcript .jsonl size on disk
   costUsd: number; // cumulative estimated spend so far, USD
   focused: boolean; // open in the Claude app right now (transient; bold + pinned top)
+  compact?: Compact | null; // set for ~3 turns after a /compact; drives the compact strip
+}
+
+// A recent compaction on a session (within 3 post-compact turns). The gauge strip
+// shows pre->post size; the full summary text is fetched lazily on click.
+export interface Compact {
+  pre: number; // context tokens just before the compaction
+  post: number; // context tokens just after
+  turnsSince: number; // assistant turns since the boundary, 0..3
+  tsMs: number; // boundary timestamp, epoch ms
+}
+
+// The full compaction summary, fetched on demand for the reader window.
+export interface CompactSummary {
+  pre: number;
+  post: number;
+  tsMs: number;
+  text: string; // the isCompactSummary message content (plain string)
 }
 
 // One time-sample of a session, accumulated client-side for the history graph.

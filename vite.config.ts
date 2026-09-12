@@ -18,6 +18,7 @@ export default defineConfig({
         dailyspend: resolve(__dirname, "dailyspend.html"),
         themes: resolve(__dirname, "themes.html"),
         fonts: resolve(__dirname, "fonts.html"),
+        compact: resolve(__dirname, "compact.html"),
       },
     },
   },

@@ -183,6 +183,9 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, focused: O
         size_bytes,
         cost_usd,
         focused: is_focused,
+        // Codex rollouts have no plaintext compaction summary (it is encrypted),
+        // so recent-compaction data is unavailable for Codex sessions.
+        compact: None,
     }
 }
 

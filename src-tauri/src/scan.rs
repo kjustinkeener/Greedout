@@ -175,6 +175,42 @@ pub struct Session {
     /// Currently open in the Claude app: pinned to top and shown bold. Transient
     /// (re-read each poll); not persisted, so it reverts on switching away.
     pub focused: bool,
+    /// Present only in the brief window right after a /compact: the latest
+    /// compaction's pre/post token counts, how many assistant turns have landed
+    /// since (0..=3), and its timestamp. None once more than 3 turns have passed
+    /// (or for Codex, which has no plaintext compaction). See `Compact`.
+    pub compact: Option<Compact>,
+}
+
+/// Recent-compaction data for the "just compacted" banner. Populated by the tail
+/// scan only while the newest `compact_boundary` is within the last few assistant
+/// turns of EOF (the show-window rule); the full summary text is fetched lazily on
+/// click via `compact_summary`, not carried here.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Compact {
+    /// Context size just BEFORE the compaction (`compactMetadata.preTokens`).
+    pub pre: u64,
+    /// Context size just AFTER the compaction (`compactMetadata.postTokens`).
+    pub post: u64,
+    /// Assistant-usage turns that have landed since the boundary: 0 = just
+    /// compacted (no new turn yet), through 3 = the third post-compact turn.
+    pub turns_since: u32,
+    /// Boundary timestamp in epoch milliseconds.
+    pub ts_ms: i64,
+}
+
+/// The latest compaction's summary text plus its boundary metadata, returned by
+/// the `get_compact_summary` command on click. Reads more of the transcript than
+/// the poll path, so it lives outside `Compact`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompactSummary {
+    pub pre: u64,
+    pub post: u64,
+    pub ts_ms: i64,
+    /// The `isCompactSummary` user record's plain-string summary (~14k chars).
+    pub text: String,
 }
 
 /// One point on the focus panel's over-time graph: context size and cumulative
@@ -194,6 +230,9 @@ struct Tailed {
     title: Option<String>,
     subtitle: Option<String>,
     cwd: Option<String>,
+    /// Set only when the newest `compact_boundary` is within 3 assistant turns of
+    /// EOF (the show-window rule); None otherwise. See `Compact`.
+    compact: Option<Compact>,
 }
 
 fn now_secs() -> u64 {
@@ -473,6 +512,7 @@ fn build_session(
         size_bytes,
         cost_usd,
         focused: is_focused,
+        compact: t.compact,
     }
 }
 
@@ -750,7 +790,27 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
     }
 
     let mut out = Tailed::default();
+    // Recent-compaction detection, independent of the ctx logic below. Scanning
+    // backward from EOF, count assistant-usage turns until we reach a
+    // `compact_boundary`; that count is `turns_since`. The show-window rule only
+    // keeps the boundary when it lies within 3 turns of EOF, so once the count
+    // passes 3 we stop looking (keeps this tail-bounded and cheap).
+    let mut turns_since: u32 = 0;
+    let mut compact_done = false;
     for line in lines.iter().rev() {
+        if !compact_done {
+            if line.contains("\"assistant\"") && line.contains("\"usage\"") {
+                turns_since = turns_since.saturating_add(1);
+                if turns_since > 3 {
+                    compact_done = true;
+                }
+            } else if line.contains("compact_boundary") {
+                if let Some((pre, post, ts_ms)) = parse_compact_boundary(line) {
+                    out.compact = Some(Compact { pre, post, turns_since, ts_ms });
+                }
+                compact_done = true;
+            }
+        }
         // A /compact leaves the old (large) pre-compact usage records in the
         // transcript. Scanning backward, the first thing we hit is the truth:
         // a post-compact assistant usage (real current size) OR, if none has
@@ -1240,6 +1300,78 @@ fn parse_post_tokens(line: &str) -> Option<u64> {
         .and_then(Value::as_u64)
 }
 
+/// Parse a `compact_boundary` system record into `(preTokens, postTokens,
+/// timestamp_ms)`. pre/post default to 0 when the field is absent; the timestamp
+/// to 0 when unparseable. None for any line that is not a compact_boundary.
+fn parse_compact_boundary(line: &str) -> Option<(u64, u64, i64)> {
+    let v: Value = serde_json::from_str(line).ok()?;
+    if v.get("subtype")?.as_str()? != "compact_boundary" {
+        return None;
+    }
+    let meta = v.get("compactMetadata");
+    let pre = meta.and_then(|m| m.get("preTokens")).and_then(Value::as_u64).unwrap_or(0);
+    let post = meta.and_then(|m| m.get("postTokens")).and_then(Value::as_u64).unwrap_or(0);
+    let ts_ms = v.get("timestamp").and_then(Value::as_str).and_then(iso_to_millis).unwrap_or(0);
+    Some((pre, post, ts_ms))
+}
+
+/// The `message.content` summary text of an `isCompactSummary` user record. It is
+/// normally a plain string (~14k chars); an array-of-blocks shape is handled as a
+/// fallback by concatenating each block's `text`. None for any other record.
+fn parse_compact_summary_text(line: &str) -> Option<String> {
+    let v: Value = serde_json::from_str(line).ok()?;
+    if v.get("isCompactSummary").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    let content = v.get("message").and_then(|m| m.get("content"))?;
+    if let Some(s) = content.as_str() {
+        return Some(s.to_string());
+    }
+    if let Some(arr) = content.as_array() {
+        let joined = arr
+            .iter()
+            .filter_map(|b| b.get("text").and_then(Value::as_str))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if !joined.is_empty() {
+            return Some(joined);
+        }
+    }
+    None
+}
+
+/// The latest compaction's summary text plus its boundary metadata for one Claude
+/// session, or None if the session has no compaction (or is Codex, whose id never
+/// resolves to a `~/.claude` transcript, and whose summary is encrypted anyway).
+/// May read the whole transcript -- only called on click, never in the poll loop.
+pub fn compact_summary(id: &str) -> Option<CompactSummary> {
+    let path = transcript_path(id)?;
+    let text = std::fs::read_to_string(&path).ok()?;
+    // A session can compact multiple times; keep the LATEST boundary and the
+    // `isCompactSummary` record that immediately follows it.
+    let mut latest: Option<(u64, u64, i64)> = None;
+    let mut summary: Option<String> = None;
+    let mut awaiting = false;
+    for line in text.lines() {
+        if line.contains("compact_boundary") {
+            if let Some(b) = parse_compact_boundary(line) {
+                latest = Some(b);
+                summary = None;
+                awaiting = true;
+                continue;
+            }
+        }
+        if awaiting && line.contains("isCompactSummary") {
+            if let Some(s) = parse_compact_summary_text(line) {
+                summary = Some(s);
+                awaiting = false;
+            }
+        }
+    }
+    let (pre, post, ts_ms) = latest?;
+    Some(CompactSummary { pre, post, ts_ms, text: summary.unwrap_or_default() })
+}
+
 /// Pull a top-level string field out of a one-line JSON record.
 fn parse_field(line: &str, key: &str) -> Option<String> {
     let v: Value = serde_json::from_str(line).ok()?;
@@ -1427,6 +1559,56 @@ mod tests {
         let out = scan_tail_buf(buf.as_bytes(), false);
         // ctx = input + cache_creation + cache_read = 20000.
         assert_eq!(out.ctx, Some(20000));
+    }
+
+    // --- recent-compaction detection (turns_since + show-window rule) ---
+
+    fn boundary(pre: u64, post: u64, ts: &str) -> String {
+        format!(
+            r#"{{"type":"system","subtype":"compact_boundary","timestamp":"{ts}","compactMetadata":{{"trigger":"manual","preTokens":{pre},"postTokens":{post}}}}}"#
+        )
+    }
+
+    #[test]
+    fn compact_detection_just_compacted_zero_turns() {
+        // Boundary is the last record: no assistant turn has landed since it.
+        let b = boundary(174000, 12052, "2026-09-10T01:00:00.000Z");
+        let out = scan_tail_buf(format!("{b}\n").as_bytes(), false);
+        let c = out.compact.expect("compact must be set right after a boundary");
+        assert_eq!(c.pre, 174000);
+        assert_eq!(c.post, 12052);
+        assert_eq!(c.turns_since, 0);
+        assert_eq!(c.ts_ms, iso_to_millis("2026-09-10T01:00:00.000Z").unwrap());
+    }
+
+    #[test]
+    fn compact_detection_counts_turns_since_within_window() {
+        // Boundary then three post-compact assistant-usage turns: turns_since == 3,
+        // still inside the show-window (<= 3), so compact is populated.
+        let b = boundary(174000, 12052, "2026-09-10T01:00:00.000Z");
+        let t1 = assistant("t1", "claude-opus-4-8", "2026-09-10T01:01:00.000Z", 13000, 100);
+        let t2 = assistant("t2", "claude-opus-4-8", "2026-09-10T01:02:00.000Z", 14000, 100);
+        let t3 = assistant("t3", "claude-opus-4-8", "2026-09-10T01:03:00.000Z", 15000, 100);
+        let out = scan_tail_buf(format!("{b}\n{t1}\n{t2}\n{t3}\n").as_bytes(), false);
+        let c = out.compact.expect("compact must be set at turns_since == 3");
+        assert_eq!(c.turns_since, 3);
+        assert_eq!(c.pre, 174000);
+        assert_eq!(c.post, 12052);
+    }
+
+    #[test]
+    fn compact_detection_none_past_show_window() {
+        // A fourth post-compact turn pushes the boundary past the show-window rule:
+        // compact must be None (banner no longer shown).
+        let b = boundary(174000, 12052, "2026-09-10T01:00:00.000Z");
+        let mut buf = format!("{b}\n");
+        for i in 1..=4 {
+            let a = assistant(&format!("t{i}"), "claude-opus-4-8", "2026-09-10T01:0{i}:00.000Z", 13000, 100);
+            buf.push_str(&a);
+            buf.push('\n');
+        }
+        let out = scan_tail_buf(buf.as_bytes(), false);
+        assert!(out.compact.is_none(), "boundary >3 turns from EOF must not populate compact");
     }
 
     #[test]

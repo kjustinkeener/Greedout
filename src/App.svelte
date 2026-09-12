@@ -144,6 +144,59 @@
     });
   }
 
+  // Open the compaction-summary reader for a session in its own window. Reuse the
+  // window if already open (only the focused session shows a strip, so there is
+  // effectively one reader at a time).
+  async function openCompact(s: Session) {
+    const q = new URLSearchParams({ id: s.id, title: `${s.title} · ${s.project}` });
+    const url = `compact.html?${q.toString()}`;
+    const existing = await WebviewWindow.getByLabel("compact");
+    if (existing) {
+      try {
+        await existing.unminimize();
+        await existing.show();
+        await existing.setFocus();
+        return;
+      } catch {
+        try {
+          await existing.close();
+        } catch {
+          // already gone
+        }
+      }
+    }
+    let pos: { x: number; y: number } | undefined;
+    try {
+      const sf = await appWindow.scaleFactor();
+      const p = (await appWindow.outerPosition()).toLogical(sf);
+      pos = { x: Math.round(p.x + 24), y: Math.round(p.y + 24) };
+    } catch {
+      // Position unavailable; let the OS place it.
+    }
+    const aot = (await invoke<Config>("get_config").catch(() => null))?.always_on_top ?? true;
+    const w = new WebviewWindow("compact", {
+      url,
+      title: "Compaction Summary",
+      width: 560,
+      height: 520,
+      resizable: true,
+      alwaysOnTop: aot,
+      focus: true,
+      ...(pos ? { x: pos.x, y: pos.y } : {}),
+    });
+    placeWindow(w, "compact");
+    void w.once("tauri://error", async () => {
+      const stale = await WebviewWindow.getByLabel("compact");
+      if (stale) {
+        try {
+          await stale.close();
+        } catch {
+          // already gone
+        }
+      }
+    });
+  }
+
   // Open the baseline-context analysis in its own window (2x the gauge window,
   // separate from it) for the session open in the Claude app, or the most-recent
   // one if none is focused. Reuse the window if it's already open.
@@ -580,6 +633,7 @@
           onRename={() => rename(s)}
           onOpenSession={() => openSession(s)}
           onOpenProject={() => openProject(s)}
+          onOpenCompact={() => openCompact(s)}
           {showPrompt}
           linksEnabled={clickableTitles}
         />

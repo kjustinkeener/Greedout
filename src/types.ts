@@ -28,6 +28,7 @@ export interface Compact {
   post: number; // context tokens just after
   turnsSince: number; // assistant turns since the boundary, 0..3
   tsMs: number; // boundary timestamp, epoch ms
+  hasSummary: boolean; // true (Claude): click opens the reader; false (Codex): summary encrypted, inert strip
 }
 
 // The full compaction summary, fetched on demand for the reader window.

@@ -131,18 +131,25 @@
   {/if}
 
   {#if session.compact}
-    <button
+    <svelte:element
+      this={session.compact.hasSummary ? "button" : "div"}
       class="compact"
-      onclick={() => onOpenCompact?.()}
-      title={t("main.compactTip")}
+      class:static={!session.compact.hasSummary}
+      role={session.compact.hasSummary ? "button" : undefined}
+      onclick={session.compact.hasSummary ? () => onOpenCompact?.() : undefined}
+      title={session.compact.hasSummary ? t("main.compactTip") : undefined}
     >
       <span class="cico"><Icon name="compact" size={12} /></span>
       <span class="cmain"
         >{t("main.compacted")} <span class="csz">{fmtK(session.compact.pre)}<span class="carr">&rarr;</span>{fmtK(session.compact.post)}</span></span
       >
       <span class="cago">{fmtAgo(Math.floor(session.compact.tsMs / 1000))}</span>
-      <span class="cread">{t("main.compactRead")}</span>
-    </button>
+      <span class="cread"
+        >{session.compact.hasSummary
+          ? t("main.compactRead")
+          : t("main.compactEncrypted")}</span
+      >
+    </svelte:element>
   {/if}
 </div>
 
@@ -390,6 +397,19 @@
   }
   .compact:hover {
     background: var(--panel-2, rgba(127, 127, 127, 0.2));
+  }
+  /* Codex: no readable summary, so the band is inert and its trailing label reads
+     as a note rather than a link. */
+  .compact.static {
+    cursor: default;
+  }
+  .compact.static:hover {
+    background: var(--panel-2, rgba(127, 127, 127, 0.12));
+  }
+  .compact.static .cread {
+    color: var(--muted);
+    opacity: 0.8;
+    font-style: italic;
   }
   .compact .cico {
     flex: 0 0 auto;

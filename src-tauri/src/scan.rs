@@ -198,6 +198,11 @@ pub struct Compact {
     pub turns_since: u32,
     /// Boundary timestamp in epoch milliseconds.
     pub ts_ms: i64,
+    /// True when the plaintext summary is readable on click (Claude Code). False
+    /// for Codex, whose compaction summary is encrypted on disk: the strip still
+    /// shows the pre/post sizes and time, but the reader link becomes a static
+    /// "summary encrypted" note.
+    pub has_summary: bool,
 }
 
 /// The latest compaction's summary text plus its boundary metadata, returned by
@@ -815,7 +820,7 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
                 // record shape) parses to None -- ignore it and keep scanning
                 // back to the genuine boundary.
                 if let Some((pre, post, ts_ms)) = parse_compact_boundary(line) {
-                    out.compact = Some(Compact { pre, post, turns_since, ts_ms });
+                    out.compact = Some(Compact { pre, post, turns_since, ts_ms, has_summary: true });
                     compact_done = true;
                 }
             } else if is_user_prompt(line) {

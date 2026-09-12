@@ -18,7 +18,7 @@
 
 use crate::config::{codex_dir, Config};
 use crate::scan::{
-    downsample, iso_to_millis, last_component, model_info, Sample, Session,
+    downsample, iso_to_millis, last_component, model_info, Compact, Sample, Session,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -128,6 +128,16 @@ struct Tailed {
     /// (`model_context_window`, e.g. 258400 = 272000 tier × 95% effective), read
     /// from the rollout itself rather than the model's API-ceiling `context_max`.
     window: Option<u64>,
+    /// Recent-compaction strip data: the newest `compacted` boundary while it is
+    /// still within the last few prompts of EOF. `has_summary` is always false --
+    /// Codex compaction summaries are encrypted on disk, so the strip shows sizes
+    /// and time but no reader.
+    compact: Option<Compact>,
+    /// True once the compaction question is settled for the current window: a
+    /// boundary was found, more than 3 prompts have passed, or the whole file was
+    /// read. Gates the tail-scan grow loop so it walks back far enough to reach a
+    /// boundary hidden behind a large tool-output burst (see scan.rs).
+    compact_resolved: bool,
 }
 
 /// Build one Codex session row for the poll list. Mirrors scan::build_session but
@@ -183,9 +193,10 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, focused: O
         size_bytes,
         cost_usd,
         focused: is_focused,
-        // Codex rollouts have no plaintext compaction summary (it is encrypted),
-        // so recent-compaction data is unavailable for Codex sessions.
-        compact: None,
+        // The recent-compaction strip: sizes + time from the tail scan. Its
+        // `has_summary` is false, so the reader link renders as "summary encrypted"
+        // (Codex compaction summaries are not stored in the clear).
+        compact: t.compact,
     }
 }
 
@@ -205,7 +216,9 @@ fn tail_scan(path: &Path) -> Option<Tailed> {
         let mut buf = Vec::with_capacity((len - start) as usize);
         file.read_to_end(&mut buf).ok()?;
         let out = scan_tail_buf(&buf, start > 0);
-        if (out.ctx.is_some() && out.model.is_some() && out.cwd.is_some()) || start == 0 {
+        if (out.ctx.is_some() && out.model.is_some() && out.cwd.is_some() && out.compact_resolved)
+            || start == 0
+        {
             return Some(out);
         }
         win = win.saturating_mul(8);
@@ -229,7 +242,34 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
     // brief just-compacted gap. Analog of scan.rs's Claude `compact_boundary` fix
     // (Claude has `postTokens`; Codex's `compacted` record carries no post count).
     let mut compacted = false;
+    // Recent-compaction strip (separate from the ctx-gap `compacted` flag above,
+    // which only fires when no post-compact usage exists yet). Scanning backward,
+    // every `token_usage_record` seen before the boundary is NEWER than it, so the
+    // last one written before we hit the boundary is the first post-compact size;
+    // the first usage seen AFTER the boundary is the pre-compact size. `has_summary`
+    // is false: Codex's summary is encrypted, so the strip carries sizes + time only.
+    let mut boundary_found = false;
+    let mut boundary_ts: Option<i64> = None;
+    let mut post_after: Option<u64> = None;
+    let mut pre_before: Option<u64> = None;
+    let mut prompts_since: u32 = 0;
     for line in lines.iter().rev() {
+        if !boundary_found {
+            if is_codex_user_prompt(line) {
+                prompts_since = prompts_since.saturating_add(1);
+            } else if line.contains("\"compacted\"") && is_record_type(line, "compacted") {
+                boundary_found = true;
+                boundary_ts = line_ts_ms(line);
+            } else if line.contains("\"token_usage_record\"") {
+                if let Some((c, _)) = usage_from(line) {
+                    post_after = Some(c);
+                }
+            }
+        } else if pre_before.is_none() && line.contains("\"token_usage_record\"") {
+            if let Some((c, _)) = usage_from(line) {
+                pre_before = Some(c);
+            }
+        }
         if !compacted
             && out.ctx.is_none()
             && line.contains("\"compacted\"")
@@ -263,15 +303,38 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
         if out.window.is_none() && line.contains("model_context_window") {
             out.window = window_from(line);
         }
+        // Compaction is "settled" once the boundary and its pre-compact usage are
+        // both in hand, or once more than 3 prompts have passed (boundary too old to
+        // show). Only then may we stop early; otherwise keep walking so a boundary
+        // hidden behind a big tool-output burst is still reached.
+        let compact_settled = (boundary_found && pre_before.is_some()) || prompts_since > 3;
         if (out.ctx.is_some() || compacted)
             && out.thread.is_some()
             && out.model.is_some()
             && out.cwd.is_some()
             && out.window.is_some()
+            && compact_settled
         {
             break;
         }
     }
+    // Only surface the strip once the post-compact size exists (the next turn's
+    // usage record). Codex writes no post count in the boundary itself, so in the
+    // brief just-compacted gap `post` is unknown; showing "->0k" would be a lie, and
+    // the gauge already reads "--" during that gap. It fills in one turn later.
+    if boundary_found && prompts_since <= 3 {
+        if let (Some(ts_ms), Some(post), Some(pre)) = (boundary_ts, post_after, pre_before) {
+            out.compact = Some(Compact {
+                pre,
+                post,
+                turns_since: prompts_since,
+                ts_ms,
+                has_summary: false,
+            });
+        }
+    }
+    out.compact_resolved =
+        (boundary_found && pre_before.is_some()) || prompts_since > 3 || !partial_start;
     out
 }
 
@@ -283,6 +346,35 @@ fn is_record_type(line: &str, want: &str) -> bool {
         .ok()
         .and_then(|v| v.get("type").and_then(Value::as_str).map(|t| t == want))
         .unwrap_or(false)
+}
+
+/// True when a line is a genuine typed user prompt: an `event_msg` carrying an
+/// `item_completed` whose item is a `UserMessage`. This is the same record the chat
+/// extractor and search treat as the user's turn, so tool outputs and injected
+/// context (different item types) don't inflate the post-compaction prompt count.
+fn is_codex_user_prompt(line: &str) -> bool {
+    if !line.contains("\"UserMessage\"") || !line.contains("item_completed") {
+        return false;
+    }
+    let Ok(v) = serde_json::from_str::<Value>(line) else {
+        return false;
+    };
+    let p = v.get("payload");
+    if p.and_then(|p| p.get("type")).and_then(Value::as_str) != Some("item_completed") {
+        return false;
+    }
+    p.and_then(|p| p.get("item"))
+        .and_then(|i| i.get("type"))
+        .and_then(Value::as_str)
+        == Some("UserMessage")
+}
+
+/// A record's own leading ISO-Z `timestamp` in epoch milliseconds.
+fn line_ts_ms(line: &str) -> Option<i64> {
+    let v: Value = serde_json::from_str(line).ok()?;
+    v.get("timestamp")
+        .and_then(Value::as_str)
+        .and_then(iso_to_millis)
 }
 
 /// The enforced per-session context window from a line that carries
@@ -731,6 +823,71 @@ mod tests {
         p.push(format!("gxc_{}_{n}.jsonl", std::process::id()));
         std::fs::write(&p, content).unwrap();
         p
+    }
+
+    /// A genuine typed Codex prompt (event_msg / item_completed / UserMessage).
+    fn codex_prompt(text: &str) -> String {
+        format!(
+            r#"{{"timestamp":"2026-09-10T05:07:00.000Z","type":"event_msg","payload":{{"type":"item_completed","item":{{"type":"UserMessage","content":[{{"type":"text","text":"{text}"}}]}}}}}}"#
+        )
+    }
+
+    fn usage_rec(ctx: u64) -> String {
+        format!(
+            r#"{{"timestamp":"2026-09-10T05:07:10.000Z","type":"token_usage_record","payload":{{"usage":{{"input_tokens":{ctx},"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}},"thread_token_usage":{{"input_tokens":{ctx},"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}}}}"#
+        )
+    }
+
+    const BOUNDARY: &str =
+        r#"{"timestamp":"2026-09-10T05:06:55.487Z","type":"compacted","payload":{"message":""}}"#;
+
+    // --- scan_tail_buf: recent-compaction strip ---
+
+    #[test]
+    fn compact_strip_within_window_has_sizes_time_and_no_summary() {
+        // Oldest -> newest: pre-compact usage, the boundary, post-compact usage, then
+        // one real prompt. The strip must carry pre/post sizes, the boundary time, a
+        // turn count of 1, and has_summary=false (Codex summary is encrypted).
+        let buf = format!(
+            "{}\n{}\n{}\n{}\n",
+            usage_rec(226000),
+            BOUNDARY,
+            usage_rec(27000),
+            codex_prompt("keep going")
+        );
+        let out = scan_tail_buf(buf.as_bytes(), false);
+        let c = out.compact.expect("strip present within the show window");
+        assert_eq!(c.pre, 226000);
+        assert_eq!(c.post, 27000);
+        assert_eq!(c.turns_since, 1);
+        assert!(!c.has_summary, "Codex compaction summary is encrypted");
+        assert_eq!(c.ts_ms, iso_to_millis("2026-09-10T05:06:55.487Z").unwrap());
+    }
+
+    #[test]
+    fn compact_strip_none_more_than_three_prompts_past_boundary() {
+        // Four prompts after the boundary: it has scrolled out of the show window.
+        let buf = format!(
+            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n",
+            usage_rec(226000),
+            BOUNDARY,
+            usage_rec(27000),
+            codex_prompt("one"),
+            codex_prompt("two"),
+            codex_prompt("three"),
+            codex_prompt("four"),
+        );
+        let out = scan_tail_buf(buf.as_bytes(), false);
+        assert!(out.compact.is_none(), "boundary is older than 3 prompts");
+    }
+
+    #[test]
+    fn compact_strip_absent_in_gap_before_post_size_exists() {
+        // Right after the boundary, before the next turn writes a usage record, the
+        // post-compact size is unknown; showing "->0k" would lie, so no strip yet.
+        let buf = format!("{}\n{}\n", usage_rec(226000), BOUNDARY);
+        let out = scan_tail_buf(buf.as_bytes(), false);
+        assert!(out.compact.is_none(), "no strip until the post size is known");
     }
 
     // --- scan_tail_buf: compaction semantics (session bug-fixes) ---

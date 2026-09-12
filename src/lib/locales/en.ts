@@ -47,6 +47,7 @@ export const en = {
   "main.compacted": "Compacted",
   "main.compactRead": "read summary",
   "main.compactTip": "Context was compacted. Click to read the summary.",
+  "main.compactEncrypted": "summary encrypted",
   "main.context": "context",
   "main.startupFloor": "startup floor",
 

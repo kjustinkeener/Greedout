@@ -4,6 +4,15 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
+## [Unreleased]
+
+### Added
+- The recent-compaction strip now appears for Codex sessions too. Codex writes no
+  post-compact size in the boundary record and encrypts the summary, so the strip
+  fills in one turn later (once the post size exists) and its trailing label reads
+  "summary encrypted" instead of a reader link, but the pre and post sizes and the
+  time since the compaction are shown the same as for Claude Code.
+
 ## [0.2.6] - 2026-09-12
 
 ### Added

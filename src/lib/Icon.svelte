@@ -24,6 +24,7 @@
     | "home"
     | "search"
     | "bar-chart"
+    | "compact"
     | "arrow-up";
 
   const PATHS: Record<IconName, string[]> = {
@@ -46,6 +47,9 @@
     home: ["M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", "M9 22V12h6v10"],
     search: ["M18 11a7 7 0 1 1-14 0 7 7 0 1 1 14 0", "M16.5 16.5 21 21"],
     "bar-chart": ["M18 20V10", "M12 20V4", "M6 20v-6", "M3 20h18"],
+    // Three bars narrowing top to bottom: content pressed into less space --
+    // compaction.
+    compact: ["M3 6h18", "M6 12h12", "M9 18h6"],
   };
 </script>
 

@@ -2,6 +2,7 @@
   import type { Session, Sample, HistHover } from "../types";
   import Speedo from "./Speedo.svelte";
   import History from "./History.svelte";
+  import Icon from "./Icon.svelte";
   import { gaugeColor, spendFor, spendOverride, themeTick } from "./theme";
   import { agoTip, ctxTip, limitsTip, modelTip, sizeTip, moneyTip, spendTip } from "./tips";
   import { t } from "./i18n.svelte";
@@ -123,25 +124,25 @@
     </div>
   </div>
 
+  <History {samples} target={session.target} onHover={(h) => (hov = h)} />
+
+  {#if showPrompt && session.subtitle}
+    <div class="subtitle">{session.subtitle}</div>
+  {/if}
+
   {#if session.compact}
     <button
       class="compact"
       onclick={() => onOpenCompact?.()}
       title={t("main.compactTip")}
     >
-      <span class="cico">⟳</span>
+      <span class="cico"><Icon name="compact" size={12} /></span>
       <span class="cmain"
         >{t("main.compacted")} <span class="csz">{fmtK(session.compact.pre)}<span class="carr">&rarr;</span>{fmtK(session.compact.post)}</span></span
       >
       <span class="cago">{fmtAgo(Math.floor(session.compact.tsMs / 1000))}</span>
       <span class="cread">{t("main.compactRead")}</span>
     </button>
-  {/if}
-
-  <History {samples} target={session.target} onHover={(h) => (hov = h)} />
-
-  {#if showPrompt && session.subtitle}
-    <div class="subtitle">{session.subtitle}</div>
   {/if}
 </div>
 
@@ -363,18 +364,23 @@
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;
   }
-  /* Recent-compaction strip: a full-width bar under the gauge, present for ~3
-     turns after a /compact. Click opens the summary reader. */
+  /* Recent-compaction strip: a full-bleed band at the very bottom of the panel,
+     present for ~3 prompts after a /compact. It breaks out of the panel padding
+     to reach both side edges and the bottom border, so the panel's left gradient
+     bar (::before) runs down its left too and it reads as part of the same box.
+     Click opens the summary reader. */
   .compact {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 6px;
-    width: 100%;
-    margin: 2px 0 3px;
-    padding: 3px 6px;
-    background: var(--panel-2, rgba(127, 127, 127, 0.1));
-    border: 1px solid var(--edge);
-    border-radius: 4px;
+    /* Full-bleed: an auto-width block only SHIFTS under negative side margins
+       (flush left, short right), so widen it explicitly to cover both paddings. */
+    width: calc(100% + 20px);
+    margin: 8px -10px -10px;
+    padding: 5px 10px;
+    background: var(--panel-2, rgba(127, 127, 127, 0.12));
+    border: none;
+    border-top: 1px solid var(--edge);
     color: var(--fg);
     font: inherit;
     font-size-adjust: var(--font-ui-adj);
@@ -383,12 +389,13 @@
     cursor: pointer;
   }
   .compact:hover {
-    border-color: var(--muted);
+    background: var(--panel-2, rgba(127, 127, 127, 0.2));
   }
   .compact .cico {
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
     color: var(--g1);
-    font-weight: var(--w-bold);
   }
   .compact .cmain {
     flex: 0 1 auto;

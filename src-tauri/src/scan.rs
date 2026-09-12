@@ -183,8 +183,8 @@ pub struct Session {
 }
 
 /// Recent-compaction data for the "just compacted" banner. Populated by the tail
-/// scan only while the newest `compact_boundary` is within the last few assistant
-/// turns of EOF (the show-window rule); the full summary text is fetched lazily on
+/// scan only while the newest `compact_boundary` is within the last few user
+/// prompts of EOF (the show-window rule); the full summary text is fetched lazily on
 /// click via `compact_summary`, not carried here.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -193,8 +193,8 @@ pub struct Compact {
     pub pre: u64,
     /// Context size just AFTER the compaction (`compactMetadata.postTokens`).
     pub post: u64,
-    /// Assistant-usage turns that have landed since the boundary: 0 = just
-    /// compacted (no new turn yet), through 3 = the third post-compact turn.
+    /// Genuine user prompts that have landed since the boundary: 0 = just
+    /// compacted (no new prompt yet), through 3 = the third post-compact prompt.
     pub turns_since: u32,
     /// Boundary timestamp in epoch milliseconds.
     pub ts_ms: i64,
@@ -230,9 +230,16 @@ struct Tailed {
     title: Option<String>,
     subtitle: Option<String>,
     cwd: Option<String>,
-    /// Set only when the newest `compact_boundary` is within 3 assistant turns of
+    /// Set only when the newest `compact_boundary` is within 3 user prompts of
     /// EOF (the show-window rule); None otherwise. See `Compact`.
     compact: Option<Compact>,
+    /// True once the compaction question is settled for this buffer: either the
+    /// boundary was found, more than 3 genuine prompts were counted (window
+    /// passed), or the buffer reached byte 0 (whole file seen). While false the
+    /// caller must grow the window -- the boundary can sit far from EOF behind a
+    /// burst of large tool-output records, so ctx/subtitle being found is not
+    /// enough to stop. See the grow loop in `tail_scan`.
+    compact_resolved: bool,
 }
 
 fn now_secs() -> u64 {
@@ -769,8 +776,11 @@ fn tail_scan(path: &Path) -> Option<Tailed> {
         // turn's last-prompt (written when the prompt landed) back past a tail
         // sized for ctx alone -- so without also waiting for the subtitle we'd
         // show a stale prompt. Every session with a prompt has a last-prompt, so
-        // this terminates near EOF rather than forcing a full read.
-        if (out.ctx.is_some() && out.subtitle.is_some()) || start == 0 {
+        // this terminates near EOF rather than forcing a full read. The same
+        // applies to a recent compaction: its boundary can sit far behind a burst
+        // of large tool-output records, so we also wait until `compact_resolved`
+        // (boundary found, >3 prompts counted, or whole file read).
+        if (out.ctx.is_some() && out.subtitle.is_some() && out.compact_resolved) || start == 0 {
             return Some(out);
         }
         win = win.saturating_mul(8);
@@ -799,16 +809,23 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
     let mut compact_done = false;
     for line in lines.iter().rev() {
         if !compact_done {
-            if line.contains("\"assistant\"") && line.contains("\"usage\"") {
+            if line.contains("compact_boundary") {
+                // A real boundary record ends the count; a line that merely
+                // mentions the string (e.g. a compaction summary quoting the
+                // record shape) parses to None -- ignore it and keep scanning
+                // back to the genuine boundary.
+                if let Some((pre, post, ts_ms)) = parse_compact_boundary(line) {
+                    out.compact = Some(Compact { pre, post, turns_since, ts_ms });
+                    compact_done = true;
+                }
+            } else if is_user_prompt(line) {
+                // Count turns the way the user perceives them: one per prompt
+                // they send. A single reply emits many assistant/tool records,
+                // so counting those closed the window almost immediately.
                 turns_since = turns_since.saturating_add(1);
                 if turns_since > 3 {
                     compact_done = true;
                 }
-            } else if line.contains("compact_boundary") {
-                if let Some((pre, post, ts_ms)) = parse_compact_boundary(line) {
-                    out.compact = Some(Compact { pre, post, turns_since, ts_ms });
-                }
-                compact_done = true;
             }
         }
         // A /compact leaves the old (large) pre-compact usage records in the
@@ -827,10 +844,14 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
             }
         }
         if out.ctx.is_none() && line.contains("compact_boundary") {
-            // Seen the boundary before any newer usage: context was reset.
-            // Use its postTokens; fall back to 0 (empty) rather than let a
-            // pre-compact usage further back masquerade as the current size.
-            out.ctx = Some(parse_post_tokens(line).unwrap_or(0));
+            // Seen the boundary before any newer usage: context was reset. Use its
+            // postTokens; fall back to 0 (empty) rather than let a pre-compact
+            // usage further back masquerade as the current size. Guard on a
+            // successful parse so a summary that merely quotes the boundary JSON
+            // in its prose does not zero the gauge.
+            if let Some(post) = parse_post_tokens(line) {
+                out.ctx = Some(post);
+            }
         }
         if out.title.is_none() && line.contains("custom-title") {
             if let Some(v) = parse_field(line, "customTitle") {
@@ -847,15 +868,22 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
                 out.cwd = Some(v);
             }
         }
-        // Stop once we have everything this tail can give us.
+        // Stop once we have everything this tail can give us -- including a
+        // settled compaction answer. Without `compact_done` the loop would break
+        // near EOF and never scan back to a boundary that sits far behind a burst
+        // of large records.
         if out.ctx.is_some()
             && out.title.is_some()
             && out.subtitle.is_some()
             && out.cwd.is_some()
+            && compact_done
         {
             break;
         }
     }
+    // If we never settled the compaction answer, only the whole file (a buffer
+    // that includes byte 0, i.e. not a partial start) is conclusive.
+    out.compact_resolved = compact_done || !partial_start;
     out
 }
 
@@ -1300,6 +1328,24 @@ fn parse_post_tokens(line: &str) -> Option<u64> {
         .and_then(Value::as_u64)
 }
 
+/// A genuine human-typed prompt record, as opposed to a tool result, a
+/// slash-command scaffold, a hook injection, an `isCompactSummary`, or a
+/// sidechain. Used to count post-compact "turns" the way the user perceives
+/// them: one per prompt they send, not one per streamed assistant/tool record
+/// (a single reply emits a dozen of those). Cheap string checks only -- this
+/// runs on every line of the tail buffer.
+fn is_user_prompt(line: &str) -> bool {
+    line.contains("\"type\":\"user\"")
+        && !line.contains("\"tool_result\"")
+        && !line.contains("\"isCompactSummary\"")
+        && !line.contains("\"isMeta\":true")
+        && !line.contains("\"isSidechain\":true")
+        && !line.contains("<command-name>")
+        && !line.contains("<command-message>")
+        && !line.contains("<local-command-stdout>")
+        && !line.contains("<local-command-stderr>")
+}
+
 /// Parse a `compact_boundary` system record into `(preTokens, postTokens,
 /// timestamp_ms)`. pre/post default to 0 when the field is absent; the timestamp
 /// to 0 when unparseable. None for any line that is not a compact_boundary.
@@ -1438,6 +1484,11 @@ mod tests {
         format!(
             r#"{{"type":"assistant","timestamp":"{ts}","message":{{"id":"{id}","model":"{model}","usage":{{"input_tokens":{input},"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":{output}}}}}}}"#
         )
+    }
+
+    /// A genuine typed user prompt (the unit `turns_since` counts).
+    fn user_prompt(text: &str) -> String {
+        format!(r#"{{"type":"user","message":{{"role":"user","content":"{text}"}}}}"#)
     }
 
     // --- model_info: prices, windows, and the "?" fallback ---
@@ -1583,13 +1634,28 @@ mod tests {
 
     #[test]
     fn compact_detection_counts_turns_since_within_window() {
-        // Boundary then three post-compact assistant-usage turns: turns_since == 3,
-        // still inside the show-window (<= 3), so compact is populated.
+        // Boundary then three post-compact prompts, each with a full multi-record
+        // assistant reply between them: turns_since counts the PROMPTS (3), not the
+        // assistant/tool records (which a real reply emits by the dozen). Still
+        // inside the show-window (<= 3), so compact is populated.
         let b = boundary(174000, 12052, "2026-09-10T01:00:00.000Z");
-        let t1 = assistant("t1", "claude-opus-4-8", "2026-09-10T01:01:00.000Z", 13000, 100);
-        let t2 = assistant("t2", "claude-opus-4-8", "2026-09-10T01:02:00.000Z", 14000, 100);
-        let t3 = assistant("t3", "claude-opus-4-8", "2026-09-10T01:03:00.000Z", 15000, 100);
-        let out = scan_tail_buf(format!("{b}\n{t1}\n{t2}\n{t3}\n").as_bytes(), false);
+        let mut buf = format!("{b}\n");
+        for i in 1..=3 {
+            buf.push_str(&user_prompt(&format!("prompt {i}")));
+            buf.push('\n');
+            // A reply is many assistant records; none of them should count.
+            for j in 0..5 {
+                buf.push_str(&assistant(
+                    &format!("t{i}_{j}"),
+                    "claude-opus-4-8",
+                    "2026-09-10T01:01:00.000Z",
+                    13000,
+                    100,
+                ));
+                buf.push('\n');
+            }
+        }
+        let out = scan_tail_buf(buf.as_bytes(), false);
         let c = out.compact.expect("compact must be set at turns_since == 3");
         assert_eq!(c.turns_since, 3);
         assert_eq!(c.pre, 174000);
@@ -1598,17 +1664,73 @@ mod tests {
 
     #[test]
     fn compact_detection_none_past_show_window() {
-        // A fourth post-compact turn pushes the boundary past the show-window rule:
-        // compact must be None (banner no longer shown).
+        // A fourth post-compact prompt pushes the boundary past the show-window
+        // rule: compact must be None (banner no longer shown).
         let b = boundary(174000, 12052, "2026-09-10T01:00:00.000Z");
         let mut buf = format!("{b}\n");
         for i in 1..=4 {
-            let a = assistant(&format!("t{i}"), "claude-opus-4-8", "2026-09-10T01:0{i}:00.000Z", 13000, 100);
-            buf.push_str(&a);
+            buf.push_str(&user_prompt(&format!("prompt {i}")));
             buf.push('\n');
         }
         let out = scan_tail_buf(buf.as_bytes(), false);
-        assert!(out.compact.is_none(), "boundary >3 turns from EOF must not populate compact");
+        assert!(out.compact.is_none(), "boundary >3 prompts from EOF must not populate compact");
+    }
+
+    #[test]
+    fn compact_detection_ignores_command_and_tool_records() {
+        // Slash-command scaffolds and tool_result records are user-type but are NOT
+        // prompts: with only those between EOF and the boundary, turns_since stays 0
+        // and the strip still shows. (Regression: assistant/record counting closed
+        // the window after a single multi-tool reply.)
+        let b = boundary(174000, 12052, "2026-09-10T01:00:00.000Z");
+        let cmd = r#"{"type":"user","message":{"role":"user","content":"<command-name>/compact</command-name>"}}"#;
+        let stdout = r#"{"type":"user","message":{"role":"user","content":"<local-command-stdout>ok</local-command-stdout>"}}"#;
+        let tool = r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"x"}]}}"#;
+        let asst = assistant("a", "claude-opus-4-8", "2026-09-10T01:01:00.000Z", 13000, 100);
+        let buf = format!("{b}\n{cmd}\n{stdout}\n{asst}\n{tool}\n{asst}\n");
+        let out = scan_tail_buf(buf.as_bytes(), false);
+        let c = out.compact.expect("compact must survive command/tool/assistant records");
+        assert_eq!(c.turns_since, 0);
+    }
+
+    #[test]
+    fn compact_detection_summary_prose_does_not_poison() {
+        // The isCompactSummary record can quote the boundary JSON verbatim in its
+        // prose. Scanning backward must skip it (parses to None) and still reach the
+        // real boundary behind it.
+        let b = boundary(174000, 12052, "2026-09-10T01:00:00.000Z");
+        let summary = r#"{"type":"user","isCompactSummary":true,"message":{"content":"...on disk: {\"type\":\"system\",\"subtype\":\"compact_boundary\",\"compactMetadata\":{...}}..."}}"#;
+        let out = scan_tail_buf(format!("{b}\n{summary}\n").as_bytes(), false);
+        let c = out.compact.expect("real boundary must be found behind the summary prose");
+        assert_eq!(c.pre, 174000);
+        assert_eq!(c.turns_since, 0);
+    }
+
+    #[test]
+    fn tail_scan_grows_to_reach_boundary_far_behind_big_records() {
+        // Boundary within the show-window (0 new prompts), but a huge non-usage
+        // record sits between it and EOF. ctx + subtitle are found in the first
+        // 64KB, so the OLD stop condition returned there and never reached the
+        // boundary; the grow loop must keep going until compact_resolved.
+        let dir = std::env::temp_dir().join(format!("greedout_farboundary_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("s.jsonl");
+        let b = boundary(174000, 12052, "2026-09-10T01:00:00.000Z");
+        // 600KB of noise (not a usage / prompt / boundary / last-prompt record):
+        // pushes the boundary several 64KB windows back from EOF.
+        let noise = "x".repeat(600_000);
+        let big = format!(r#"{{"type":"system","subtype":"noise","blob":"{noise}"}}"#);
+        let usage = assistant("a", "claude-opus-4-8", "2026-09-10T01:01:00.000Z", 12100, 10);
+        let sub = r#"{"type":"system","subtype":"last-prompt","lastPrompt":"hi","cwd":"/x"}"#;
+        // top -> bottom: boundary, big noise, small usage (ctx), last-prompt (sub).
+        let body = format!("{b}\n{big}\n{usage}\n{sub}\n");
+        std::fs::write(&path, body).unwrap();
+        let out = tail_scan(&path).expect("tail_scan");
+        std::fs::remove_dir_all(&dir).ok();
+        assert_eq!(out.ctx, Some(12100), "ctx from the small post-noise usage");
+        let c = out.compact.expect("boundary far behind a big record must still be found");
+        assert_eq!(c.pre, 174000);
+        assert_eq!(c.turns_since, 0);
     }
 
     #[test]

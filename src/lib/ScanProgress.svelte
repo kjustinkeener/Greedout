@@ -37,7 +37,8 @@
   }
   function elapsed(st: PhaseState): string {
     if (!st.t0) return "";
-    return `${Math.round((st.end || now) - st.t0)}ms`;
+    const ms = (st.end || now) - st.t0;
+    return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
   }
 
   function cancel() {

@@ -1,16 +1,14 @@
 <script lang="ts">
   // Shared scan-progress panel for the shared-cache build, used by both the Daily
   // Spend window and the Context Explorer so the two render identically. It is
-  // pure PRESENTATION: all scan state (phases, log, running) lives in the shared
+  // pure PRESENTATION: all scan state (phases, running) lives in the shared
   // scanControl store; this component only draws it as three stacked, labeled
-  // phase bars (index -> enrich -> write) plus a rolling log of the files being
-  // read. Each host window drives the DATA side-effects via scanControl.onScanDone.
+  // phase bars (index -> enrich -> write), each with its count and elapsed. Host
+  // windows drive the DATA side-effects via scanControl.onScanDone.
   import { scanState, cancelScan, type PhaseState } from "./scanControl";
 
   // oncancel: when given, Cancel calls this; otherwise it cancels the scan itself.
-  // fill: grow to occupy the whole window and let the log scroll, for the empty-
-  // state build (no data yet) instead of a static "building…" placeholder.
-  let { oncancel, fill = false }: { oncancel?: () => void; fill?: boolean } = $props();
+  let { oncancel }: { oncancel?: () => void } = $props();
 
   // A clock that ticks only while a scan runs, so the active phase's ms updates
   // smoothly. The store stays pure data; the ticking lives here in the view.
@@ -42,46 +40,14 @@
     return `${Math.round((st.end || now) - st.t0)}ms`;
   }
 
-  // Color at fraction `t` (0..1) along the theme gauge sweep g0 -> g1 -> g2
-  // (stops at 0, 0.5, 1). Used to tint each log line to match the bar-fill color
-  // at the instant it was emitted. color-mix keeps it theme-reactive.
-  function sweepColor(t: number): string {
-    const c = Math.max(0, Math.min(1, t));
-    if (c <= 0.5) return `color-mix(in oklab, var(--g0), var(--g1) ${(c / 0.5) * 100}%)`;
-    return `color-mix(in oklab, var(--g1), var(--g2) ${((c - 0.5) / 0.5) * 100}%)`;
-  }
-
   function cancel() {
     if (oncancel) oncancel();
     else cancelScan();
   }
-
-  // Keep the log from yanking back to the top when a new line is prepended while
-  // the user has scrolled down to read older lines (fill mode). New lines go in at
-  // the head, which grows the content above the viewport; browsers hold scrollTop
-  // as a pixel offset, so without this the viewed line jumps. When the user is at
-  // the very top (scrollTop 0) we leave it, so it keeps tracking the newest line.
-  let logEl = $state<HTMLUListElement | null>(null);
-  let prevTop = 0;
-  let prevHeight = 0;
-  $effect.pre(() => {
-    void $scanState.log;
-    if (logEl) {
-      prevTop = logEl.scrollTop;
-      prevHeight = logEl.scrollHeight;
-    }
-  });
-  $effect(() => {
-    void $scanState.log;
-    if (logEl && prevTop > 0) {
-      const grew = logEl.scrollHeight - prevHeight;
-      if (grew > 0) logEl.scrollTop = prevTop + grew;
-    }
-  });
 </script>
 
 {#if $scanState.running}
-  <div class="scanbar" class:fill>
+  <div class="scanbar">
     {#each phases as ph, i (ph.label)}
       <div class="prow" class:inactive={ph.st.total === 0}>
         <span class="plabel">{ph.label}</span>
@@ -95,13 +61,6 @@
     <div class="pfoot">
       <button class="pcancel" onclick={cancel}>Cancel</button>
     </div>
-    {#if $scanState.log.length}
-      <ul class="plog" bind:this={logEl}>
-        {#each $scanState.log as line (line.id)}
-          <li style:color={sweepColor(line.t)}>{line.text}</li>
-        {/each}
-      </ul>
-    {/if}
   </div>
 {/if}
 
@@ -110,21 +69,6 @@
     flex: none;
     padding: 8px 14px 6px;
     border-bottom: 1px solid var(--panel);
-  }
-  /* Fill mode: own the whole window (empty-state build) so the log fills the space
-     a "building…" placeholder used to waste. The bars stay pinned at the top; the
-     log grows and scrolls. */
-  .scanbar.fill {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    border-bottom: none;
-  }
-  .scanbar.fill .plog {
-    flex: 1;
-    max-height: none;
-    overflow-y: auto;
   }
   .prow {
     display: grid;
@@ -200,22 +144,5 @@
   .pcancel:hover {
     color: var(--fg);
     border-color: var(--muted);
-  }
-  .plog {
-    margin: 4px 0 0;
-    padding: 0;
-    list-style: none;
-    font-size: 9px;
-    color: var(--muted);
-    opacity: 0.9;
-    font-variant-numeric: tabular-nums;
-    max-height: 66px;
-    overflow: hidden;
-  }
-  .plog li {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.35;
   }
 </style>

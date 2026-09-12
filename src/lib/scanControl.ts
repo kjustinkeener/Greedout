@@ -26,25 +26,11 @@ export interface PhaseState {
   t0: number;
   end: number;
 }
-// One log line. `id` is a stable, monotonic key so the {#each} keys by identity:
-// a newest-first prepend then inserts a real node at the top (existing nodes keep
-// their text and shift down) rather than reusing nodes and rewriting text in
-// place, which would make the log crawl through a fixed viewport. `t` is its
-// position along the OVERALL 3-bar gradient sweep (0..1) at the moment it was
-// emitted; the view colors the line by mixing the theme gauge stops
-// (--g0/--g1/--g2) at `t`, so a line's color matches the bar it came from.
-export interface LogLine {
-  id: number;
-  text: string;
-  t: number;
-}
-let logSeq = 0;
 export interface ScanState {
   running: boolean;
   index: PhaseState;
   enrich: PhaseState;
   write: PhaseState;
-  log: LogLine[];
 }
 
 const zeroPhase = (): PhaseState => ({ done: 0, total: 0, t0: 0, end: 0 });
@@ -53,7 +39,6 @@ const initial = (): ScanState => ({
   index: zeroPhase(),
   enrich: zeroPhase(),
   write: zeroPhase(),
-  log: [],
 });
 
 // The single source of truth for scan progress in this window. ScanProgress
@@ -81,7 +66,7 @@ void listen<BrowseProgress>("browse-progress", (e) => {
   const p = e.payload;
   const t = performance.now();
   scanState.update((s) => {
-    let { running, index, enrich, write, log } = s;
+    let { running, index, enrich, write } = s;
     // A scan is underway but this window didn't start it (it mounted mid-scan, or
     // the other window / a background enrich triggered it): reset and turn running
     // on so a fresh set of bars shows. This runs at most once per run (running
@@ -90,7 +75,6 @@ void listen<BrowseProgress>("browse-progress", (e) => {
       index = zeroPhase();
       enrich = zeroPhase();
       write = zeroPhase();
-      log = [];
       running = true;
     }
     if (p.phase === "index") {
@@ -108,18 +92,7 @@ void listen<BrowseProgress>("browse-progress", (e) => {
       write = finish(write, t);
       running = false;
     }
-    // Human-readable line for the active file; newest first, deduped against the
-    // current head. Capped generously so the fill-mode log (empty-state build) has
-    // enough scrollback; the compact top-bar view clips it with max-height. Each
-    // line carries its overall-sweep fraction `t` = (phaseIndex + done/total)/3, so
-    // the view can color it the same as the bar's fill at emit time.
-    if (p.current && p.current !== log[0]?.text) {
-      const seg = p.phase === "enrich" ? 1 : p.phase === "write" ? 2 : 0;
-      const frac = p.total ? p.done / p.total : 0;
-      const t = (seg + frac) / 3;
-      log = [{ id: logSeq++, text: p.current, t }, ...log].slice(0, 200);
-    }
-    return { running, index, enrich, write, log };
+    return { running, index, enrich, write };
   });
   if (p.phase === "done" || p.phase === "canceled") {
     const canceled = p.phase === "canceled";

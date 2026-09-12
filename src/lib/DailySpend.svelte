@@ -26,7 +26,7 @@
   let loading = $state(true);
   // Scan state (the shared cache build, reused from the Context Explorer scan)
   // lives in the shared scanControl store; `running` gates the empty-state
-  // "Building the spend cache…" message and the rescan button here.
+  // message and the rescan button here.
   const scanning = $derived($scanState.running);
   let level = $state<"months" | "days" | "day">("months");
   let curMonth = $state(""); // "YYYY-MM"
@@ -482,13 +482,13 @@
     {/if}
   </nav>
 
-  <ScanProgress oncancel={cancelScan} fill={!summary.length} />
+  <ScanProgress oncancel={cancelScan} />
 
   {#if loading}
     <div class="msg">{t("common.loading")}</div>
   {:else if !summary.length}
-    <!-- While the first build runs, the fill-mode ScanProgress log owns the window;
-         only show the resting empty message once the scan is done with no spend. -->
+    <!-- The scan bars (above) show progress during the first build; only show the
+         resting empty message once the scan is done with no spend. -->
     {#if !scanning}
       <div class="msg">No spend recorded yet.</div>
     {/if}

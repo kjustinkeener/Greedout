@@ -26,14 +26,19 @@ export interface PhaseState {
   t0: number;
   end: number;
 }
-// One log line: the file text, plus `t` = its position along the OVERALL 3-bar
-// gradient sweep (0..1) at the moment it was emitted. The view colors the line
-// by mixing the theme gauge stops (--g0/--g1/--g2) at `t`, so a line's color
-// matches the fill color of the bar it came from at that instant.
+// One log line. `id` is a stable, monotonic key so the {#each} keys by identity:
+// a newest-first prepend then inserts a real node at the top (existing nodes keep
+// their text and shift down) rather than reusing nodes and rewriting text in
+// place, which would make the log crawl through a fixed viewport. `t` is its
+// position along the OVERALL 3-bar gradient sweep (0..1) at the moment it was
+// emitted; the view colors the line by mixing the theme gauge stops
+// (--g0/--g1/--g2) at `t`, so a line's color matches the bar it came from.
 export interface LogLine {
+  id: number;
   text: string;
   t: number;
 }
+let logSeq = 0;
 export interface ScanState {
   running: boolean;
   index: PhaseState;
@@ -112,7 +117,7 @@ void listen<BrowseProgress>("browse-progress", (e) => {
       const seg = p.phase === "enrich" ? 1 : p.phase === "write" ? 2 : 0;
       const frac = p.total ? p.done / p.total : 0;
       const t = (seg + frac) / 3;
-      log = [{ text: p.current, t }, ...log].slice(0, 200);
+      log = [{ id: logSeq++, text: p.current, t }, ...log].slice(0, 200);
     }
     return { running, index, enrich, write, log };
   });

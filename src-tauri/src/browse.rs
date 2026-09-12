@@ -557,6 +557,10 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
     {
         let tx = conn.transaction()?;
         let mut done = 0u64;
+        // Wall-clock of the previous emitted line, so each line's ms is the time
+        // actually waited for that step (this batch of rows), not one file's stat
+        // time -- which is sub-ms and unrelated to the visible cadence.
+        let mut last_emit = std::time::Instant::now();
         for path in &paths {
             if cancel_flag().load(Ordering::Relaxed) {
                 break;
@@ -564,9 +568,7 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
             let path_str = path.to_string_lossy().to_string();
             seen.insert(path_str.clone());
             let id = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-            let st = std::time::Instant::now();
             let (mtime, size) = file_stat(path).unwrap_or((0, 0));
-            let stat_ms = st.elapsed().as_millis();
             let dir = path
                 .parent()
                 .and_then(|p| p.file_name())
@@ -582,14 +584,17 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
             )?;
             done += 1;
             if done % 25 == 0 || done == total {
-                // Same shape as the parse/save lines: file size (MB) + this file's
-                // stat time (ms) + "Locating <project middot id>".
+                // Same shape as the parse/save lines: file size (MB) + ms waited
+                // for this step (since the previous line) + "Locating <project
+                // middot id>".
+                let step_ms = last_emit.elapsed().as_millis();
+                last_emit = std::time::Instant::now();
                 let name = if project.is_empty() {
                     id.clone()
                 } else {
                     format!("{project} \u{00b7} {id}")
                 };
-                let line = format!("{:.2}MB  {}ms  Locating {}", size as f64 / 1_000_000.0, stat_ms, name);
+                let line = format!("{:.2}MB  {}ms  Locating {}", size as f64 / 1_000_000.0, step_ms, name);
                 emit_progress(app, "index", done, total, &line);
             }
         }
@@ -745,6 +750,11 @@ fn enrich_parallel(
     let chunk = stale.len().div_ceil(nthreads);
     let done = std::sync::atomic::AtomicU64::new(0);
     let wall = std::time::Instant::now();
+    // Microseconds (relative to `wall`) of the last emitted line, shared across the
+    // reader threads, so each line's ms is the wall time waited since the previous
+    // line rather than one file's parse time (parallelism makes the latter
+    // meaningless as a "wait"). swap gives each emit an exclusive delta.
+    let last_emit_us = std::sync::atomic::AtomicU64::new(0);
     // Parallel read/parse. `thread::scope` lets the threads borrow `done`/`app`
     // without 'static bounds; each returns its enriched rows plus timers so the
     // scan can attribute the pass to disk (read) vs CPU (parse). Reading once and
@@ -756,6 +766,7 @@ fn enrich_parallel(
             .chunks(chunk.max(1))
             .map(|part| {
                 let done = &done;
+                let last_emit_us = &last_emit_us;
                 s.spawn(move || {
                     let mut out = Vec::with_capacity(part.len());
                     let mut t = EnrichTimers::default();
@@ -779,12 +790,16 @@ fn enrich_parallel(
                         t.files += 1;
                         let d = done.fetch_add(1, Ordering::Relaxed) + 1;
                         if throttle <= 1 || d % throttle == 0 || d == etotal {
-                            // Each log line: file size (MB) + this file's parse time
-                            // (ms) + "Parsing <project middot title>".
+                            // Each log line: file size (MB) + ms waited for this step
+                            // (wall time since the previous emitted line) + "Parsing
+                            // <project middot title>".
+                            let now_us = wall.elapsed().as_micros() as u64;
+                            let prev = last_emit_us.swap(now_us, Ordering::Relaxed);
+                            let step_ms = now_us.saturating_sub(prev) / 1000;
                             let line = format!(
                                 "{:.2}MB  {}ms  Parsing {}",
                                 raw.len() as f64 / 1_000_000.0,
-                                parse.as_millis(),
+                                step_ms,
                                 scan_label(id, &meta),
                             );
                             emit_progress(app, "enrich", d, etotal, &line);
@@ -829,11 +844,12 @@ fn enrich_parallel(
     let wtotal = results.len() as u64;
     let wt0 = std::time::Instant::now();
     let mut n = 0u64;
+    // Wall-clock of the previous emitted line (see the index/enrich passes): each
+    // line's ms is the time waited for this batch of writes, not one row's insert.
+    let mut last_emit = std::time::Instant::now();
     let mut tx = conn.transaction()?;
     for r in &results {
-        let ws = std::time::Instant::now();
         write_enrich(&tx, &r.path, &r.meta, r.mtime, r.size, &r.chat_text, r.first_ms, r.last_ms)?;
-        let wms = ws.elapsed();
         n += 1;
         if n % 200 == 0 {
             tx.commit()?;
@@ -844,12 +860,14 @@ fn enrich_parallel(
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_default();
-            // Same shape as the parse lines: file size (MB) + this row's write time
-            // (ms) + "Saving <project middot title>".
+            // Same shape as the parse lines: file size (MB) + ms waited for this
+            // step (since the previous line) + "Saving <project middot title>".
+            let step_ms = last_emit.elapsed().as_millis();
+            last_emit = std::time::Instant::now();
             let line = format!(
                 "{:.2}MB  {}ms  Saving {}",
                 r.size as f64 / 1_000_000.0,
-                wms.as_millis(),
+                step_ms,
                 scan_label(&id, &r.meta),
             );
             emit_progress(app, "write", n, wtotal, &line);

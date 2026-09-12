@@ -97,7 +97,7 @@
     </div>
     {#if $scanState.log.length}
       <ul class="plog" bind:this={logEl}>
-        {#each $scanState.log as line, i (i)}
+        {#each $scanState.log as line (line.id)}
           <li style:color={sweepColor(line.t)}>{line.text}</li>
         {/each}
       </ul>

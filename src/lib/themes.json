@@ -1,0 +1,2154 @@
+[
+  {
+    "id": "auto",
+    "label": "Auto (system)",
+    "group": "Core",
+    "scheme": "light dark",
+    "autoLightFrom": "light",
+    "note": null
+  },
+  {
+    "id": "light",
+    "label": "Light",
+    "group": "Core",
+    "scheme": "light",
+    "note": null,
+    "colors": {
+      "bg": [
+        245,
+        246,
+        248
+      ],
+      "fg": "#1c2024",
+      "muted": "#6a7178",
+      "track": "#d8dce1",
+      "green": "#2ea043",
+      "yellow": "#bf8700",
+      "red": "#d1242f",
+      "live": "#2ea043",
+      "edge": "rgba(0, 0, 0, 0.12)",
+      "edgeSoft": "rgba(0, 0, 0, 0.07)",
+      "hover": "rgba(0, 0, 0, 0.06)",
+      "panel": "rgba(0, 0, 0, 0.03)"
+    },
+    "gradient": [
+      "#00ffe8",
+      "#fffe00",
+      "#ff0000"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "purple",
+    "label": "Midnight Purple",
+    "group": "Neon",
+    "scheme": "dark",
+    "note": "Midnight Purple: dark violet ground, lavender text, violet->pink gauge.",
+    "colors": {
+      "bg": [
+        20,
+        16,
+        33
+      ],
+      "fg": "#e8e4f2",
+      "muted": "#8b83a3",
+      "track": "#2a2340",
+      "green": "#3ee08f",
+      "yellow": "#fac847",
+      "red": "#ff5d8f",
+      "live": "#3ee08f",
+      "edge": "rgba(167, 139, 250, 0.16)",
+      "edgeSoft": "rgba(167, 139, 250, 0.09)",
+      "hover": "rgba(167, 139, 250, 0.14)",
+      "panel": "rgba(167, 139, 250, 0.06)"
+    },
+    "gradient": [
+      "#3ee08f",
+      "#a78bfa",
+      "#ff4d8d"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "ocean",
+    "label": "Ocean",
+    "group": "Cool",
+    "scheme": "dark",
+    "note": "Ocean: deep navy, teal-blue gauge.",
+    "colors": {
+      "bg": [
+        12,
+        22,
+        34
+      ],
+      "fg": "#d6e6f2",
+      "muted": "#6b8299",
+      "track": "#1c2f42",
+      "green": "#35d0a0",
+      "yellow": "#e0b64a",
+      "red": "#ff6b6b",
+      "live": "#35d0a0",
+      "edge": "rgba(90, 160, 220, 0.16)",
+      "edgeSoft": "rgba(90, 160, 220, 0.09)",
+      "hover": "rgba(90, 160, 220, 0.13)",
+      "panel": "rgba(90, 160, 220, 0.06)"
+    },
+    "gradient": [
+      "#2dd4bf",
+      "#3b82f6",
+      "#fb7185"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "matrix",
+    "label": "Terminal",
+    "group": "Greens",
+    "scheme": "dark",
+    "note": "Matrix: near-black terminal, green->lime->red gauge.",
+    "colors": {
+      "bg": [
+        6,
+        14,
+        9
+      ],
+      "fg": "#b9f5c9",
+      "muted": "#4e7a5c",
+      "track": "#10321c",
+      "green": "#22c55e",
+      "yellow": "#a3e635",
+      "red": "#ef4444",
+      "live": "#22c55e",
+      "edge": "rgba(80, 220, 120, 0.16)",
+      "edgeSoft": "rgba(80, 220, 120, 0.09)",
+      "hover": "rgba(80, 220, 120, 0.13)",
+      "panel": "rgba(80, 220, 120, 0.06)"
+    },
+    "gradient": [
+      "#16a34a",
+      "#a3e635",
+      "#ef4444"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "amber",
+    "label": "Amber",
+    "group": "Warm",
+    "scheme": "dark",
+    "note": "Amber: warm CRT, yellow->orange->red gauge.",
+    "colors": {
+      "bg": [
+        22,
+        15,
+        6
+      ],
+      "fg": "#ffd9a0",
+      "muted": "#9c7a4e",
+      "track": "#3a2a12",
+      "green": "#b5c94a",
+      "yellow": "#ffb300",
+      "red": "#ff5722",
+      "live": "#ffb300",
+      "edge": "rgba(255, 180, 80, 0.16)",
+      "edgeSoft": "rgba(255, 180, 80, 0.09)",
+      "hover": "rgba(255, 180, 80, 0.13)",
+      "panel": "rgba(255, 180, 80, 0.06)"
+    },
+    "gradient": [
+      "#ffd54f",
+      "#ff9800",
+      "#ff3d00"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "rose",
+    "label": "Rose",
+    "group": "Pastel",
+    "scheme": "dark",
+    "note": "Rose: dark mauve, pink->magenta->crimson gauge.",
+    "colors": {
+      "bg": [
+        26,
+        14,
+        22
+      ],
+      "fg": "#f3dce8",
+      "muted": "#a37f95",
+      "track": "#3a2030",
+      "green": "#4ade80",
+      "yellow": "#f5b942",
+      "red": "#fb2c66",
+      "live": "#4ade80",
+      "edge": "rgba(244, 114, 182, 0.16)",
+      "edgeSoft": "rgba(244, 114, 182, 0.09)",
+      "hover": "rgba(244, 114, 182, 0.13)",
+      "panel": "rgba(244, 114, 182, 0.06)"
+    },
+    "gradient": [
+      "#f9a8d4",
+      "#ec4899",
+      "#be123c"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "nord",
+    "label": "Arctic",
+    "group": "Pastel",
+    "scheme": "dark",
+    "note": "Nord: arctic blue-grey, frost gauge.",
+    "colors": {
+      "bg": [
+        46,
+        52,
+        64
+      ],
+      "fg": "#d8dee9",
+      "muted": "#6c7686",
+      "track": "#3b4252",
+      "green": "#a3be8c",
+      "yellow": "#ebcb8b",
+      "red": "#bf616a",
+      "live": "#a3be8c",
+      "edge": "rgba(136, 192, 208, 0.16)",
+      "edgeSoft": "rgba(136, 192, 208, 0.09)",
+      "hover": "rgba(136, 192, 208, 0.13)",
+      "panel": "rgba(136, 192, 208, 0.06)"
+    },
+    "gradient": [
+      "#8fbcbb",
+      "#81a1c1",
+      "#bf616a"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "dracula",
+    "label": "Nocturne",
+    "group": "Pastel",
+    "scheme": "dark",
+    "note": "Dracula: dark slate, cyan->purple->red gauge.",
+    "colors": {
+      "bg": [
+        40,
+        42,
+        54
+      ],
+      "fg": "#f8f8f2",
+      "muted": "#6272a4",
+      "track": "#383a4a",
+      "green": "#50fa7b",
+      "yellow": "#f1fa8c",
+      "red": "#ff5555",
+      "live": "#50fa7b",
+      "edge": "rgba(189, 147, 249, 0.18)",
+      "edgeSoft": "rgba(189, 147, 249, 0.1)",
+      "hover": "rgba(189, 147, 249, 0.15)",
+      "panel": "rgba(189, 147, 249, 0.07)"
+    },
+    "gradient": [
+      "#8be9fd",
+      "#bd93f9",
+      "#ff5555"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "gruvbox",
+    "label": "Retro",
+    "group": "Warm",
+    "scheme": "dark",
+    "note": "Gruvbox: retro warm, green->yellow->red gauge.",
+    "colors": {
+      "bg": [
+        40,
+        40,
+        40
+      ],
+      "fg": "#ebdbb2",
+      "muted": "#a89984",
+      "track": "#3c3836",
+      "green": "#b8bb26",
+      "yellow": "#fabd2f",
+      "red": "#fb4934",
+      "live": "#b8bb26",
+      "edge": "rgba(254, 128, 25, 0.16)",
+      "edgeSoft": "rgba(254, 128, 25, 0.09)",
+      "hover": "rgba(254, 128, 25, 0.13)",
+      "panel": "rgba(254, 128, 25, 0.06)"
+    },
+    "gradient": [
+      "#b8bb26",
+      "#fabd2f",
+      "#fb4934"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "solarized",
+    "label": "Solar",
+    "group": "Greens",
+    "scheme": "dark",
+    "note": "Solarized: dark teal base, cyan->yellow->red gauge.",
+    "colors": {
+      "bg": [
+        0,
+        43,
+        54
+      ],
+      "fg": "#93a1a1",
+      "muted": "#586e75",
+      "track": "#073642",
+      "green": "#859900",
+      "yellow": "#b58900",
+      "red": "#dc322f",
+      "live": "#859900",
+      "edge": "rgba(38, 139, 210, 0.18)",
+      "edgeSoft": "rgba(38, 139, 210, 0.1)",
+      "hover": "rgba(38, 139, 210, 0.14)",
+      "panel": "rgba(38, 139, 210, 0.07)"
+    },
+    "gradient": [
+      "#2aa198",
+      "#b58900",
+      "#dc322f"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "crimson",
+    "label": "Crimson",
+    "group": "Neon",
+    "scheme": "dark",
+    "note": "Crimson: dark oxblood, all-red gauge.",
+    "colors": {
+      "bg": [
+        26,
+        10,
+        13
+      ],
+      "fg": "#f0d9dc",
+      "muted": "#a06b74",
+      "track": "#3a1620",
+      "green": "#4ade80",
+      "yellow": "#f5b942",
+      "red": "#ff2d55",
+      "live": "#4ade80",
+      "edge": "rgba(255, 45, 85, 0.16)",
+      "edgeSoft": "rgba(255, 45, 85, 0.09)",
+      "hover": "rgba(255, 45, 85, 0.13)",
+      "panel": "rgba(255, 45, 85, 0.06)"
+    },
+    "gradient": [
+      "#fca5a5",
+      "#ef4444",
+      "#991b1b"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "mint",
+    "label": "Mint",
+    "group": "Light",
+    "scheme": "light",
+    "note": "Mint: soft mint-green ground, teal-green text, teal->green->red gauge. A light theme, so the spend text uses the dark-grey override below.",
+    "colors": {
+      "bg": [
+        214,
+        244,
+        228
+      ],
+      "fg": "#123326",
+      "muted": "#4e7a67",
+      "track": "#b3e0c9",
+      "green": "#0f9d58",
+      "yellow": "#bf8700",
+      "red": "#d1242f",
+      "live": "#0f9d58",
+      "edge": "rgba(16, 122, 88, 0.16)",
+      "edgeSoft": "rgba(16, 122, 88, 0.09)",
+      "hover": "rgba(16, 122, 88, 0.1)",
+      "panel": "rgba(16, 122, 88, 0.05)"
+    },
+    "gradient": [
+      "#00ffcc",
+      "#00ff00",
+      "#ff0000"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "paper",
+    "label": "Paper",
+    "group": "Light",
+    "scheme": "light",
+    "note": "Paper: warm off-white, sepia text, amber->orange->red gauge.",
+    "colors": {
+      "bg": [
+        245,
+        240,
+        230
+      ],
+      "fg": "#2b2620",
+      "muted": "#7a6f5e",
+      "track": "#ddd4c2",
+      "green": "#2ea043",
+      "yellow": "#bf8700",
+      "red": "#d1242f",
+      "live": "#2ea043",
+      "edge": "rgba(120, 100, 60, 0.16)",
+      "edgeSoft": "rgba(120, 100, 60, 0.09)",
+      "hover": "rgba(120, 100, 60, 0.08)",
+      "panel": "rgba(120, 100, 60, 0.04)"
+    },
+    "gradient": [
+      "#d9a441",
+      "#e8722d",
+      "#d1242f"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "sky",
+    "label": "Sky",
+    "group": "Light",
+    "scheme": "light",
+    "note": "Sky: pale blue, navy text, cyan->blue->red gauge.",
+    "colors": {
+      "bg": [
+        225,
+        238,
+        250
+      ],
+      "fg": "#16324d",
+      "muted": "#5a7794",
+      "track": "#bcd4ea",
+      "green": "#2ea043",
+      "yellow": "#bf8700",
+      "red": "#d1242f",
+      "live": "#2ea043",
+      "edge": "rgba(40, 110, 190, 0.16)",
+      "edgeSoft": "rgba(40, 110, 190, 0.09)",
+      "hover": "rgba(40, 110, 190, 0.08)",
+      "panel": "rgba(40, 110, 190, 0.04)"
+    },
+    "gradient": [
+      "#06b6d4",
+      "#2563eb",
+      "#dc2626"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "lavender",
+    "label": "Lavender",
+    "group": "Blush",
+    "scheme": "light",
+    "note": "Lavender: soft violet-white, plum text, violet->magenta->red gauge.",
+    "colors": {
+      "bg": [
+        240,
+        234,
+        250
+      ],
+      "fg": "#372952",
+      "muted": "#7a6b96",
+      "track": "#d6cbe8",
+      "green": "#2ea043",
+      "yellow": "#bf8700",
+      "red": "#d1242f",
+      "live": "#2ea043",
+      "edge": "rgba(130, 90, 200, 0.16)",
+      "edgeSoft": "rgba(130, 90, 200, 0.09)",
+      "hover": "rgba(130, 90, 200, 0.08)",
+      "panel": "rgba(130, 90, 200, 0.04)"
+    },
+    "gradient": [
+      "#8b5cf6",
+      "#d946ef",
+      "#dc2626"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "sage",
+    "label": "Sage",
+    "group": "Light",
+    "scheme": "light",
+    "note": "Sage: muted green-grey, forest text, green->olive->red gauge.",
+    "colors": {
+      "bg": [
+        232,
+        238,
+        230
+      ],
+      "fg": "#263321",
+      "muted": "#647059",
+      "track": "#cbd6c2",
+      "green": "#2ea043",
+      "yellow": "#bf8700",
+      "red": "#d1242f",
+      "live": "#2ea043",
+      "edge": "rgba(90, 120, 70, 0.16)",
+      "edgeSoft": "rgba(90, 120, 70, 0.09)",
+      "hover": "rgba(90, 120, 70, 0.08)",
+      "panel": "rgba(90, 120, 70, 0.04)"
+    },
+    "gradient": [
+      "#4d9e5a",
+      "#a0a832",
+      "#d1242f"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "bubblegum",
+    "label": "Bubblegum",
+    "group": "Blush",
+    "scheme": "light",
+    "note": "Bubblegum: the girly one; hot-pink on candy pink, magenta->fuchsia->red gauge.",
+    "colors": {
+      "bg": [
+        255,
+        228,
+        242
+      ],
+      "fg": "#6b1b47",
+      "muted": "#c56596",
+      "track": "#ffc2df",
+      "green": "#d6259b",
+      "yellow": "#e8659e",
+      "red": "#e11d48",
+      "live": "#ec4899",
+      "edge": "rgba(236, 72, 153, 0.20)",
+      "edgeSoft": "rgba(236, 72, 153, 0.10)",
+      "hover": "rgba(236, 72, 153, 0.10)",
+      "panel": "rgba(236, 72, 153, 0.05)"
+    },
+    "gradient": [
+      "#ff4fb0",
+      "#ff00aa",
+      "#e11d48"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "cottoncandy",
+    "label": "Cotton Candy",
+    "group": "Blush",
+    "scheme": "light",
+    "note": "Cotton Candy: soft pastel pink+blue dream, pink->periwinkle->coral gauge.",
+    "colors": {
+      "bg": [
+        245,
+        236,
+        255
+      ],
+      "fg": "#4a3a63",
+      "muted": "#9b8bb8",
+      "track": "#e2d4f2",
+      "green": "#7c6bd6",
+      "yellow": "#d178b8",
+      "red": "#ef5a6f",
+      "live": "#b39ddb",
+      "edge": "rgba(160, 130, 220, 0.18)",
+      "edgeSoft": "rgba(160, 130, 220, 0.09)",
+      "hover": "rgba(160, 130, 220, 0.08)",
+      "panel": "rgba(160, 130, 220, 0.04)"
+    },
+    "gradient": [
+      "#7ec8ff",
+      "#ff9ed8",
+      "#ef5a6f"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "vaporwave",
+    "label": "Vaporwave",
+    "group": "Neon",
+    "scheme": "dark",
+    "note": "Vaporwave: retro dusk; cyan->magenta->hot-red on deep indigo.",
+    "colors": {
+      "bg": [
+        26,
+        15,
+        46
+      ],
+      "fg": "#f5e9ff",
+      "muted": "#a087c9",
+      "track": "rgba(255, 255, 255, 0.10)",
+      "green": "#05d9e8",
+      "yellow": "#ff6ac1",
+      "red": "#ff2e63",
+      "live": "#05d9e8",
+      "edge": "rgba(255, 106, 193, 0.22)",
+      "edgeSoft": "rgba(255, 106, 193, 0.10)",
+      "hover": "rgba(255, 106, 193, 0.10)",
+      "panel": "rgba(255, 106, 193, 0.05)"
+    },
+    "gradient": [
+      "#05d9e8",
+      "#ff6ac1",
+      "#ff2e63"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "sunset",
+    "label": "Sunset",
+    "group": "Warm",
+    "scheme": "dark",
+    "note": "Sunset: warm dusk; gold->orange->deep-red on charcoal plum.",
+    "colors": {
+      "bg": [
+        32,
+        22,
+        30
+      ],
+      "fg": "#ffe8d6",
+      "muted": "#c99a86",
+      "track": "rgba(255, 255, 255, 0.09)",
+      "green": "#ffd166",
+      "yellow": "#f3722c",
+      "red": "#d00000",
+      "live": "#ffd166",
+      "edge": "rgba(243, 114, 44, 0.20)",
+      "edgeSoft": "rgba(243, 114, 44, 0.10)",
+      "hover": "rgba(243, 114, 44, 0.10)",
+      "panel": "rgba(243, 114, 44, 0.05)"
+    },
+    "gradient": [
+      "#ffd166",
+      "#f3722c",
+      "#9d0208"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "cyberpunk",
+    "label": "Neon Grid",
+    "group": "Neon",
+    "scheme": "dark",
+    "note": "Cyberpunk: neon acid; lime->yellow->magenta on near-black.",
+    "colors": {
+      "bg": [
+        10,
+        10,
+        16
+      ],
+      "fg": "#e7fbff",
+      "muted": "#6d8ba0",
+      "track": "rgba(0, 255, 200, 0.08)",
+      "green": "#00ff9f",
+      "yellow": "#fcee09",
+      "red": "#ff003c",
+      "live": "#00ff9f",
+      "edge": "rgba(252, 238, 9, 0.18)",
+      "edgeSoft": "rgba(0, 255, 159, 0.10)",
+      "hover": "rgba(252, 238, 9, 0.08)",
+      "panel": "rgba(0, 255, 159, 0.04)"
+    },
+    "gradient": [
+      "#00ff9f",
+      "#fcee09",
+      "#ff003c"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "lofi",
+    "label": "Lofi",
+    "group": "Warm",
+    "scheme": "dark",
+    "note": "Lofi: dusty cozy dusk; muted mauve->peach->clay on warm charcoal.",
+    "colors": {
+      "bg": [
+        30,
+        27,
+        34
+      ],
+      "fg": "#e8ddd3",
+      "muted": "#9a8f9c",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#b9a8c9",
+      "yellow": "#d9a679",
+      "red": "#cf7a72",
+      "live": "#b9a8c9",
+      "edge": "rgba(200, 170, 190, 0.16)",
+      "edgeSoft": "rgba(200, 170, 190, 0.08)",
+      "hover": "rgba(200, 170, 190, 0.07)",
+      "panel": "rgba(200, 170, 190, 0.04)"
+    },
+    "gradient": [
+      "#a7c4bc",
+      "#d9a679",
+      "#cf7a72"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "coffee",
+    "label": "Coffee",
+    "group": "Warm",
+    "scheme": "dark",
+    "note": "Coffee: warm cafe; cream->caramel->terracotta on roasted brown.",
+    "colors": {
+      "bg": [
+        33,
+        25,
+        20
+      ],
+      "fg": "#f0e2d0",
+      "muted": "#b09578",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#d9c7a3",
+      "yellow": "#cf9b56",
+      "red": "#c0553b",
+      "live": "#d9c7a3",
+      "edge": "rgba(210, 170, 120, 0.16)",
+      "edgeSoft": "rgba(210, 170, 120, 0.08)",
+      "hover": "rgba(210, 170, 120, 0.07)",
+      "panel": "rgba(210, 170, 120, 0.04)"
+    },
+    "gradient": [
+      "#e3d5b8",
+      "#c98f43",
+      "#c0553b"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "sakura",
+    "label": "Sakura",
+    "group": "Blush",
+    "scheme": "light",
+    "note": "Sakura: soft cherry-blossom light; pink->rose->crimson gauge.",
+    "colors": {
+      "bg": [
+        255,
+        241,
+        245
+      ],
+      "fg": "#5a3a48",
+      "muted": "#b08a97",
+      "track": "#f6d5df",
+      "green": "#7fa86b",
+      "yellow": "#d98aa8",
+      "red": "#d1477a",
+      "live": "#e8a0bb",
+      "edge": "rgba(210, 130, 160, 0.16)",
+      "edgeSoft": "rgba(210, 130, 160, 0.08)",
+      "hover": "rgba(210, 130, 160, 0.07)",
+      "panel": "rgba(210, 130, 160, 0.04)"
+    },
+    "gradient": [
+      "#8fc99b",
+      "#f2a5c4",
+      "#d1477a"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "deepsea",
+    "label": "Deep Sea",
+    "group": "Neon",
+    "scheme": "dark",
+    "note": "Deep Sea: cool abyssal dark; teal->aqua->coral on midnight navy.",
+    "colors": {
+      "bg": [
+        12,
+        22,
+        33
+      ],
+      "fg": "#d6ecf2",
+      "muted": "#6f93a3",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#2dd4bf",
+      "yellow": "#38bdf8",
+      "red": "#fb7185",
+      "live": "#2dd4bf",
+      "edge": "rgba(56, 189, 248, 0.16)",
+      "edgeSoft": "rgba(56, 189, 248, 0.08)",
+      "hover": "rgba(56, 189, 248, 0.08)",
+      "panel": "rgba(56, 189, 248, 0.04)"
+    },
+    "gradient": [
+      "#2dd4bf",
+      "#38bdf8",
+      "#fb7185"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "monokai",
+    "label": "Acid",
+    "group": "Greens",
+    "scheme": "dark",
+    "note": "Monokai: classic editor dark; green->yellow->pink on olive charcoal.",
+    "colors": {
+      "bg": [
+        39,
+        40,
+        34
+      ],
+      "fg": "#f8f8f2",
+      "muted": "#9a9a86",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#a6e22e",
+      "yellow": "#e6db74",
+      "red": "#f92672",
+      "live": "#a6e22e",
+      "edge": "rgba(230, 219, 116, 0.16)",
+      "edgeSoft": "rgba(230, 219, 116, 0.08)",
+      "hover": "rgba(230, 219, 116, 0.07)",
+      "panel": "rgba(230, 219, 116, 0.04)"
+    },
+    "gradient": [
+      "#a6e22e",
+      "#e6db74",
+      "#f92672"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "tokyonight",
+    "label": "Skyline",
+    "group": "Pastel",
+    "scheme": "dark",
+    "note": "Tokyo Night: popular dark; blue->purple->magenta on deep navy.",
+    "colors": {
+      "bg": [
+        26,
+        27,
+        38
+      ],
+      "fg": "#c0caf5",
+      "muted": "#7a82ad",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#7aa2f7",
+      "yellow": "#bb9af7",
+      "red": "#f7768e",
+      "live": "#7aa2f7",
+      "edge": "rgba(122, 162, 247, 0.16)",
+      "edgeSoft": "rgba(122, 162, 247, 0.08)",
+      "hover": "rgba(122, 162, 247, 0.08)",
+      "panel": "rgba(122, 162, 247, 0.04)"
+    },
+    "gradient": [
+      "#7aa2f7",
+      "#bb9af7",
+      "#f7768e"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "forest",
+    "label": "Forest",
+    "group": "Greens",
+    "scheme": "dark",
+    "note": "Forest: deep pine dark; green->moss->rust on forest black.",
+    "colors": {
+      "bg": [
+        18,
+        28,
+        22
+      ],
+      "fg": "#dce8d8",
+      "muted": "#7f9880",
+      "track": "rgba(255, 255, 255, 0.07)",
+      "green": "#6fbf73",
+      "yellow": "#b7c25a",
+      "red": "#d47c4a",
+      "live": "#6fbf73",
+      "edge": "rgba(120, 190, 120, 0.15)",
+      "edgeSoft": "rgba(120, 190, 120, 0.08)",
+      "hover": "rgba(120, 190, 120, 0.07)",
+      "panel": "rgba(120, 190, 120, 0.04)"
+    },
+    "gradient": [
+      "#6fbf73",
+      "#b7c25a",
+      "#d4562a"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "slate",
+    "label": "Slate",
+    "group": "Pastel",
+    "scheme": "dark",
+    "note": "Slate: cool graphite dark; steel->sky->rose on gunmetal.",
+    "colors": {
+      "bg": [
+        24,
+        28,
+        34
+      ],
+      "fg": "#dbe2ea",
+      "muted": "#7d8794",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#7dd3fc",
+      "yellow": "#93a3b5",
+      "red": "#f472a0",
+      "live": "#7dd3fc",
+      "edge": "rgba(125, 211, 252, 0.14)",
+      "edgeSoft": "rgba(125, 211, 252, 0.07)",
+      "hover": "rgba(125, 211, 252, 0.07)",
+      "panel": "rgba(125, 211, 252, 0.04)"
+    },
+    "gradient": [
+      "#7dd3fc",
+      "#a3b1c2",
+      "#f472a0"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "sepia",
+    "label": "Sepia",
+    "group": "Light",
+    "scheme": "light",
+    "note": "Sepia: warm old-paper light; olive->ochre->rust gauge.",
+    "colors": {
+      "bg": [
+        244,
+        236,
+        220
+      ],
+      "fg": "#4a3f2e",
+      "muted": "#8c7c5e",
+      "track": "#e3d8bf",
+      "green": "#7a8b3a",
+      "yellow": "#b98a2e",
+      "red": "#b04a2a",
+      "live": "#8a7a3a",
+      "edge": "rgba(150, 120, 70, 0.18)",
+      "edgeSoft": "rgba(150, 120, 70, 0.09)",
+      "hover": "rgba(150, 120, 70, 0.08)",
+      "panel": "rgba(150, 120, 70, 0.04)"
+    },
+    "gradient": [
+      "#8a9a4a",
+      "#c48a2e",
+      "#b0402a"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "peach",
+    "label": "Peach",
+    "group": "Blush",
+    "scheme": "light",
+    "note": "Peach: warm pastel light; coral->apricot->rose gauge.",
+    "colors": {
+      "bg": [
+        255,
+        238,
+        228
+      ],
+      "fg": "#6b4230",
+      "muted": "#c08a72",
+      "track": "#ffd6c2",
+      "green": "#f0956b",
+      "yellow": "#f4a259",
+      "red": "#e5484d",
+      "live": "#ffab76",
+      "edge": "rgba(240, 140, 100, 0.18)",
+      "edgeSoft": "rgba(240, 140, 100, 0.09)",
+      "hover": "rgba(240, 140, 100, 0.08)",
+      "panel": "rgba(240, 140, 100, 0.04)"
+    },
+    "gradient": [
+      "#ffb27a",
+      "#f4884f",
+      "#e5484d"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "reef",
+    "label": "Reef",
+    "group": "Greens",
+    "scheme": "dark",
+    "note": "Reef: aqua->seafoam->orange gauge on deep teal-black.",
+    "colors": {
+      "bg": [
+        12,
+        26,
+        28
+      ],
+      "fg": "#d7f0ec",
+      "muted": "#6f9a95",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#00e5d0",
+      "yellow": "#7fd48c",
+      "red": "#ff8c00",
+      "live": "#00e5d0",
+      "edge": "rgba(0, 229, 208, 0.15)",
+      "edgeSoft": "rgba(0, 229, 208, 0.08)",
+      "hover": "rgba(0, 229, 208, 0.07)",
+      "panel": "rgba(0, 229, 208, 0.04)"
+    },
+    "gradient": [
+      "#00e5d0",
+      "#7fd46a",
+      "#ff8c00"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "graphite",
+    "label": "Graphite",
+    "group": "Cool",
+    "scheme": "dark",
+    "note": "Graphite: aqua->orange gauge (like Reef) on a neutral cool dark-grey base.",
+    "colors": {
+      "bg": [
+        26,
+        29,
+        33
+      ],
+      "fg": "#e2e6ea",
+      "muted": "#8a929b",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#12ddc9",
+      "yellow": "#8fc76a",
+      "red": "#ff8c1a",
+      "live": "#12ddc9",
+      "edge": "rgba(150, 160, 172, 0.14)",
+      "edgeSoft": "rgba(150, 160, 172, 0.08)",
+      "hover": "rgba(150, 160, 172, 0.07)",
+      "panel": "rgba(150, 160, 172, 0.04)"
+    },
+    "gradient": [
+      "#12ddc9",
+      "#8fc76a",
+      "#ff8c1a"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "flux",
+    "label": "Flux",
+    "group": "Cool",
+    "scheme": "dark",
+    "note": "Flux: aqua->orange->magenta gauge on a neutral cool dark-grey base.",
+    "colors": {
+      "bg": [
+        26,
+        29,
+        33
+      ],
+      "fg": "#e2e6ea",
+      "muted": "#8a929b",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#12ddc9",
+      "yellow": "#ff9424",
+      "red": "#ff2ea6",
+      "live": "#12ddc9",
+      "edge": "rgba(150, 160, 172, 0.14)",
+      "edgeSoft": "rgba(150, 160, 172, 0.08)",
+      "hover": "rgba(150, 160, 172, 0.07)",
+      "panel": "rgba(150, 160, 172, 0.04)"
+    },
+    "gradient": [
+      "#12ddc9",
+      "#ff9424",
+      "#ff2ea6"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "apricot",
+    "label": "Apricot",
+    "group": "Light Pastel",
+    "scheme": "light",
+    "note": "Apricot: soft pastel orange; peach->coral->red gauge.",
+    "colors": {
+      "bg": [
+        255,
+        237,
+        224
+      ],
+      "fg": "#6e4a33",
+      "muted": "#bb9077",
+      "track": "#ffd9c2",
+      "green": "#ff9e6b",
+      "yellow": "#f4884f",
+      "red": "#ef5a4c",
+      "live": "#ffb488",
+      "edge": "rgba(230, 150, 100, 0.16)",
+      "edgeSoft": "rgba(230, 150, 100, 0.08)",
+      "hover": "rgba(230, 150, 100, 0.08)",
+      "panel": "rgba(230, 150, 100, 0.04)"
+    },
+    "gradient": [
+      "#ffc196",
+      "#ff9160",
+      "#ef5a4c"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "butter",
+    "label": "Butter",
+    "group": "Light Pastel",
+    "scheme": "light",
+    "note": "Butter: soft pastel yellow; cream->gold->amber gauge.",
+    "colors": {
+      "bg": [
+        255,
+        250,
+        224
+      ],
+      "fg": "#6a5f2e",
+      "muted": "#b3a86f",
+      "track": "#f2ead0",
+      "green": "#e6cf6a",
+      "yellow": "#d9a94a",
+      "red": "#d97a3a",
+      "live": "#f0dd8a",
+      "edge": "rgba(190, 160, 70, 0.16)",
+      "edgeSoft": "rgba(190, 160, 70, 0.08)",
+      "hover": "rgba(190, 160, 70, 0.08)",
+      "panel": "rgba(190, 160, 70, 0.04)"
+    },
+    "gradient": [
+      "#ffe9a0",
+      "#f0c256",
+      "#e0803a"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "pistachio",
+    "label": "Pistachio",
+    "group": "Light Pastel",
+    "scheme": "light",
+    "note": "Pistachio: soft pastel green; mint->lime->clay gauge.",
+    "colors": {
+      "bg": [
+        234,
+        246,
+        224
+      ],
+      "fg": "#46592f",
+      "muted": "#8ba073",
+      "track": "#d6e6c2",
+      "green": "#9fd07a",
+      "yellow": "#bcc95a",
+      "red": "#d99a5a",
+      "live": "#b6dd94",
+      "edge": "rgba(140, 180, 100, 0.16)",
+      "edgeSoft": "rgba(140, 180, 100, 0.08)",
+      "hover": "rgba(140, 180, 100, 0.08)",
+      "panel": "rgba(140, 180, 100, 0.04)"
+    },
+    "gradient": [
+      "#bfe3a0",
+      "#c9c95a",
+      "#dd8a54"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "seafoam",
+    "label": "Seafoam",
+    "group": "Light Pastel",
+    "scheme": "light",
+    "note": "Seafoam: soft pastel teal; aqua->green->coral gauge.",
+    "colors": {
+      "bg": [
+        224,
+        246,
+        242
+      ],
+      "fg": "#2f5952",
+      "muted": "#78a89f",
+      "track": "#c2e6df",
+      "green": "#7fd0c0",
+      "yellow": "#a8cf88",
+      "red": "#ef8a7a",
+      "live": "#9fe0d2",
+      "edge": "rgba(90, 180, 165, 0.16)",
+      "edgeSoft": "rgba(90, 180, 165, 0.08)",
+      "hover": "rgba(90, 180, 165, 0.08)",
+      "panel": "rgba(90, 180, 165, 0.04)"
+    },
+    "gradient": [
+      "#a0e6d8",
+      "#9dd6a0",
+      "#ef7a68"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "cornflower",
+    "label": "Cornflower",
+    "group": "Light Pastel",
+    "scheme": "light",
+    "note": "Cornflower: soft pastel blue; periwinkle->lilac->rose gauge.",
+    "colors": {
+      "bg": [
+        230,
+        238,
+        255
+      ],
+      "fg": "#3a4468",
+      "muted": "#8a94bb",
+      "track": "#d2ddf5",
+      "green": "#9db5f0",
+      "yellow": "#b0a0f0",
+      "red": "#ef7ba0",
+      "live": "#b0c4ff",
+      "edge": "rgba(120, 140, 220, 0.16)",
+      "edgeSoft": "rgba(120, 140, 220, 0.08)",
+      "hover": "rgba(120, 140, 220, 0.08)",
+      "panel": "rgba(120, 140, 220, 0.04)"
+    },
+    "gradient": [
+      "#a8c4ff",
+      "#b6a0f0",
+      "#ef7ba0"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "linen",
+    "label": "Linen",
+    "group": "Neutral",
+    "scheme": "light",
+    "note": "Linen: warm off-white; sage->ochre->clay earthy gauge.",
+    "colors": {
+      "bg": [
+        247,
+        242,
+        233
+      ],
+      "fg": "#4a4438",
+      "muted": "#9a9080",
+      "track": "#e6ddcd",
+      "green": "#8a9a6a",
+      "yellow": "#c0a052",
+      "red": "#b5714a",
+      "live": "#a0ac7a",
+      "edge": "rgba(150, 135, 100, 0.15)",
+      "edgeSoft": "rgba(150, 135, 100, 0.08)",
+      "hover": "rgba(150, 135, 100, 0.07)",
+      "panel": "rgba(150, 135, 100, 0.04)"
+    },
+    "gradient": [
+      "#9aa877",
+      "#c4a256",
+      "#b0603a"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "oat",
+    "label": "Oat",
+    "group": "Neutral",
+    "scheme": "light",
+    "note": "Oat: soft beige; wheat->tan->terracotta gauge.",
+    "colors": {
+      "bg": [
+        240,
+        231,
+        216
+      ],
+      "fg": "#52483a",
+      "muted": "#a0947e",
+      "track": "#ddd0ba",
+      "green": "#b8a878",
+      "yellow": "#c99a5a",
+      "red": "#bd6a44",
+      "live": "#cabd94",
+      "edge": "rgba(160, 140, 105, 0.15)",
+      "edgeSoft": "rgba(160, 140, 105, 0.08)",
+      "hover": "rgba(160, 140, 105, 0.07)",
+      "panel": "rgba(160, 140, 105, 0.04)"
+    },
+    "gradient": [
+      "#cabd94",
+      "#c8974f",
+      "#b85e3a"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "greige",
+    "label": "Greige",
+    "group": "Neutral",
+    "scheme": "light",
+    "note": "Greige: grey-beige neutral; taupe->tan->rust gauge.",
+    "colors": {
+      "bg": [
+        236,
+        232,
+        226
+      ],
+      "fg": "#4c473f",
+      "muted": "#988f83",
+      "track": "#d8d1c7",
+      "green": "#a49a86",
+      "yellow": "#bb9a68",
+      "red": "#b06a4e",
+      "live": "#b6ac9a",
+      "edge": "rgba(150, 140, 125, 0.15)",
+      "edgeSoft": "rgba(150, 140, 125, 0.08)",
+      "hover": "rgba(150, 140, 125, 0.07)",
+      "panel": "rgba(150, 140, 125, 0.04)"
+    },
+    "gradient": [
+      "#b8ad98",
+      "#bd9a62",
+      "#a85e42"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "stone",
+    "label": "Stone",
+    "group": "Neutral",
+    "scheme": "light",
+    "note": "Stone: cool light grey-beige; slate->sand->brick gauge.",
+    "colors": {
+      "bg": [
+        234,
+        233,
+        230
+      ],
+      "fg": "#45443f",
+      "muted": "#918f88",
+      "track": "#d6d4cf",
+      "green": "#96988c",
+      "yellow": "#b0a276",
+      "red": "#a86a54",
+      "live": "#a8a89c",
+      "edge": "rgba(140, 138, 130, 0.15)",
+      "edgeSoft": "rgba(140, 138, 130, 0.08)",
+      "hover": "rgba(140, 138, 130, 0.07)",
+      "panel": "rgba(140, 138, 130, 0.04)"
+    },
+    "gradient": [
+      "#a6a89a",
+      "#b2a06e",
+      "#a05c46"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "taupe",
+    "label": "Taupe",
+    "group": "Neutral",
+    "scheme": "dark",
+    "note": "Taupe: warm dark neutral; mushroom->tan->rust on deep greige.",
+    "colors": {
+      "bg": [
+        38,
+        35,
+        31
+      ],
+      "fg": "#e6ded2",
+      "muted": "#a1988a",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#c2b79e",
+      "yellow": "#cfa96a",
+      "red": "#c6714a",
+      "live": "#c2b79e",
+      "edge": "rgba(190, 175, 150, 0.14)",
+      "edgeSoft": "rgba(190, 175, 150, 0.08)",
+      "hover": "rgba(190, 175, 150, 0.07)",
+      "panel": "rgba(190, 175, 150, 0.04)"
+    },
+    "gradient": [
+      "#cdbf9f",
+      "#cfa257",
+      "#c05e3a"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "ash",
+    "label": "Ash",
+    "group": "Core",
+    "scheme": "dark",
+    "note": "--- Midtones: one medium-luminance base per category. --- */ /* Ash (Core): neutral mid-grey, default cyan->yellow->red gauge.",
+    "colors": {
+      "bg": [
+        102,
+        106,
+        112
+      ],
+      "fg": "#eef0f2",
+      "muted": "#c3c9d0",
+      "track": "rgba(255, 255, 255, 0.14)",
+      "green": "#00ffe8",
+      "yellow": "#fffe00",
+      "red": "#ff5a4d",
+      "live": "#00ffe8",
+      "edge": "rgba(255, 255, 255, 0.16)",
+      "edgeSoft": "rgba(255, 255, 255, 0.09)",
+      "hover": "rgba(255, 255, 255, 0.08)",
+      "panel": "rgba(255, 255, 255, 0.05)"
+    },
+    "gradient": [
+      "#00ffe8",
+      "#fffe00",
+      "#ff0000"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "dusk",
+    "label": "Dusk",
+    "group": "Neon",
+    "scheme": "dark",
+    "note": "Dusk (Neon): mid violet, cyan->pink->red neon gauge.",
+    "colors": {
+      "bg": [
+        74,
+        58,
+        102
+      ],
+      "fg": "#f2ebff",
+      "muted": "#c3b3de",
+      "track": "rgba(255, 255, 255, 0.13)",
+      "green": "#22e0ff",
+      "yellow": "#ff5ecb",
+      "red": "#ff2e63",
+      "live": "#22e0ff",
+      "edge": "rgba(255, 255, 255, 0.15)",
+      "edgeSoft": "rgba(255, 255, 255, 0.08)",
+      "hover": "rgba(255, 255, 255, 0.08)",
+      "panel": "rgba(255, 255, 255, 0.05)"
+    },
+    "gradient": [
+      "#22e0ff",
+      "#ff5ecb",
+      "#ff2e63"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "terracotta",
+    "label": "Terracotta",
+    "group": "Warm",
+    "scheme": "dark",
+    "note": "Terracotta (Warm): mid clay, gold->orange->red gauge.",
+    "colors": {
+      "bg": [
+        122,
+        84,
+        68
+      ],
+      "fg": "#ffece0",
+      "muted": "#e0b09c",
+      "track": "rgba(255, 255, 255, 0.13)",
+      "green": "#ffd28a",
+      "yellow": "#ff9e5a",
+      "red": "#e5473c",
+      "live": "#ffd28a",
+      "edge": "rgba(255, 255, 255, 0.15)",
+      "edgeSoft": "rgba(255, 255, 255, 0.08)",
+      "hover": "rgba(255, 255, 255, 0.08)",
+      "panel": "rgba(255, 255, 255, 0.05)"
+    },
+    "gradient": [
+      "#ffd28a",
+      "#ff9e5a",
+      "#e5473c"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "steelblue",
+    "label": "Steel Blue",
+    "group": "Cool",
+    "scheme": "dark",
+    "note": "Steel Blue (Cool): mid blue-grey, aqua->green->coral gauge.",
+    "colors": {
+      "bg": [
+        74,
+        92,
+        112
+      ],
+      "fg": "#eaf1f8",
+      "muted": "#b7c7da",
+      "track": "rgba(255, 255, 255, 0.13)",
+      "green": "#40e0d0",
+      "yellow": "#9ec96a",
+      "red": "#ff6b6b",
+      "live": "#40e0d0",
+      "edge": "rgba(255, 255, 255, 0.15)",
+      "edgeSoft": "rgba(255, 255, 255, 0.08)",
+      "hover": "rgba(255, 255, 255, 0.08)",
+      "panel": "rgba(255, 255, 255, 0.05)"
+    },
+    "gradient": [
+      "#40e0d0",
+      "#9ec96a",
+      "#ff6b6b"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "moss",
+    "label": "Moss",
+    "group": "Greens",
+    "scheme": "dark",
+    "note": "Moss (Greens): mid forest green, lime->olive->rust gauge.",
+    "colors": {
+      "bg": [
+        78,
+        96,
+        72
+      ],
+      "fg": "#eef4e6",
+      "muted": "#bccbac",
+      "track": "rgba(255, 255, 255, 0.13)",
+      "green": "#8ee06a",
+      "yellow": "#cdd45a",
+      "red": "#e0824a",
+      "live": "#8ee06a",
+      "edge": "rgba(255, 255, 255, 0.15)",
+      "edgeSoft": "rgba(255, 255, 255, 0.08)",
+      "hover": "rgba(255, 255, 255, 0.08)",
+      "panel": "rgba(255, 255, 255, 0.05)"
+    },
+    "gradient": [
+      "#8ee06a",
+      "#cdd45a",
+      "#e0824a"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "clay",
+    "label": "Clay",
+    "group": "Neutral",
+    "scheme": "dark",
+    "note": "Clay (Neutral): mid greige, sand->ochre->rust earthy gauge.",
+    "colors": {
+      "bg": [
+        124,
+        112,
+        100
+      ],
+      "fg": "#f4ece2",
+      "muted": "#d3c7b8",
+      "track": "rgba(255, 255, 255, 0.13)",
+      "green": "#cdbf9f",
+      "yellow": "#cfa257",
+      "red": "#c05e3a",
+      "live": "#cdbf9f",
+      "edge": "rgba(255, 255, 255, 0.15)",
+      "edgeSoft": "rgba(255, 255, 255, 0.08)",
+      "hover": "rgba(255, 255, 255, 0.08)",
+      "panel": "rgba(255, 255, 255, 0.05)"
+    },
+    "gradient": [
+      "#cdbf9f",
+      "#cfa257",
+      "#c05e3a"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "fog",
+    "label": "Fog",
+    "group": "Light",
+    "scheme": "light",
+    "note": "Fog (Light): mid grey, deep teal->ochre->brick gauge, dark text.",
+    "colors": {
+      "bg": [
+        170,
+        174,
+        180
+      ],
+      "fg": "#2c2f34",
+      "muted": "#565b62",
+      "track": "rgba(0, 0, 0, 0.15)",
+      "green": "#0f8a99",
+      "yellow": "#b07d18",
+      "red": "#c62828",
+      "live": "#0f8a99",
+      "edge": "rgba(0, 0, 0, 0.16)",
+      "edgeSoft": "rgba(0, 0, 0, 0.09)",
+      "hover": "rgba(0, 0, 0, 0.07)",
+      "panel": "rgba(0, 0, 0, 0.04)"
+    },
+    "gradient": [
+      "#0aa2b5",
+      "#d08a1e",
+      "#c62828"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "dustyrose",
+    "label": "Dusty Rose",
+    "group": "Blush",
+    "scheme": "light",
+    "note": "Dusty Rose (Light Pastel): mid muted rose, teal->rose->crimson gauge.",
+    "colors": {
+      "bg": [
+        190,
+        158,
+        166
+      ],
+      "fg": "#3a2830",
+      "muted": "#6f545e",
+      "track": "rgba(0, 0, 0, 0.13)",
+      "green": "#4c9e97",
+      "yellow": "#c56d8c",
+      "red": "#b0405f",
+      "live": "#6bb3b0",
+      "edge": "rgba(0, 0, 0, 0.14)",
+      "edgeSoft": "rgba(0, 0, 0, 0.08)",
+      "hover": "rgba(0, 0, 0, 0.07)",
+      "panel": "rgba(0, 0, 0, 0.04)"
+    },
+    "gradient": [
+      "#6bb3b0",
+      "#d98aa8",
+      "#b0405f"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "mauve",
+    "label": "Mauve",
+    "group": "Pastel",
+    "scheme": "dark",
+    "note": "Mauve (Pastel): mid muted purple, periwinkle->lilac->rose gauge.",
+    "colors": {
+      "bg": [
+        110,
+        98,
+        124
+      ],
+      "fg": "#f2ecf6",
+      "muted": "#cabbd6",
+      "track": "rgba(255, 255, 255, 0.13)",
+      "green": "#9db5f0",
+      "yellow": "#c39ae0",
+      "red": "#ef7ba0",
+      "live": "#9db5f0",
+      "edge": "rgba(255, 255, 255, 0.15)",
+      "edgeSoft": "rgba(255, 255, 255, 0.08)",
+      "hover": "rgba(255, 255, 255, 0.08)",
+      "panel": "rgba(255, 255, 255, 0.05)"
+    },
+    "gradient": [
+      "#9db5f0",
+      "#c39ae0",
+      "#ef7ba0"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "amethyst",
+    "label": "Amethyst",
+    "group": "Neon",
+    "scheme": "dark",
+    "note": "--- Bright purple / violet forward. --- */ /* Amethyst: deep violet-black; lilac->violet->magenta gauge.",
+    "colors": {
+      "bg": [
+        24,
+        16,
+        36
+      ],
+      "fg": "#efe6ff",
+      "muted": "#a892cc",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#c98bff",
+      "yellow": "#a855f7",
+      "red": "#e24dff",
+      "live": "#c98bff",
+      "edge": "rgba(180, 120, 255, 0.16)",
+      "edgeSoft": "rgba(180, 120, 255, 0.08)",
+      "hover": "rgba(180, 120, 255, 0.08)",
+      "panel": "rgba(180, 120, 255, 0.04)"
+    },
+    "gradient": [
+      "#c98bff",
+      "#a04dff",
+      "#e24dff"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "ultraviolet",
+    "label": "Ultraviolet",
+    "group": "Neon",
+    "scheme": "dark",
+    "note": "Ultraviolet: near-black; indigo->violet->hot-magenta gauge.",
+    "colors": {
+      "bg": [
+        16,
+        12,
+        30
+      ],
+      "fg": "#e8e2ff",
+      "muted": "#9788c4",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#7c4dff",
+      "yellow": "#b04dff",
+      "red": "#ff4de0",
+      "live": "#7c4dff",
+      "edge": "rgba(150, 100, 255, 0.16)",
+      "edgeSoft": "rgba(150, 100, 255, 0.08)",
+      "hover": "rgba(150, 100, 255, 0.08)",
+      "panel": "rgba(150, 100, 255, 0.04)"
+    },
+    "gradient": [
+      "#7c6bff",
+      "#b04dff",
+      "#ff4de0"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "orchid",
+    "label": "Orchid",
+    "group": "Neon",
+    "scheme": "dark",
+    "note": "Orchid: plum-black; orchid->violet->pink gauge.",
+    "colors": {
+      "bg": [
+        28,
+        18,
+        34
+      ],
+      "fg": "#f4e6f8",
+      "muted": "#b592c0",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#e0a0ff",
+      "yellow": "#c04dff",
+      "red": "#ff4da8",
+      "live": "#e0a0ff",
+      "edge": "rgba(200, 120, 230, 0.16)",
+      "edgeSoft": "rgba(200, 120, 230, 0.08)",
+      "hover": "rgba(200, 120, 230, 0.08)",
+      "panel": "rgba(200, 120, 230, 0.04)"
+    },
+    "gradient": [
+      "#e0a0ff",
+      "#c04dff",
+      "#ff4da8"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "rosewood",
+    "label": "Rosewood",
+    "group": "Warm",
+    "scheme": "dark",
+    "note": "--- Warm with a touch of pink/red at the top. --- */ /* Rosewood: warm maroon-brown; honey->coral->rose gauge.",
+    "colors": {
+      "bg": [
+        40,
+        26,
+        26
+      ],
+      "fg": "#f6e4dc",
+      "muted": "#c39a90",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#ffcf8a",
+      "yellow": "#ff9f72",
+      "red": "#e5477a",
+      "live": "#ffcf8a",
+      "edge": "rgba(230, 140, 120, 0.15)",
+      "edgeSoft": "rgba(230, 140, 120, 0.08)",
+      "hover": "rgba(230, 140, 120, 0.07)",
+      "panel": "rgba(230, 140, 120, 0.04)"
+    },
+    "gradient": [
+      "#ffcf8a",
+      "#ff8f6a",
+      "#e5477a"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "ember",
+    "label": "Ember",
+    "group": "Warm",
+    "scheme": "dark",
+    "note": "Ember: warm ember-black; amber->flame->hot-pink gauge.",
+    "colors": {
+      "bg": [
+        34,
+        22,
+        20
+      ],
+      "fg": "#ffe6da",
+      "muted": "#c9998a",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#ffb066",
+      "yellow": "#ff7a4a",
+      "red": "#ff3d7f",
+      "live": "#ffb066",
+      "edge": "rgba(255, 130, 90, 0.15)",
+      "edgeSoft": "rgba(255, 130, 90, 0.08)",
+      "hover": "rgba(255, 130, 90, 0.07)",
+      "panel": "rgba(255, 130, 90, 0.04)"
+    },
+    "gradient": [
+      "#ffb066",
+      "#ff6b4a",
+      "#ff3d7f"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "sienna",
+    "label": "Sienna",
+    "group": "Warm",
+    "scheme": "dark",
+    "note": "Sienna: warm earthen; wheat->sienna->raspberry gauge.",
+    "colors": {
+      "bg": [
+        38,
+        28,
+        22
+      ],
+      "fg": "#f4e6d8",
+      "muted": "#c2a084",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#f0b878",
+      "yellow": "#e5845a",
+      "red": "#d64d6a",
+      "live": "#f0b878",
+      "edge": "rgba(220, 150, 100, 0.15)",
+      "edgeSoft": "rgba(220, 150, 100, 0.08)",
+      "hover": "rgba(220, 150, 100, 0.07)",
+      "panel": "rgba(220, 150, 100, 0.04)"
+    },
+    "gradient": [
+      "#f0b878",
+      "#e5845a",
+      "#d64d6a"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "glacier",
+    "label": "Glacier",
+    "group": "Cool",
+    "scheme": "dark",
+    "note": "--- Cool gradients: gauges that stay cool (cyan->blue->violet). --- */ /* Glacier: icy dark; pale cyan->azure->indigo gauge.",
+    "colors": {
+      "bg": [
+        14,
+        22,
+        34
+      ],
+      "fg": "#dbe8f5",
+      "muted": "#7f93ad",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#a8f0ff",
+      "yellow": "#4aa8ff",
+      "red": "#6a5cff",
+      "live": "#a8f0ff",
+      "edge": "rgba(120, 180, 255, 0.15)",
+      "edgeSoft": "rgba(120, 180, 255, 0.08)",
+      "hover": "rgba(120, 180, 255, 0.07)",
+      "panel": "rgba(120, 180, 255, 0.04)"
+    },
+    "gradient": [
+      "#a8f0ff",
+      "#3d9bff",
+      "#6a4aff"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "tide",
+    "label": "Tide",
+    "group": "Cool",
+    "scheme": "dark",
+    "note": "Tide: teal-navy dark; aqua->blue->violet gauge.",
+    "colors": {
+      "bg": [
+        10,
+        26,
+        34
+      ],
+      "fg": "#d6ecef",
+      "muted": "#6f96a0",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#00e0d0",
+      "yellow": "#1e90ff",
+      "red": "#7a3cff",
+      "live": "#00e0d0",
+      "edge": "rgba(60, 200, 220, 0.15)",
+      "edgeSoft": "rgba(60, 200, 220, 0.08)",
+      "hover": "rgba(60, 200, 220, 0.07)",
+      "panel": "rgba(60, 200, 220, 0.04)"
+    },
+    "gradient": [
+      "#00e5d0",
+      "#1e90ff",
+      "#7a3cff"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "aurora",
+    "label": "Aurora",
+    "group": "Cool",
+    "scheme": "dark",
+    "note": "Aurora: indigo-black dark; mint->cyan->blue->violet gauge.",
+    "colors": {
+      "bg": [
+        16,
+        20,
+        36
+      ],
+      "fg": "#e0e6f8",
+      "muted": "#8088b0",
+      "track": "rgba(255, 255, 255, 0.08)",
+      "green": "#4dffd0",
+      "yellow": "#3aa8ff",
+      "red": "#a04dff",
+      "live": "#4dffd0",
+      "edge": "rgba(120, 140, 255, 0.15)",
+      "edgeSoft": "rgba(120, 140, 255, 0.08)",
+      "hover": "rgba(120, 140, 255, 0.07)",
+      "panel": "rgba(120, 140, 255, 0.04)"
+    },
+    "gradient": [
+      "#4dffd0",
+      "#3aa8ff",
+      "#a04dff"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "pop",
+    "label": "Pop",
+    "group": "Bright",
+    "scheme": "light",
+    "note": "--- Bright: light backgrounds with vivid, saturated gauge colors. --- */ /* Pop: white base, electric cyan->magenta->red gauge.",
+    "colors": {
+      "bg": [
+        252,
+        252,
+        255
+      ],
+      "fg": "#1a1a24",
+      "muted": "#6b6b7a",
+      "track": "#e8e8ef",
+      "green": "#00c2d6",
+      "yellow": "#e000a8",
+      "red": "#ff0033",
+      "live": "#00c2d6",
+      "edge": "rgba(0, 0, 0, 0.12)",
+      "edgeSoft": "rgba(0, 0, 0, 0.06)",
+      "hover": "rgba(0, 0, 0, 0.05)",
+      "panel": "rgba(0, 0, 0, 0.03)"
+    },
+    "gradient": [
+      "#00d9f0",
+      "#ff00aa",
+      "#ff0033"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "citrus",
+    "label": "Citrus",
+    "group": "Bright",
+    "scheme": "light",
+    "note": "Citrus: bright warm; lime->yellow->orange gauge on cream white.",
+    "colors": {
+      "bg": [
+        255,
+        253,
+        245
+      ],
+      "fg": "#2a2410",
+      "muted": "#7a7150",
+      "track": "#efe9d4",
+      "green": "#4fc500",
+      "yellow": "#f2b600",
+      "red": "#ff5a00",
+      "live": "#6fd41a",
+      "edge": "rgba(0, 0, 0, 0.11)",
+      "edgeSoft": "rgba(0, 0, 0, 0.06)",
+      "hover": "rgba(0, 0, 0, 0.05)",
+      "panel": "rgba(0, 0, 0, 0.03)"
+    },
+    "gradient": [
+      "#7ad400",
+      "#ffbe00",
+      "#ff4b00"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "candy",
+    "label": "Candy",
+    "group": "Bright",
+    "scheme": "light",
+    "note": "Candy: bright pink base, magenta->violet->blue gauge.",
+    "colors": {
+      "bg": [
+        255,
+        248,
+        253
+      ],
+      "fg": "#2a1030",
+      "muted": "#8a5c86",
+      "track": "#f3dcee",
+      "green": "#ff2ea6",
+      "yellow": "#b03cf0",
+      "red": "#3a5cff",
+      "live": "#ff5ec0",
+      "edge": "rgba(120, 20, 120, 0.12)",
+      "edgeSoft": "rgba(120, 20, 120, 0.06)",
+      "hover": "rgba(120, 20, 120, 0.05)",
+      "panel": "rgba(120, 20, 120, 0.03)"
+    },
+    "gradient": [
+      "#ff2ea6",
+      "#a83cf0",
+      "#2f5cff"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "volt",
+    "label": "Volt",
+    "group": "Bright",
+    "scheme": "light",
+    "note": "Volt: bright white base, green->lime->hot-red gauge.",
+    "colors": {
+      "bg": [
+        250,
+        255,
+        250
+      ],
+      "fg": "#0f2410",
+      "muted": "#5a7a5c",
+      "track": "#dcefdc",
+      "green": "#00d43a",
+      "yellow": "#b6e000",
+      "red": "#ff1744",
+      "live": "#00e044",
+      "edge": "rgba(0, 80, 20, 0.12)",
+      "edgeSoft": "rgba(0, 80, 20, 0.06)",
+      "hover": "rgba(0, 80, 20, 0.05)",
+      "panel": "rgba(0, 80, 20, 0.03)"
+    },
+    "gradient": [
+      "#00e04a",
+      "#bfe000",
+      "#ff1744"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "azure",
+    "label": "Azure",
+    "group": "Bright",
+    "scheme": "light",
+    "note": "Azure: bright white-blue base, sky->violet->pink gauge.",
+    "colors": {
+      "bg": [
+        246,
+        251,
+        255
+      ],
+      "fg": "#10203a",
+      "muted": "#5c7090",
+      "track": "#d8e6f4",
+      "green": "#00a2ff",
+      "yellow": "#7c4dff",
+      "red": "#ff2e88",
+      "live": "#29b6ff",
+      "edge": "rgba(0, 60, 120, 0.12)",
+      "edgeSoft": "rgba(0, 60, 120, 0.06)",
+      "hover": "rgba(0, 60, 120, 0.05)",
+      "panel": "rgba(0, 60, 120, 0.03)"
+    },
+    "gradient": [
+      "#00b0ff",
+      "#7c4dff",
+      "#ff2e88"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  }
+]

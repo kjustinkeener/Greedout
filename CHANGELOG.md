@@ -4,7 +4,7 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
-## [Unreleased]
+## [0.2.7] - 2026-09-12
 
 ### Added
 - The recent-compaction strip now appears for Codex sessions too. Codex writes no
@@ -12,6 +12,13 @@ documented in the GitHub Releases notes and the `v*` git tags.
   fills in one turn later (once the post size exists) and its trailing label reads
   "summary encrypted" instead of a reader link, but the pre and post sizes and the
   time since the compaction are shown the same as for Claude Code.
+
+### Changed
+- The full project path is now a tooltip on the project name only, instead of on
+  the whole session row or panel. The session-title and project tooltips are
+  labeled ("Session: ..." and "Project: ..."), each keeping its rename or explore
+  hint on a second line. The Codex "summary encrypted" strip has an explanatory
+  tooltip.
 
 ## [0.2.6] - 2026-09-12
 

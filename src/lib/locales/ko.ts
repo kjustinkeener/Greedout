@@ -15,6 +15,13 @@ export const ko: PartialDict = {
   "main.exploreOrRename": "클릭하여 탐색 · 더블클릭하여 이름 변경",
   "main.rename": "더블클릭하여 이름 변경",
   "main.exploreProject": "이 프로젝트 탐색",
+  "main.sessionTip": "세션: {title}",
+  "main.projectTip": "프로젝트: {path}",
+  "main.compacted": "압축됨",
+  "main.compactRead": "요약 보기",
+  "main.compactTip": "컨텍스트가 압축되었습니다. 클릭하면 요약을 볼 수 있습니다.",
+  "main.compactEncrypted": "요약 암호화됨",
+  "main.compactEncryptedTip": "컨텍스트가 압축되었습니다. Codex는 압축 요약을 디스크에 암호화하여 저장하므로 표시할 수 없습니다.",
   "main.limits": "목표 {target} · 최대 {max}",
   "main.spend": "지출",
   "main.context": "컨텍스트",
@@ -135,4 +142,9 @@ export const ko: PartialDict = {
 
   "common.close": "닫기",
   "common.loading": "로드 중…",
+
+  "compact.title": "압축 요약",
+  "compact.loading": "요약 로드 중…",
+  "compact.none": "이 세션에 대한 압축 요약이 없습니다.",
+  "compact.tokens": "토큰",
 };

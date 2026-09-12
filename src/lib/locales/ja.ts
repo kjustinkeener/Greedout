@@ -15,6 +15,13 @@ export const ja: PartialDict = {
   "main.exploreOrRename": "クリックで探索・ダブルクリックで名前変更",
   "main.rename": "ダブルクリックで名前を変更",
   "main.exploreProject": "このプロジェクトを探索",
+  "main.sessionTip": "セッション: {title}",
+  "main.projectTip": "プロジェクト: {path}",
+  "main.compacted": "コンパクト化済み",
+  "main.compactRead": "要約を読む",
+  "main.compactTip": "コンテキストがコンパクト化されました。クリックすると要約を読めます。",
+  "main.compactEncrypted": "要約は暗号化",
+  "main.compactEncryptedTip": "コンテキストがコンパクト化されました。Codex はコンパクト化の要約をディスク上で暗号化するため、表示できません。",
   "main.limits": "目標 {target} · 最大 {max}",
   "main.spend": "支出",
   "main.context": "コンテキスト",
@@ -135,4 +142,9 @@ export const ja: PartialDict = {
 
   "common.close": "閉じる",
   "common.loading": "読み込み中…",
+
+  "compact.title": "コンパクト化の要約",
+  "compact.loading": "要約を読み込み中…",
+  "compact.none": "このセッションにはコンパクト化の要約がありません。",
+  "compact.tokens": "トークン",
 };

@@ -15,6 +15,13 @@ export const it: PartialDict = {
   "main.exploreOrRename": "Clic per esplorare · doppio clic per rinominare",
   "main.rename": "Doppio clic per rinominare",
   "main.exploreProject": "Esplora questo progetto",
+  "main.sessionTip": "Sessione: {title}",
+  "main.projectTip": "Progetto: {path}",
+  "main.compacted": "Compattato",
+  "main.compactRead": "leggi il riepilogo",
+  "main.compactTip": "Il contesto è stato compattato. Clicca per leggere il riepilogo.",
+  "main.compactEncrypted": "riepilogo cifrato",
+  "main.compactEncryptedTip": "Il contesto è stato compattato. Codex cifra il riepilogo della compattazione su disco, quindi non può essere mostrato.",
   "main.limits": "obiettivo {target} · max {max}",
   "main.spend": "spesa",
   "main.context": "contesto",
@@ -136,4 +143,9 @@ export const it: PartialDict = {
 
   "common.close": "Chiudi",
   "common.loading": "Caricamento…",
+
+  "compact.title": "Riepilogo della compattazione",
+  "compact.loading": "Caricamento del riepilogo…",
+  "compact.none": "Nessun riepilogo della compattazione disponibile per questa sessione.",
+  "compact.tokens": "token",
 };

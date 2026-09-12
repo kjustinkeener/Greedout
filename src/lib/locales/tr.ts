@@ -15,6 +15,13 @@ export const tr: PartialDict = {
   "main.exploreOrRename": "İncelemek için tıklayın · yeniden adlandırmak için çift tıklayın",
   "main.rename": "Yeniden adlandırmak için çift tıklayın",
   "main.exploreProject": "Bu projeyi incele",
+  "main.sessionTip": "Oturum: {title}",
+  "main.projectTip": "Proje: {path}",
+  "main.compacted": "Sıkıştırıldı",
+  "main.compactRead": "özeti oku",
+  "main.compactTip": "Bağlam sıkıştırıldı. Özeti okumak için tıklayın.",
+  "main.compactEncrypted": "özet şifreli",
+  "main.compactEncryptedTip": "Bağlam sıkıştırıldı. Codex, sıkıştırma özetini diskte şifrelediği için gösterilemiyor.",
   "main.limits": "hedef {target} · maks {max}",
   "main.spend": "harcama",
   "main.context": "bağlam",
@@ -136,4 +143,9 @@ export const tr: PartialDict = {
 
   "common.close": "Kapat",
   "common.loading": "Yükleniyor…",
+
+  "compact.title": "Sıkıştırma özeti",
+  "compact.loading": "Özet yükleniyor…",
+  "compact.none": "Bu oturum için sıkıştırma özeti yok.",
+  "compact.tokens": "token",
 };

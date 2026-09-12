@@ -17,6 +17,13 @@ export const es: PartialDict = {
   "main.exploreOrRename": "Clic para explorar · doble clic para renombrar",
   "main.rename": "Doble clic para renombrar",
   "main.exploreProject": "Explorar este proyecto",
+  "main.sessionTip": "Sesión: {title}",
+  "main.projectTip": "Proyecto: {path}",
+  "main.compacted": "Compactado",
+  "main.compactRead": "leer resumen",
+  "main.compactTip": "El contexto se compactó. Haz clic para leer el resumen.",
+  "main.compactEncrypted": "resumen cifrado",
+  "main.compactEncryptedTip": "El contexto se compactó. Codex cifra el resumen de compactación en el disco, por lo que no se puede mostrar.",
   "main.limits": "objetivo {target} · máx {max}",
   "main.spend": "gasto",
   "main.context": "contexto",
@@ -146,4 +153,9 @@ export const es: PartialDict = {
 
   "common.close": "Cerrar",
   "common.loading": "Cargando…",
+
+  "compact.title": "Resumen de compactación",
+  "compact.loading": "Cargando resumen…",
+  "compact.none": "No hay ningún resumen de compactación disponible para esta sesión.",
+  "compact.tokens": "tokens",
 } as const;

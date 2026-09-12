@@ -15,6 +15,13 @@ export const fr: PartialDict = {
   "main.exploreOrRename": "Cliquer pour explorer · double-cliquer pour renommer",
   "main.rename": "Double-cliquer pour renommer",
   "main.exploreProject": "Explorer ce projet",
+  "main.sessionTip": "Session : {title}",
+  "main.projectTip": "Projet : {path}",
+  "main.compacted": "Compacté",
+  "main.compactRead": "lire le résumé",
+  "main.compactTip": "Le contexte a été compacté. Cliquez pour lire le résumé.",
+  "main.compactEncrypted": "résumé chiffré",
+  "main.compactEncryptedTip": "Le contexte a été compacté. Codex chiffre le résumé du compactage sur le disque, il ne peut donc pas être affiché.",
   "main.limits": "cible {target} · max {max}",
   "main.spend": "dépenses",
   "main.context": "contexte",
@@ -136,4 +143,9 @@ export const fr: PartialDict = {
 
   "common.close": "Fermer",
   "common.loading": "Chargement…",
+
+  "compact.title": "Résumé du compactage",
+  "compact.loading": "Chargement du résumé…",
+  "compact.none": "Aucun résumé de compactage n'est disponible pour cette session.",
+  "compact.tokens": "jetons",
 };

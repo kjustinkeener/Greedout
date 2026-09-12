@@ -15,6 +15,13 @@ export const nl: PartialDict = {
   "main.exploreOrRename": "Klik om te verkennen · dubbelklik om te hernoemen",
   "main.rename": "Dubbelklik om te hernoemen",
   "main.exploreProject": "Dit project verkennen",
+  "main.sessionTip": "Sessie: {title}",
+  "main.projectTip": "Project: {path}",
+  "main.compacted": "Gecompacteerd",
+  "main.compactRead": "samenvatting lezen",
+  "main.compactTip": "De context is gecompacteerd. Klik om de samenvatting te lezen.",
+  "main.compactEncrypted": "samenvatting versleuteld",
+  "main.compactEncryptedTip": "De context is gecompacteerd. Codex versleutelt de compactiesamenvatting op schijf, dus deze kan niet worden getoond.",
   "main.limits": "doel {target} · max {max}",
   "main.spend": "uitgaven",
   "main.context": "context",
@@ -136,4 +143,9 @@ export const nl: PartialDict = {
 
   "common.close": "Sluiten",
   "common.loading": "Laden…",
+
+  "compact.title": "Compactiesamenvatting",
+  "compact.loading": "Samenvatting laden…",
+  "compact.none": "Geen compactiesamenvatting beschikbaar voor deze sessie.",
+  "compact.tokens": "tokens",
 };

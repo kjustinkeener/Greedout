@@ -15,6 +15,13 @@ export const de: PartialDict = {
   "main.exploreOrRename": "Klicken zum Erkunden · Doppelklick zum Umbenennen",
   "main.rename": "Doppelklick zum Umbenennen",
   "main.exploreProject": "Dieses Projekt erkunden",
+  "main.sessionTip": "Sitzung: {title}",
+  "main.projectTip": "Projekt: {path}",
+  "main.compacted": "Komprimiert",
+  "main.compactRead": "Zusammenfassung lesen",
+  "main.compactTip": "Der Kontext wurde komprimiert. Klicken, um die Zusammenfassung zu lesen.",
+  "main.compactEncrypted": "Zusammenfassung verschlüsselt",
+  "main.compactEncryptedTip": "Der Kontext wurde komprimiert. Codex verschlüsselt die Zusammenfassung der Komprimierung auf der Festplatte, daher kann sie nicht angezeigt werden.",
   "main.limits": "Ziel {target} · max {max}",
   "main.spend": "Ausgaben",
   "main.context": "Kontext",
@@ -136,4 +143,9 @@ export const de: PartialDict = {
 
   "common.close": "Schließen",
   "common.loading": "Wird geladen…",
+
+  "compact.title": "Zusammenfassung der Komprimierung",
+  "compact.loading": "Zusammenfassung wird geladen…",
+  "compact.none": "Für diese Sitzung ist keine Zusammenfassung der Komprimierung verfügbar.",
+  "compact.tokens": "Tokens",
 };

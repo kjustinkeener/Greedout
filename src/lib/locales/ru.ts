@@ -15,6 +15,13 @@ export const ru: PartialDict = {
   "main.exploreOrRename": "Клик, чтобы открыть · двойной клик, чтобы переименовать",
   "main.rename": "Двойной клик, чтобы переименовать",
   "main.exploreProject": "Открыть этот проект",
+  "main.sessionTip": "Сессия: {title}",
+  "main.projectTip": "Проект: {path}",
+  "main.compacted": "Сжато",
+  "main.compactRead": "открыть сводку",
+  "main.compactTip": "Контекст был сжат. Нажмите, чтобы открыть сводку.",
+  "main.compactEncrypted": "сводка зашифрована",
+  "main.compactEncryptedTip": "Контекст был сжат. Codex шифрует сводку сжатия на диске, поэтому показать её нельзя.",
   "main.limits": "цель {target} · макс {max}",
   "main.spend": "расходы",
   "main.context": "контекст",
@@ -136,4 +143,9 @@ export const ru: PartialDict = {
 
   "common.close": "Закрыть",
   "common.loading": "Загрузка…",
+
+  "compact.title": "Сводка сжатия",
+  "compact.loading": "Загрузка сводки…",
+  "compact.none": "Для этой сессии нет сводки сжатия.",
+  "compact.tokens": "токенов",
 };

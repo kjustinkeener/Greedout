@@ -15,6 +15,13 @@ export const zhHans: PartialDict = {
   "main.exploreOrRename": "点击浏览 · 双击重命名",
   "main.rename": "双击重命名",
   "main.exploreProject": "浏览此项目",
+  "main.sessionTip": "会话：{title}",
+  "main.projectTip": "项目：{path}",
+  "main.compacted": "已压缩",
+  "main.compactRead": "阅读摘要",
+  "main.compactTip": "上下文已压缩。点击以阅读摘要。",
+  "main.compactEncrypted": "摘要已加密",
+  "main.compactEncryptedTip": "上下文已压缩。Codex 会在磁盘上加密压缩摘要，因此无法显示。",
   "main.limits": "目标 {target} · 上限 {max}",
   "main.spend": "花费",
   "main.context": "上下文",
@@ -135,4 +142,9 @@ export const zhHans: PartialDict = {
 
   "common.close": "关闭",
   "common.loading": "加载中…",
+
+  "compact.title": "压缩摘要",
+  "compact.loading": "正在加载摘要…",
+  "compact.none": "此会话没有可用的压缩摘要。",
+  "compact.tokens": "token",
 };

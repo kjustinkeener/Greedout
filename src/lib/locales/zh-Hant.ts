@@ -15,6 +15,13 @@ export const zhHant: PartialDict = {
   "main.exploreOrRename": "點一下開啟檢視器‧點兩下重新命名",
   "main.rename": "點兩下重新命名",
   "main.exploreProject": "檢視此專案",
+  "main.sessionTip": "工作階段：{title}",
+  "main.projectTip": "專案：{path}",
+  "main.compacted": "已壓縮",
+  "main.compactRead": "閱讀摘要",
+  "main.compactTip": "上下文已壓縮。點擊即可閱讀摘要。",
+  "main.compactEncrypted": "摘要已加密",
+  "main.compactEncryptedTip": "上下文已壓縮。Codex 會在磁碟上加密壓縮摘要，因此無法顯示。",
   "main.limits": "目標 {target} · 上限 {max}",
   "main.spend": "花費",
   "main.context": "上下文",
@@ -136,4 +143,9 @@ export const zhHant: PartialDict = {
 
   "common.close": "關閉",
   "common.loading": "載入中…",
+
+  "compact.title": "壓縮摘要",
+  "compact.loading": "正在載入摘要…",
+  "compact.none": "此工作階段沒有可用的壓縮摘要。",
+  "compact.tokens": "權杖",
 };

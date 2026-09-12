@@ -260,6 +260,7 @@ pub fn migrate_sidecars() {
         "config.json",
         "labels.json",
         "window-state.json",
+        "themes.json",
         "cache.sqlite",
         "cache.sqlite-wal",
         "cache.sqlite-shm",

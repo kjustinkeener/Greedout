@@ -9,6 +9,7 @@ mod update;
 mod scan;
 mod stats;
 mod sysfonts;
+mod themes;
 mod winstate;
 
 use scan::Session;
@@ -466,6 +467,8 @@ pub fn run() {
             load_window_state,
             get_config,
             set_config,
+            themes::get_user_themes,
+            themes::set_user_themes,
             browse_status,
             browse_enable,
             browse_scan,

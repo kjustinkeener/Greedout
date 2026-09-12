@@ -241,6 +241,13 @@ export interface SysStats {
   memPct: number; // used / total, 0..1
 }
 
+// A user-defined theme and its palette. The Rust `themes::UserTheme` /
+// `UserThemeColors` structs serialize to exactly this shape, which is the same
+// shape the theme emitter (src/lib/themeCss.ts) already defines as ThemeData /
+// ThemeColors. Re-exported here (rather than redeclared) so the mirror of the
+// Rust payload cannot drift from the emitter's own contract.
+export type { ThemeData as UserTheme, ThemeColors as UserThemeColors } from "./lib/themeCss";
+
 /** A font set the user saved. Flat, so it spreads straight onto the prefs. */
 export interface UserFontSet {
   id: string;

@@ -4,6 +4,15 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
+## [0.2.6] - 2026-09-12
+
+### Added
+- Recent-compaction strip on the focused gauge: right after a `/compact`, a
+  full-width band under the readout shows the pre and post context size and how
+  long ago it happened, and stays for the next three prompts. Click it to open a
+  reader window with the full compaction summary text. Claude Code only; Codex
+  compaction summaries are encrypted on disk and have no strip.
+
 ## [0.2.5] - 2026-09-12
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "greedout",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "description": "Always-on-top gauges for your live AI coding sessions: context fill, spend, and history. Supports Claude Code.",
   "license": "MIT",

@@ -7,21 +7,24 @@
 //
 // Subcommands:
 //   generate  read src/lib/themes.json  -> write src/themes.generated.css
-//   verify    parse the ORIGINAL palette region out of git (HEAD:src/app.css)
-//             AND the generated CSS, build a canonical {context -> {prop:value}}
-//             map for each, and assert deep equality. Prints THEMES_LOSSLESS_OK
-//             (exit 0) on match, a precise diff (exit 1) on mismatch. The gate.
-//   extract   (authoring aid) parse the palette region out of the current
-//             src/app.css + labels/groups out of src/lib/theme.ts -> rewrite
-//             src/lib/themes.json. Not part of the build; themes.json is the
-//             committed source of truth once authored.
+//   verify    parse the FROZEN baseline (tools/themes-baseline.css, the palette
+//             region as it stood just before the refactor) AND the generated
+//             CSS, build a canonical {context -> {prop:value}} map for each, and
+//             assert deep equality. Prints THEMES_LOSSLESS_OK (exit 0) on match,
+//             a precise diff (exit 1) on mismatch. The gate; runnable in CI.
+//   extract   (obsolete authoring aid) parsed the palette region out of the
+//             pre-refactor src/app.css + theme.ts to bootstrap themes.json.
+//             themes.json is now the source of truth; kept for reference only.
 //
 // No dependencies beyond Node builtins.
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+// The palette emitter is shared with the browser runtime (user-theme injection)
+// so built-in and user palettes are emitted by the same code. Node 24 strips the
+// TypeScript types on import; the module is browser-safe (no Node builtins).
+import { themeToCss, TOKEN_MAP } from "../src/lib/themeCss.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, "..");
@@ -30,6 +33,7 @@ const P = {
   themeTs: resolve(repo, "src/lib/theme.ts"),
   json: resolve(repo, "src/lib/themes.json"),
   outCss: resolve(repo, "src/themes.generated.css"),
+  baseline: resolve(repo, "tools/themes-baseline.css"),
 };
 
 // --- CSS parsing ------------------------------------------------------------
@@ -149,20 +153,6 @@ function readThemeMeta() {
   return meta;
 }
 
-const TOKEN_MAP = [
-  ["--fg", "fg"],
-  ["--muted", "muted"],
-  ["--track", "track"],
-  ["--green", "green"],
-  ["--yellow", "yellow"],
-  ["--red", "red"],
-  ["--live", "live"],
-  ["--edge", "edge"],
-  ["--edge-soft", "edgeSoft"],
-  ["--hover", "hover"],
-  ["--panel", "panel"],
-];
-
 function declsToColors(d) {
   const colors = {};
   const bg = d["--bg-rgb"];
@@ -281,27 +271,6 @@ const BANNER =
   "   over the gauge scale, and the halo is a transparent shadow rather than a\n" +
   "   removed one, so a new light palette only has to set the variable. */";
 
-// Emit the declaration body (indented `indent`) for a theme entry. Order:
-// spend-fg/spend-shadow (light only) is emitted AFTER color-scheme here; source
-// order varied per block but computed style does not depend on it. Shared so
-// build-time and any future runtime injection cannot drift.
-export function themeToCss(t, indent = "  ", opts = {}) {
-  const c = t.colors || {};
-  const lines = [];
-  const push = (prop, val) => lines.push(`${indent}${prop}: ${val};`);
-  if (!opts.omitScheme) push("color-scheme", t.scheme);
-  if (t.spendFg != null) push("--spend-fg", t.spendFg);
-  if (t.spendShadow != null) push("--spend-shadow", t.spendShadow);
-  if (c.bg) push("--bg-rgb", c.bg.join(", "));
-  for (const [css, key] of TOKEN_MAP) if (c[key] != null) push(css, c[key]);
-  if (t.gradient) {
-    push("--g0", t.gradient[0]);
-    push("--g1", t.gradient[1]);
-    push("--g2", t.gradient[2]);
-  }
-  return lines.join("\n");
-}
-
 function themeBlock(t, selector) {
   return `${selector} {\n${themeToCss(t)}\n}`;
 }
@@ -346,16 +315,11 @@ function generate() {
 
 // --- verify -----------------------------------------------------------------
 
-function gitOriginalAppCss() {
-  const out = execFileSync("git", ["-C", repo, "show", "HEAD:src/app.css"], {
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  return out;
-}
-
 function verify() {
-  const original = sliceRegion(gitOriginalAppCss());
+  // The known-good reference is a frozen fixture (the palette region as it stood
+  // just before the refactor), not git HEAD: HEAD's app.css no longer contains
+  // the region, and a fixture keeps the gate runnable forever and in CI.
+  const original = readFileSync(P.baseline, "utf8");
   const generated = readFileSync(P.outCss, "utf8");
 
   const mapA = canonMap(original);

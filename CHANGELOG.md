@@ -4,6 +4,19 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
+## [0.2.5] - 2026-09-12
+
+### Added
+- Live search in the Context Explorer: results update as you type once the
+  query reaches three characters (the trigram index floor), instead of only on
+  Enter. Shorter queries still search on Enter through the disk-scan path.
+
+### Changed
+- The live-search debounce is adaptive: it ratchets up to the slowest search
+  roundtrip seen so far (clamped to a usable range), so an instant index stays
+  responsive while a cache that leans on the slower disk scan backs off on its
+  own rather than relaunching on every keystroke.
+
 ## [0.2.4] - 2026-09-11
 
 ### Added

@@ -124,6 +124,18 @@
   let editing = $state<Draft | null>(null);
   let editingIsNew = $state(false);
   const editPal = $derived(editing ? userPalette(editing) : null);
+  // A theme name must be unique (case-insensitive) against the built-ins and the
+  // other user themes, so the picker and the saved list stay unambiguous.
+  const nameTaken = $derived.by(() => {
+    if (!editing) return false;
+    const label = editing.label.trim().toLowerCase();
+    if (!label) return false;
+    const others = [
+      ...THEMES.map((t) => t.label),
+      ...userThemes.filter((t) => t.id !== editing!.id).map((t) => t.label),
+    ];
+    return others.some((l) => l.toLowerCase() === label);
+  });
 
   const HEX_TOKENS: [SKey, string][] = [
     ["fg", "Text"],
@@ -271,7 +283,7 @@
   }
 
   async function save() {
-    if (!editing || !editing.label.trim()) return;
+    if (!editing || !editing.label.trim() || nameTaken) return;
     const draft = $state.snapshot(editing) as ThemeData;
     const next = [...userThemes.filter((t) => t.id !== draft.id), draft];
     userThemes = next;
@@ -404,7 +416,7 @@
       <span class="title">{editingIsNew ? "New theme" : "Edit theme"}</span>
       <span class="spacer"></span>
       <button class="ghost" onclick={cancel}>Cancel</button>
-      <button class="primary" disabled={!editing.label.trim()} onclick={save}>Save</button>
+      <button class="primary" disabled={!editing.label.trim() || nameTaken} onclick={save}>Save</button>
     </div>
 
     <div class="escroll">
@@ -416,8 +428,9 @@
 
       <label class="field">
         <span>Name</span>
-        <input type="text" bind:value={editing.label} placeholder="My theme" />
+        <input type="text" class:bad={nameTaken} bind:value={editing.label} placeholder="My theme" />
       </label>
+      {#if nameTaken}<div class="nameerr">A theme with this name already exists.</div>{/if}
       <div class="field">
         <span>Scheme</span>
         <div class="seg">
@@ -788,6 +801,14 @@
     height: 24px;
     border: 1px solid var(--edge);
     border-radius: 5px;
+  }
+  .field input.bad {
+    border-color: var(--red);
+  }
+  .nameerr {
+    color: var(--red);
+    font-size: calc(11px * var(--size-ui));
+    margin: -2px 0 6px;
   }
   .spendsample {
     display: inline-block;

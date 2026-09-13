@@ -99,6 +99,21 @@
   });
   onDestroy(() => void unlistenTheme.then((u) => u()));
 
+  // User themes are not in the built-in THEMES registry, so the theme button
+  // would show a raw slug for one. Load them (and follow live edits) to resolve
+  // the display name.
+  let userThemes = $state<{ id: string; label: string }[]>([]);
+  invoke<{ id: string; label: string }[]>("get_user_themes")
+    .then((v) => (userThemes = v))
+    .catch(() => {});
+  const unlistenUserThemes = listen<{ id: string; label: string }[]>(
+    "user-themes",
+    (e) => (userThemes = e.payload ?? []),
+  );
+  onDestroy(() => void unlistenUserThemes.then((u) => u()));
+  const themeLabel = (id: string) =>
+    THEMES.find((th) => th.id === id)?.label ?? userThemes.find((th) => th.id === id)?.label ?? id;
+
   // Same for fonts: the picker owns the choice, this panel mirrors the label.
   const unlistenFonts = listen<FontPrefs>("fonts", (e) => {
     if (cfg) cfg = { ...cfg, ...e.payload };
@@ -365,7 +380,7 @@
     <label class="field" title={t("settings.themeTip")} oncontextmenu={(e) => resetField("theme", e)}>
       <span>{t("settings.theme")}</span>
       <button class="sel themebtn" onclick={openThemes}>
-        {THEMES.find((th) => th.id === cfg!.theme)?.label ?? cfg.theme}
+        {themeLabel(cfg.theme)}
         <span class="chev"><Icon name="chevron-right" size={11} /></span>
       </button>
     </label>

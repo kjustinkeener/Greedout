@@ -456,6 +456,7 @@
 <div class="wrap" oncontextmenu={zoomOut} role="presentation">
   <header class="bar" data-tauri-drag-region>
     <Brand size={15} font={14} />
+    <span class="wtitle">Daily Spend</span>
     <span class="total" title={headerTitle}>{usd(headerTotal)}</span>
     <button
       class="rescan"
@@ -690,6 +691,11 @@
   }
   .total {
     margin-left: auto;
+  }
+  .wtitle {
+    font-weight: var(--w-bold);
+    font-size: calc(14px * var(--size-ui));
+    color: var(--muted);
   }
   .crumbs {
     display: flex;

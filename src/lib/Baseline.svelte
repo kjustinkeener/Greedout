@@ -1433,7 +1433,7 @@
     <header data-tauri-drag-region>
       <Brand size={16} font={15} />
       <div class="titles">
-        <span class="sub" title={curTitle}>{curTitle}</span>
+        <span class="sub">Context Explorer</span>
       </div>
       <div class="search">
         <span class="sicon"><Icon name="search" size={13} /></span>

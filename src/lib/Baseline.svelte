@@ -1760,14 +1760,14 @@
                 class="mbtn"
                 class:on={sizeMetric === "tok"}
                 onclick={() => (sizeMetric = "tok")}
-                title="Size rects by tokens">{fmt(displayTotal)} tok</button
+                title="Size tiles by tokens">{fmt(displayTotal)} tok</button
               >
             {/if}
             <button
               class="mbtn"
               class:on={sizeMetric === "usd"}
               onclick={() => (sizeMetric = "usd")}
-              title="Size rects by estimated cost">{fmtUsd(displayUsd)}</button
+              title="Size tiles by estimated cost">{fmtUsd(displayUsd)}</button
             >
           </span>{#if estimated}{:else if report.capturedAt}<span class="asof"
               >{liveCtx != null ? "live · parts" : "as of"}

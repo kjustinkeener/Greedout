@@ -467,6 +467,12 @@
     >
       <Icon name="refresh" size={13} />
     </button>
+    <button class="x" onclick={() => getCurrentWindow().minimize()} aria-label="Minimize"
+      ><Icon name="minus" size={13} /></button
+    >
+    <button class="x" onclick={() => getCurrentWindow().toggleMaximize()} aria-label="Maximize"
+      ><Icon name="expand" size={11} /></button
+    >
     <button class="x" onclick={() => getCurrentWindow().close()} aria-label="Close">✕</button>
   </header>
   <nav class="crumbs" aria-label="breadcrumb">

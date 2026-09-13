@@ -1462,6 +1462,12 @@
       </div>
       <!-- The OS close button is gone with decorations off, so the header carries
            its own. -->
+      <button class="hx" onclick={() => getCurrentWindow().minimize()} aria-label="Minimize"
+        ><Icon name="minus" size={14} /></button
+      >
+      <button class="hx" onclick={() => getCurrentWindow().toggleMaximize()} aria-label="Maximize"
+        ><Icon name="expand" size={12} /></button
+      >
       <button class="hx" onclick={onClose} aria-label="Close"><Icon name="x" size={14} /></button>
     </header>
 

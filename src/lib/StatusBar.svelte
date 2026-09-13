@@ -14,9 +14,11 @@
     return () => unlisten?.();
   });
 
-  // Per-core CPU color: green (idle) → amber → red (saturated), matching the
-  // Hue sweeps 120→0 as usage goes 0→100.
-  const coreColor = (u: number) => `hsl(${Math.round(120 - 1.2 * Math.min(u, 100))} 65% 48%)`;
+  // Per-core CPU height (%) plus the reveal-size that maps the themed gauge
+  // gradient onto the full track so the fill clips the bottom %-subsection of it
+  // (idle = low-gradient end, saturated = the whole sweep). Same reveal trick as
+  // the memory bar, rotated vertical, so the bars follow the theme with no JS color.
+  const coreH = (u: number) => Math.max(2, Math.min(u, 100));
 
   // Memory bar reveals more of the fixed themed gauge gradient as usage climbs
   // (same trick as the Row context fill): the gradient always spans the whole
@@ -37,7 +39,7 @@
         <span class="core">
           <span
             class="corefill"
-            style="height:{Math.max(2, Math.min(u, 100))}%; background:{coreColor(u)}"
+            style="height:{coreH(u)}%; background-size:100% {10000 / coreH(u)}%"
           ></span>
         </span>
       {/each}
@@ -87,9 +89,16 @@
     width: 100%;
     display: block;
     border-radius: 1px;
+    /* Themed gauge gradient spanning the full track, revealed bottom-up by the
+       fill height (background-size clips it), so a bar shows the bottom slice of
+       the same gradient the speedo and memory bar use. */
+    background-color: var(--g2);
+    background-image: linear-gradient(0deg, var(--g0) 0%, var(--g1) 52%, var(--g2) 100%);
+    background-repeat: no-repeat;
+    background-position: left bottom;
     transition:
       height 0.4s ease,
-      background 0.4s ease;
+      background-size 0.4s ease;
   }
   .membar {
     position: relative;

@@ -321,6 +321,7 @@ export function initTheme() {
   }
   document.documentElement.setAttribute("data-theme", resolveTheme(stored));
 
+  setupWindowFx();
   void hydrateUserThemes();
 }
 

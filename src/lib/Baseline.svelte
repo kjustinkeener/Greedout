@@ -1432,8 +1432,8 @@
   <div class="modal">
     <header data-tauri-drag-region>
       <Brand size={16} font={15} />
-      <div class="titles">
-        <span class="sub">Context Explorer</span>
+      <div class="titles" data-tauri-drag-region>
+        <span class="sub" data-tauri-drag-region>Context Explorer</span>
       </div>
       <div class="search">
         <span class="sicon"><Icon name="search" size={13} /></span>

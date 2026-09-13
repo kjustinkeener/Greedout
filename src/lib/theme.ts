@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { injectUserThemes, type ThemeData } from "./themeCss";
 
 // Window background alpha. Two things drive it: the opacity slider sets the
@@ -25,11 +26,18 @@ export function applyOpacity(o: number) {
 }
 
 // Every window is transparent and rests at the configured opacity; entering it
-// with the pointer brings it fully opaque, leaving eases it back over 2s. Wiring
-// this from initTheme (called by every entry) means all windows get it for free.
+// with the pointer brings it fully opaque, leaving eases it back. Wiring this
+// from initTheme (called by every entry) means all windows get it for free. The
+// main window eases back slower (5s) than the secondary windows (2s).
 function setupWindowFx() {
   if (fxReady || typeof document === "undefined") return;
   fxReady = true;
+  let leaveMs = 2000;
+  try {
+    if (getCurrentWindow().label === "main") leaveMs = 5000;
+  } catch {
+    // not in a Tauri window; keep the default
+  }
   try {
     // Registering the property is what makes the alpha animate; a plain var swap
     // would step. Throws if already registered (HMR re-run), which is harmless.
@@ -51,7 +59,7 @@ function setupWindowFx() {
   });
   root.addEventListener("pointerleave", () => {
     hovering = false;
-    setBgAlpha(restAlpha, 2000);
+    setBgAlpha(restAlpha, leaveMs);
   });
   // Rest opacity = the shared config value the main window's slider drives, so a
   // secondary window (which never calls applyOpacity) rests at the same level.

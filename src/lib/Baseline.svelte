@@ -107,6 +107,9 @@
   let searchStart = 0;
   // Mutually-exclusive project filter over the results (null = all projects).
   let projectFilter = $state<string | null>(null);
+  // Result ordering: "best" = relevance score (backend default), "recent" =
+  // last-activity time. Hits stream in score-sorted; this re-sorts the shown set.
+  let sortMode = $state<"best" | "recent">("best");
   // Projects present in the current results, with hit counts, most-hits first.
   let resultProjects = $derived.by(() => {
     const counts = new Map<string, number>();
@@ -116,11 +119,16 @@
       .sort((a, b) => b.count - a.count || a.project.localeCompare(b.project));
   });
   // The active filter can go stale if its project drops out of a re-run's results.
-  let shownHits = $derived(
-    projectFilter && resultProjects.some((p) => p.project === projectFilter)
-      ? searchHits.filter((h) => h.project === projectFilter)
-      : searchHits,
-  );
+  let shownHits = $derived.by(() => {
+    const base =
+      projectFilter && resultProjects.some((p) => p.project === projectFilter)
+        ? searchHits.filter((h) => h.project === projectFilter)
+        : searchHits;
+    const arr = [...base];
+    if (sortMode === "recent") arr.sort((a, b) => b.lastMs - a.lastMs || b.score - a.score);
+    else arr.sort((a, b) => b.score - a.score || b.lastMs - a.lastMs);
+    return arr;
+  });
 
   function runSearch() {
     clearTimeout(searchTimer);
@@ -1443,6 +1451,11 @@
             }
           }}
         />
+        {#if searchActive && !searching}
+          <button class="sx" aria-label="Search again" title="Search again" onclick={runSearch}
+            ><Icon name="refresh" size={11} /></button
+          >
+        {/if}
         {#if searchQuery || searchActive}
           <button class="sx" aria-label="Clear search" onclick={clearSearch}><Icon name="x" size={11} /></button>
         {/if}
@@ -1508,7 +1521,28 @@
           >{shownHits.length} match{shownHits.length === 1 ? "" : "es"}
           {#if searching}<span class="asof">· scanning {searchProg?.done ?? 0}/{searchProg?.total ?? 0}</span>{/if}
         </span>
-        {#if resultProjects.length > 1}
+        {#if searchHits.length > 1}
+          <span class="sortsel">
+            <button
+              class="ppill"
+              class:on={sortMode === "best"}
+              onclick={() => (sortMode = "best")}
+              title="Most relevant first">Best</button
+            >
+            <button
+              class="ppill"
+              class:on={sortMode === "recent"}
+              onclick={() => (sortMode = "recent")}
+              title="Most recent first">Recent</button
+            >
+          </span>
+        {/if}
+        {#if searching}
+          <span class="grand"><button class="crumb back" onclick={cancelSearch}>Cancel</button></span>
+        {/if}
+      </div>
+      {#if resultProjects.length > 1}
+        <div class="bar pfilterbar">
           <span class="pfilters">
             <button
               class="ppill"
@@ -1525,17 +1559,8 @@
               >
             {/each}
           </span>
-        {/if}
-        <span class="grand">
-          {#if searching}
-            <button class="crumb back" onclick={cancelSearch}>Cancel</button>
-          {:else}
-            <button class="crumb back" onclick={runSearch} title="Search again">
-              <Icon name="refresh" size={11} />rerun</button
-            >
-          {/if}
-        </span>
-      </div>
+        </div>
+      {/if}
       {#if searching}
         <div class="scanwrap">
           <div class="ptrack">
@@ -1909,6 +1934,17 @@
     font-weight: var(--w-semibold);
     font-size: calc(12px * var(--size-ui));
     flex: 0 0 auto;
+  }
+  /* Best/recent result-order toggle, sitting next to the match count. */
+  .sortsel {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+  /* Project filters live on their own line below the count + sort toggle. */
+  .pfilterbar {
+    padding-top: 0;
   }
   /* Mutually-exclusive project filters over the results. Takes the middle space
      and scrolls horizontally when there are more projects than fit. */

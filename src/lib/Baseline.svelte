@@ -1650,13 +1650,29 @@
           {/if}
         </nav>
         <span class="grand">
-          {#if zoom === "root"}
-            {harnesses.length} harnesses
-          {:else if zoom === "harness"}
-            {projects.length} projects · {fmtBytes(harnessAgg?.totalBytes ?? 0)}
-          {:else}
-            {sessionRows.length} sessions
-          {/if}
+          <span class="bcount">
+            {#if zoom === "root"}
+              {harnesses.length} harnesses
+            {:else if zoom === "harness"}
+              {projects.length} projects
+            {:else}
+              {sessionRows.length} sessions
+            {/if}
+          </span>
+          <span class="metricsel" role="group" aria-label="Size tiles by">
+            <button
+              class="mbtn"
+              class:on={sizeMetric !== "usd"}
+              onclick={() => (sizeMetric = "tok")}
+              title="Size tiles by on-disk bytes">{fmtBytes(currentTotal)}</button
+            >
+            <button
+              class="mbtn"
+              class:on={sizeMetric === "usd"}
+              onclick={() => (sizeMetric = "usd")}
+              title="Size tiles by measured spend">{fmtUsd(displayUsd)}</button
+            >
+          </span>
           <button class="crumb back rescan" onclick={() => startScan(true)} disabled={scanning}
           >
             {#if !scanning}<Icon name="refresh" size={11} />{/if}{scanning
@@ -1762,25 +1778,16 @@
         </nav>
         <span class="grand">
           <span class="metricsel" role="group" aria-label="Size rects by">
-            {#if zoom === "session"}
-              <!-- tok is a point-in-time context reading; summing it across
-                   sessions/projects is meaningless, so only the session level
-                   shows a tok total. Browse levels size by on-disk bytes
-                   instead. Cost is additive and stays at every level. -->
-              <button
-                class="mbtn"
-                class:on={sizeMetric === "tok"}
-                onclick={() => (sizeMetric = "tok")}
-                title="Size tiles by tokens">{fmt(displayTotal)} tok</button
-              >
-            {:else}
-              <button
-                class="mbtn"
-                class:on={sizeMetric !== "usd"}
-                onclick={() => (sizeMetric = "tok")}
-                title="Size tiles by on-disk bytes">{fmtBytes(currentTotal)}</button
-              >
-            {/if}
+            <!-- tok is a point-in-time context reading; summing it across
+                 sessions/projects is meaningless, so only the session level
+                 shows a tok total. Browse levels get a bytes button in their
+                 own bar. Cost is additive and stays at every level. -->
+            <button
+              class="mbtn"
+              class:on={sizeMetric === "tok"}
+              onclick={() => (sizeMetric = "tok")}
+              title="Size tiles by tokens">{fmt(displayTotal)} tok</button
+            >
             <button
               class="mbtn"
               class:on={sizeMetric === "usd"}
@@ -2365,6 +2372,11 @@
   .metricsel {
     display: inline-flex;
     gap: 2px;
+  }
+  /* Level count ("12 projects") beside the browse metric toggle. */
+  .bcount {
+    color: var(--muted);
+    margin-right: 4px;
   }
   .mbtn {
     background: none;

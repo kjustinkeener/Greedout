@@ -93,7 +93,9 @@ pub fn get_user_themes() -> Vec<UserTheme> {
 #[tauri::command]
 pub fn set_user_themes(app: tauri::AppHandle, themes: Vec<UserTheme>) -> Result<(), String> {
     save_user_themes(&themes).map_err(|e| e.to_string())?;
-    for label in ["settings", "about", "baseline", "themes", "fonts"] {
+    // "main" leads: the gauge window must register a new palette's id before a
+    // follow-up "theme" pick lands on it, or the pick resolves to auto.
+    for label in ["main", "settings", "about", "baseline", "themes", "fonts"] {
         let _ = app.emit_to(label, "user-themes", &themes);
     }
     Ok(())

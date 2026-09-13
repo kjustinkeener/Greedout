@@ -4,6 +4,33 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
+## [0.2.8] - 2026-09-12
+
+### Added
+- In-app theme editor. Duplicate a built-in theme or clone one of your own, then
+  edit its background, token colors, gauge gradient, translucent surfaces and
+  spend text with a live preview, and save it as a named custom theme. Custom
+  themes group under "My Themes" at the top of the picker, persist to a sidecar
+  file, and paint on cold start with no dark flash. Names that collide with a
+  built-in or another custom theme are blocked.
+- Every secondary window (Context Explorer, Daily Spend, Settings, About, the
+  theme and font pickers) is now borderless and transparent like the main
+  window: it rests at the Opacity level and snaps opaque on hover, easing back
+  over two seconds. Context Explorer and Daily Spend gained a branded title bar
+  with minimize, maximize/restore and close buttons.
+- Context Explorer can size the browse-level tiles (harness, project and session
+  lists) by measured spend, with a bytes/$ toggle in the toolbar, and a
+  Best/Recent sort beside the search match count.
+
+### Changed
+- The CPU status-bar bars now follow the active theme, drawn as a bottom slice of
+  the gauge gradient, and recolor instantly on a theme switch.
+- The Context Explorer search toolbar was reworked: the rerun button moved inside
+  the search box and the project filter pills moved to their own line.
+- The Settings theme button shows a custom theme's name rather than its slug.
+- Title-bar maximize buttons use proper maximize and restore-down glyphs that
+  track whether the window is maximized.
+
 ## [0.2.7] - 2026-09-12
 
 ### Added

@@ -1,6 +1,6 @@
 [package]
 name = "greedout"
-version = "0.2.7"
+version = "0.2.8"
 description = "Multi-session context and spend gauges for AI coding harnesses (supports Claude Code)"
 authors = ["Justin Keener <308936412+kjustinkeener@users.noreply.github.com>"]
 edition = "2021"

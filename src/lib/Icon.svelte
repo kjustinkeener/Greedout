@@ -29,7 +29,9 @@
     | "copy"
     | "edit"
     | "trash"
-    | "plus";
+    | "plus"
+    | "maximize"
+    | "restore";
 
   const PATHS: Record<IconName, string[]> = {
     x: ["M18 6 6 18", "M6 6l12 12"],
@@ -64,6 +66,10 @@
       "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", "M10 11v6", "M14 11v6",
     ],
     plus: ["M12 5v14", "M5 12h14"],
+    // Window chrome (shared App-Patterns Title-Bar geometry): a single square
+    // for maximize, two offset squares for restore-down.
+    maximize: ["M5 5h14v14H5z"],
+    restore: ["M7 7V5h12v12h-2", "M5 9h12v12H5z"],
   };
 </script>
 

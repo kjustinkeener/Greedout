@@ -11,6 +11,7 @@
   import { onMount, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { watchMaximized } from "./winChrome";
   import type { SpendEvent, SpendSummary } from "../types";
   import Brand from "./Brand.svelte";
   import Icon from "./Icon.svelte";
@@ -19,6 +20,9 @@
   import { openExplorer } from "./explorerWindow";
   import { t, watchLocale, activeLocale } from "./i18n.svelte";
 
+  // Swap the maximize button to a restore glyph while the window is maximized.
+  let maximized = $state(false);
+  $effect(() => watchMaximized((m) => (maximized = m)));
   let summary = $state<SpendSummary[]>([]);
   // The open day's individual turns (for the swim lanes), fetched on demand.
   let dayEvents = $state<SpendEvent[]>([]);
@@ -470,8 +474,11 @@
     <button class="x" onclick={() => getCurrentWindow().minimize()} aria-label="Minimize"
       ><Icon name="minus" size={13} /></button
     >
-    <button class="x" onclick={() => getCurrentWindow().toggleMaximize()} aria-label="Maximize"
-      ><Icon name="expand" size={11} /></button
+    <button
+      class="x"
+      onclick={() => getCurrentWindow().toggleMaximize()}
+      aria-label={maximized ? "Restore" : "Maximize"}
+      ><Icon name={maximized ? "restore" : "maximize"} size={11} /></button
     >
     <button class="x" onclick={() => getCurrentWindow().close()} aria-label="Close">✕</button>
   </header>

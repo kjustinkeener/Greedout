@@ -3,6 +3,7 @@
   import Icon from "./Icon.svelte";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { watchMaximized } from "./winChrome";
   import { gaugeColor, themeTick, applyTheme, type Theme } from "./theme";
   import Brand from "./Brand.svelte";
   import ScanProgress from "./ScanProgress.svelte";
@@ -29,6 +30,9 @@
     initView = "",
   }: { id: string; title: string; initProject?: string; initView?: string } = $props();
   const onClose = () => getCurrentWindow().close();
+  // Swap the maximize button to a restore glyph while the window is maximized.
+  let maximized = $state(false);
+  $effect(() => watchMaximized((m) => (maximized = m)));
   // Trace helper for the baseline feature: to the webview console for live
   // debugging, and to greedout.log (gated by the Debug logging setting) so the
   // existing log-to-file switch captures the UI side too.
@@ -1475,8 +1479,11 @@
       <button class="hx" onclick={() => getCurrentWindow().minimize()} aria-label="Minimize"
         ><Icon name="minus" size={14} /></button
       >
-      <button class="hx" onclick={() => getCurrentWindow().toggleMaximize()} aria-label="Maximize"
-        ><Icon name="expand" size={12} /></button
+      <button
+        class="hx"
+        onclick={() => getCurrentWindow().toggleMaximize()}
+        aria-label={maximized ? "Restore" : "Maximize"}
+        ><Icon name={maximized ? "restore" : "maximize"} size={12} /></button
       >
       <button class="hx" onclick={onClose} aria-label="Close"><Icon name="x" size={14} /></button>
     </header>

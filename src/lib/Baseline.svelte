@@ -757,9 +757,6 @@
       ? topNodes.reduce((s, n) => s + n.tokens, 0)
       : (liveCtx ?? report?.total ?? 0),
   );
-  // Estimated total USD for the session (sum of role-priced top-level nodes).
-  let displayUsd = $derived(topNodes.reduce((s, n) => s + nodeUsd(n), 0));
-
   // Browse-level tiles (harness/project zoom): projects or sessions sized by
   // on-disk bytes. `detail` carries the id/path we need on click.
   let browseNodes = $derived.by<BaselineNode[]>(() => {
@@ -812,6 +809,13 @@
     return base;
   });
   let currentTotal = $derived(current.reduce((s, n) => s + n.tokens, 0));
+  // Total USD shown on the metric button: the session's role-priced estimate
+  // inside a session, else the sum of measured spend across the browse tiles.
+  let displayUsd = $derived(
+    zoom === "session"
+      ? topNodes.reduce((s, n) => s + nodeUsd(n), 0)
+      : current.reduce((s, n) => s + (n.cost ?? 0), 0),
+  );
   // Total of the current level in the ACTIVE size metric (tokens or USD), so a
   // tile's percentage matches whatever is sizing the rects.
   let currentSizeTotal = $derived(current.reduce((s, n) => s + sizeVal(n), 0));
@@ -981,10 +985,16 @@
     if (t === "User" || t === "Tool Result") return n.tokens * costIn;
     return n.tokens * costRate; // baseline/system tiles: resent as cache reads
   }
-  // The value that sizes a rect: tokens or estimated USD, per the selected metric.
+  // The value that sizes a tile: tokens/bytes, or measured/estimated spend when
+  // the USD metric is picked. nodeUsd already returns the measured `cost` at
+  // browse levels and the role-priced estimate inside a session, so USD sizing
+  // now works at every level. Falls back to tokens when nothing here has a cost
+  // yet (unenriched browse tiles) so tiles never collapse to zero area.
   function sizeVal(n: BaselineNode): number {
-    return sizeMetric === "usd" && zoom === "session" ? nodeUsd(n) : n.tokens;
+    return sizeMetric === "usd" && !usdEmpty ? nodeUsd(n) : n.tokens;
   }
+  // True when USD sizing is selected but no tile at this level has a cost yet.
+  let usdEmpty = $derived(sizeMetric === "usd" && !current.some((n) => nodeUsd(n) > 0));
   // Darken an "rgb(r,g,b)" string by a factor (1 = unchanged).
   function dim(rgb: string, factor: number): string {
     return rgb.replace(/\d+/g, (v) => String(Math.round(Number(v) * factor)));
@@ -1300,7 +1310,7 @@
   let tiles = $derived(
     zoom === "session"
       ? squarify(current, box.w, box.h, true, sizeVal) // keep conversation order
-      : squarify(current, box.w, box.h),
+      : squarify(current, box.w, box.h, false, sizeVal),
   );
   // Surface any uncaught webview error into greedout.log (gated by the Debug
   // setting via dbg). A thrown error inside an effect/render silently disables
@@ -1374,7 +1384,7 @@
               <span class="tm-size" style="font-size:{Math.max(10, labelFont(t.w, t.h) * 0.62)}px;"
                 >{#if sizeMetric === "tok" && (tileCost(t.node) ?? 0) > 0 && t.w > 56 && t.h > 44}<span
                     class="tm-cost">{fmtUsd(tileCost(t.node) ?? 0)}</span
-                  >{" · "}{/if}{sizeMetric === "usd" && zoom === "session"
+                  >{" · "}{/if}{sizeMetric === "usd" && !usdEmpty
                   ? fmtUsd(nodeUsd(t.node))
                   : tileSize(t.node.tokens)} · {tilePct(t.node)}</span
               >
@@ -1755,12 +1765,20 @@
             {#if zoom === "session"}
               <!-- tok is a point-in-time context reading; summing it across
                    sessions/projects is meaningless, so only the session level
-                   shows a tok total. Cost is additive and stays at every level. -->
+                   shows a tok total. Browse levels size by on-disk bytes
+                   instead. Cost is additive and stays at every level. -->
               <button
                 class="mbtn"
                 class:on={sizeMetric === "tok"}
                 onclick={() => (sizeMetric = "tok")}
                 title="Size tiles by tokens">{fmt(displayTotal)} tok</button
+              >
+            {:else}
+              <button
+                class="mbtn"
+                class:on={sizeMetric !== "usd"}
+                onclick={() => (sizeMetric = "tok")}
+                title="Size tiles by on-disk bytes">{fmtBytes(currentTotal)}</button
               >
             {/if}
             <button

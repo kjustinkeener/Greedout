@@ -70,6 +70,10 @@
       height: h,
       minWidth: 320,
       minHeight: 300,
+      // Borderless + transparent like the other secondary windows; each picker
+      // draws its own title bar (Brand + Close).
+      decorations: false,
+      transparent: true,
       resizable: true,
       alwaysOnTop: cfg?.always_on_top ?? true,
       focus: true,
@@ -296,7 +300,12 @@
 <!-- Auto-save: input/change events from any control bubble here. `input` (typing,
      slider drag) debounces; `change` (toggle, select, blur) saves immediately. -->
 <div class="panel" oninput={() => commit()} onchange={() => commit(true)}>
-  <div class="head"><Brand size={16} font={15} /><span class="htxt">{t("settings.title")}</span></div>
+  <div class="bar" data-tauri-drag-region>
+    <Brand size={16} font={15} />
+    <span class="title">{t("settings.title")}</span>
+    <span class="spacer"></span>
+    <button class="x" onclick={() => getCurrentWindow().close()} aria-label={t("win.close")}>✕</button>
+  </div>
   {#if !cfg}
     <div class="loading">{t("common.loading")}</div>
   {:else}
@@ -484,17 +493,36 @@
     padding: 12px;
     color: var(--fg);
   }
-  .head {
+  /* Borderless-window title bar: drag region + Close, spanning the panel's full
+     width (negative margins back out the panel padding). */
+  .bar {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-weight: var(--w-bold);
-    color: var(--fg);
-    margin-bottom: 8px;
+    margin: -12px -12px 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--edge-soft);
   }
-  .htxt {
+  .title {
     color: var(--muted);
     font-weight: var(--w-semibold);
+    font-size: calc(14px * var(--size-ui));
+  }
+  .spacer {
+    flex: 1;
+  }
+  .x {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: calc(13px * var(--size-ui));
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .x:hover {
+    background: var(--hover);
+    color: var(--fg);
   }
   .loading {
     color: var(--muted);

@@ -10,6 +10,7 @@
   // (get_spend_day) only when a day is opened, and cached per day.
   import { onMount, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import type { SpendEvent, SpendSummary } from "../types";
   import Brand from "./Brand.svelte";
   import Icon from "./Icon.svelte";
@@ -453,7 +454,7 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="wrap" oncontextmenu={zoomOut} role="presentation">
-  <header class="bar">
+  <header class="bar" data-tauri-drag-region>
     <Brand size={15} font={14} />
     <span class="total" title={headerTitle}>{usd(headerTotal)}</span>
     <button
@@ -465,6 +466,7 @@
     >
       <Icon name="refresh" size={13} />
     </button>
+    <button class="x" onclick={() => getCurrentWindow().close()} aria-label="Close">✕</button>
   </header>
   <nav class="crumbs" aria-label="breadcrumb">
     <button class="crumb" class:active={level === "months"} onclick={toMonths}>
@@ -752,6 +754,21 @@
   .rescan:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+  /* Borderless-window Close button (the OS one is gone with decorations off). */
+  .x {
+    flex: none;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 6px;
+    border-radius: 5px;
+  }
+  .x:hover {
+    background: var(--panel);
+    color: var(--fg);
   }
   .msg {
     margin: auto;

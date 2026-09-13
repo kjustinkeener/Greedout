@@ -47,7 +47,7 @@
 </script>
 
 <div class="wrap">
-  <header>
+  <header data-tauri-drag-region>
     <BrandIcon size={16} />
     <span class="htitle">{t("compact.title")}</span>
     {#if heading}<span class="hsub" title={heading}>{heading}</span>{/if}

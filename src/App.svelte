@@ -69,6 +69,10 @@
       height: 420,
       minWidth: 440,
       minHeight: 240,
+      // Borderless + transparent, like the main window: the panel supplies its
+      // own title bar (Brand + Close), so no OS chrome.
+      decorations: false,
+      transparent: true,
       resizable: true,
       alwaysOnTop: aot,
       focus: true,
@@ -126,6 +130,7 @@
       // Borderless, like Moonpool's About: the panel is one full-page drag region
       // (data-tauri-drag-region) with its own Close button, so no OS title bar.
       decorations: false,
+      transparent: true,
       resizable: false,
       alwaysOnTop: aot,
       focus: true,
@@ -179,6 +184,9 @@
       title: "Compaction Summary",
       width: 560,
       height: 520,
+      // Borderless + transparent like the other secondary windows.
+      decorations: false,
+      transparent: true,
       resizable: true,
       alwaysOnTop: aot,
       focus: true,
@@ -245,6 +253,9 @@
       title: "Context Explorer",
       width: 720,
       height: 560,
+      // Borderless + transparent like the other secondary windows.
+      decorations: false,
+      transparent: true,
       resizable: true,
       alwaysOnTop: aot,
       focus: true,
@@ -306,6 +317,9 @@
       height: 560,
       minWidth: 420,
       minHeight: 320,
+      // Borderless + transparent like the other secondary windows.
+      decorations: false,
+      transparent: true,
       resizable: true,
       alwaysOnTop: aot,
       focus: true,

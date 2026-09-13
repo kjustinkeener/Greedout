@@ -63,6 +63,9 @@ async function createExplorerWindow(opts: ExplorerTarget, retry: boolean): Promi
     title: "Context Explorer",
     width: 720,
     height: 560,
+    // Borderless + transparent like the other secondary windows.
+    decorations: false,
+    transparent: true,
     resizable: true,
     alwaysOnTop: aot,
     focus: true,

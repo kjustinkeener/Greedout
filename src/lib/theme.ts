@@ -2,11 +2,66 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { injectUserThemes, type ThemeData } from "./themeCss";
 
-// Only the background alpha is user-adjustable (opacity slider); the base RGB
-// comes from the active theme's palette in app.css.
+// Window background alpha. Two things drive it: the opacity slider sets the
+// RESTING level, and hovering the window snaps it opaque then eases back (see
+// setupWindowFx). The base RGB comes from the active theme's palette in app.css.
+let restAlpha = 0.92;
+let hovering = false;
+let fxReady = false;
+
+// Set --bg-alpha with a specific transition duration. --bg-alpha is registered as
+// an animatable custom property in setupWindowFx, so this tweens rather than jumps.
+function setBgAlpha(a: number, ms: number) {
+  const root = document.documentElement;
+  root.style.transition = `--bg-alpha ${ms}ms ease`;
+  root.style.setProperty("--bg-alpha", String(a));
+}
+
 export function applyOpacity(o: number) {
   const a = Math.min(1, Math.max(0.3, o));
-  document.documentElement.style.setProperty("--bg-alpha", String(a));
+  restAlpha = a;
+  // While hovered the window is held opaque; the new rest applies on mouse-out.
+  if (!hovering) setBgAlpha(a, 120);
+}
+
+// Every window is transparent and rests at the configured opacity; entering it
+// with the pointer brings it fully opaque, leaving eases it back over 2s. Wiring
+// this from initTheme (called by every entry) means all windows get it for free.
+function setupWindowFx() {
+  if (fxReady || typeof document === "undefined") return;
+  fxReady = true;
+  try {
+    // Registering the property is what makes the alpha animate; a plain var swap
+    // would step. Throws if already registered (HMR re-run), which is harmless.
+    (
+      window as unknown as { CSS?: { registerProperty?: (d: object) => void } }
+    ).CSS?.registerProperty?.({
+      name: "--bg-alpha",
+      syntax: "<number>",
+      inherits: true,
+      initialValue: "1",
+    });
+  } catch {
+    // already registered
+  }
+  const root = document.documentElement;
+  root.addEventListener("pointerenter", () => {
+    hovering = true;
+    setBgAlpha(1, 120);
+  });
+  root.addEventListener("pointerleave", () => {
+    hovering = false;
+    setBgAlpha(restAlpha, 2000);
+  });
+  // Rest opacity = the shared config value the main window's slider drives, so a
+  // secondary window (which never calls applyOpacity) rests at the same level.
+  invoke<{ opacity?: number }>("get_config")
+    .then((c) => {
+      if (typeof c?.opacity === "number") applyOpacity(c.opacity);
+    })
+    .catch(() => {
+      // non-Tauri / failed: rest stays at the CSS default
+    });
 }
 
 // A theme id; "auto" follows the OS, the rest are fixed palettes in app.css.

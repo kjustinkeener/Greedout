@@ -1430,7 +1430,7 @@
 />
 <div class="win">
   <div class="modal">
-    <header>
+    <header data-tauri-drag-region>
       <Brand size={16} font={15} />
       <div class="titles">
         <span class="sub" title={curTitle}>{curTitle}</span>
@@ -1460,6 +1460,9 @@
           <button class="sx" aria-label="Clear search" onclick={clearSearch}><Icon name="x" size={11} /></button>
         {/if}
       </div>
+      <!-- The OS close button is gone with decorations off, so the header carries
+           its own. -->
+      <button class="hx" onclick={onClose} aria-label="Close"><Icon name="x" size={14} /></button>
     </header>
 
     {#if detail}
@@ -1915,6 +1918,22 @@
   .sx:hover {
     color: var(--fg);
     background: var(--bg);
+  }
+  /* Header Close button (borderless window, so no OS close). */
+  .hx {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 3px 5px;
+    border-radius: 4px;
+  }
+  .hx:hover {
+    color: var(--fg);
+    background: var(--hover);
   }
   /* Home icon button in the browse breadcrumb. Sizing lives on the component. */
   .crumb.home {

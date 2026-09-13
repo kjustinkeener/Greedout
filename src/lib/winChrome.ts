@@ -7,6 +7,9 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 // toggleMaximize) so the glyph stays in sync however the window changed.
 export function watchMaximized(set: (m: boolean) => void): () => void {
   const w = getCurrentWindow();
+  // Outside a real Tauri window (unit tests, SSR) these APIs are absent; the
+  // button just stays on the maximize glyph.
+  if (typeof w?.isMaximized !== "function") return () => {};
   let un: (() => void) | undefined;
   let dead = false;
   const sync = () => w.isMaximized().then((m) => !dead && set(m));

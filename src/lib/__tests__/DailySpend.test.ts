@@ -20,6 +20,17 @@ vi.mock("@tauri-apps/api/event", () => ({
   // Never fires in these tests; just resolve to a no-op unlisten.
   listen: vi.fn(async () => () => {}),
 }));
+// The title bar tracks maximized state on mount (watchMaximized); stub the
+// window API so it resolves quietly instead of touching a real Tauri window.
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({
+    minimize: vi.fn(),
+    toggleMaximize: vi.fn(),
+    close: vi.fn(),
+    isMaximized: vi.fn(async () => false),
+    onResized: vi.fn(async () => () => {}),
+  }),
+}));
 // Clicking a lane opens the Explorer window; keep it inert so no Tauri window API
 // is touched. (These tests never click a lane, but the import must resolve.)
 vi.mock("../explorerWindow", () => ({ openExplorer: vi.fn(async () => {}) }));

@@ -51,7 +51,13 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ close: vi.fn() }),
+  getCurrentWindow: () => ({
+    close: vi.fn(),
+    minimize: vi.fn(),
+    toggleMaximize: vi.fn(),
+    isMaximized: vi.fn(async () => false),
+    onResized: vi.fn(async () => () => {}),
+  }),
 }));
 
 import Baseline from "../Baseline.svelte";

@@ -216,10 +216,31 @@
     return id;
   }
 
-  function duplicate(id: string, label: string, group: string) {
+  // A label distinct from every existing theme's, so two duplicates of the same
+  // card do not both read "Ocean copy". (Ids are always unique; labels are only
+  // cosmetic, but colliding ones are confusing in the grid.)
+  function uniqueLabel(base: string): string {
+    const taken = new Set([...THEMES.map((t) => t.label), ...userThemes.map((t) => t.label)]);
+    if (!taken.has(base)) return base;
+    let i = 2;
+    while (taken.has(`${base} ${i}`)) i++;
+    return `${base} ${i}`;
+  }
+
+  // Duplicate a built-in: read its palette off the DOM to seed a new user theme.
+  function duplicate(id: string, label: string) {
     const d = captureFull(id);
-    d.label = `${label} copy`;
-    d.group = group;
+    d.label = uniqueLabel(`${label} copy`);
+    d.group = "Custom";
+    d.id = uniqueSlug(d.label);
+    editingIsNew = true;
+    editing = d;
+  }
+
+  // Clone an existing user theme: its palette is already inline, so snapshot it.
+  function cloneUser(src: ThemeData) {
+    const d = $state.snapshot(src) as Draft;
+    d.label = uniqueLabel(`${src.label} copy`);
     d.id = uniqueSlug(d.label);
     editingIsNew = true;
     editing = d;
@@ -282,16 +303,6 @@
     if (current === id) await pick("auto"); // was selected -> fall back
   }
 
-  // Built-in groups first, then any extra groups the user's themes introduce.
-  const groups = $derived([
-    ...GROUP_ORDER,
-    ...new Set(
-      userThemes
-        .map((t) => t.group)
-        .filter((g) => g && !GROUP_ORDER.includes(g as (typeof GROUP_ORDER)[number])),
-    ),
-  ]);
-
   function onKey(e: KeyboardEvent) {
     if (e.key !== "Escape") return;
     if (editing) cancel();
@@ -326,10 +337,39 @@
   </div>
 
   <div class="scroll">
-    {#each groups as g}
+    {#if userThemes.length}
+      <div class="grouplabel">My Themes</div>
+      <div class="grid">
+        {#each userThemes as t}
+          {@const p = userPalette(t)}
+          <div class="cardwrap">
+            <button
+              class="card"
+              class:active={t.id === current}
+              style="background:{p.bg}; border-color:{p.edge};"
+              onclick={() => pick(t.id)}
+              title={t.label}
+            >
+              {@render cardBody(t.label, p, t.id === current)}
+            </button>
+            <div class="tools">
+              <button class="mini" title="Duplicate" aria-label="Duplicate" onclick={() => cloneUser(t)}>
+                <Icon name="copy" size={12} />
+              </button>
+              <button class="mini" title="Edit" aria-label="Edit" onclick={() => editUser(t)}>
+                <Icon name="edit" size={12} />
+              </button>
+              <button class="mini" title="Delete" aria-label="Delete" onclick={() => del(t.id)}>
+                <Icon name="trash" size={12} />
+              </button>
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
+    {#each GROUP_ORDER as g}
       {@const builtins = THEMES.filter((t) => t.group === g)}
-      {@const users = userThemes.filter((t) => t.group === g)}
-      {#if builtins.length || users.length}
+      {#if builtins.length}
         <div class="grouplabel">{g}</div>
         <div class="grid">
           {#each builtins as t}
@@ -346,30 +386,8 @@
               </button>
               <div class="tools">
                 <button class="mini" title="Duplicate & edit" aria-label="Duplicate and edit"
-                  onclick={() => duplicate(t.id, t.label, t.group)}>
+                  onclick={() => duplicate(t.id, t.label)}>
                   <Icon name="copy" size={12} />
-                </button>
-              </div>
-            </div>
-          {/each}
-          {#each users as t}
-            {@const p = userPalette(t)}
-            <div class="cardwrap">
-              <button
-                class="card"
-                class:active={t.id === current}
-                style="background:{p.bg}; border-color:{p.edge};"
-                onclick={() => pick(t.id)}
-                title={t.label}
-              >
-                {@render cardBody(t.label, p, t.id === current)}
-              </button>
-              <div class="tools">
-                <button class="mini" title="Edit" aria-label="Edit" onclick={() => editUser(t)}>
-                  <Icon name="edit" size={12} />
-                </button>
-                <button class="mini" title="Delete" aria-label="Delete" onclick={() => del(t.id)}>
-                  <Icon name="trash" size={12} />
                 </button>
               </div>
             </div>
@@ -400,14 +418,6 @@
         <span>Name</span>
         <input type="text" bind:value={editing.label} placeholder="My theme" />
       </label>
-      <label class="field">
-        <span>Group</span>
-        <input type="text" bind:value={editing.group} list="groups" placeholder="Custom" />
-        <datalist id="groups">
-          {#each GROUP_ORDER as g}<option value={g}></option>{/each}
-        </datalist>
-      </label>
-
       <div class="field">
         <span>Scheme</span>
         <div class="seg">
@@ -456,6 +466,19 @@
       {/each}
 
       <div class="grouplabel">Spend readout</div>
+      <div
+        class="spendsample"
+        style="background:rgb({editing.colors.bg.join(', ')}); color:{editing.spendFg ?? editing.gradient[2]};"
+      >
+        $12.34
+      </div>
+      {#if editing.spendFg != null}
+        <label class="row">
+          <span>Spend text</span>
+          <input type="color" bind:value={editing.spendFg} />
+          <input type="text" class="hex" bind:value={editing.spendFg} />
+        </label>
+      {/if}
       <label class="row check">
         <input
           type="checkbox"
@@ -464,13 +487,6 @@
         />
         <span>Custom spend text color (recommended on light themes)</span>
       </label>
-      {#if editing.spendFg != null}
-        <label class="row">
-          <span>Spend text</span>
-          <input type="color" bind:value={editing.spendFg} />
-          <input type="text" class="hex" bind:value={editing.spendFg} />
-        </label>
-      {/if}
     </div>
   </div>
 {/if}
@@ -772,5 +788,14 @@
     height: 24px;
     border: 1px solid var(--edge);
     border-radius: 5px;
+  }
+  .spendsample {
+    display: inline-block;
+    border: 1px solid var(--edge);
+    border-radius: 6px;
+    padding: 6px 14px;
+    margin: 2px 0 6px;
+    font-weight: var(--w-bold);
+    font-size: calc(15px * var(--size-num));
   }
 </style>

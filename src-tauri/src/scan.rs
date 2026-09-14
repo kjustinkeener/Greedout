@@ -18,6 +18,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const TAIL_BYTES: u64 = 64 * 1024;
 const SUBTITLE_MAX: usize = 80;
 
+/// Which harness produced a candidate transcript, so the poll pool can dispatch to
+/// the right adapter (and know how to test focus) without a stack of twin bools.
+#[derive(Clone, Copy, PartialEq)]
+enum Harness {
+    Claude,
+    Codex,
+    Cursor,
+}
+
 /// Pricing and context limits for one model. Prices are USD per million tokens
 /// (as published), converted to per-token at use. `context_max` is the hard
 /// enforced window; `target` is the recommended "sweet spot" the gauge fills to.
@@ -135,6 +144,18 @@ pub(crate) fn model_info(model: &str) -> ModelInfo {
         return ModelInfo { label: "Haiku", price_in: 1.0, price_out: 5.0,
             price_cache_write: 1.25, price_cache_read: 0.10,
             context_max: 200_000, target: 200_000 };
+    }
+    // --- xAI Grok (Cursor's default; e.g. "grok-4.6") ---
+    // Public grok-4 API pricing: $3 in / $15 out per MTok, cached input $0.75.
+    // 256k context window. cache-write mirrors input (Cursor logs no cache tokens
+    // and spend is a chars/4 estimate anyway, so cache rates only backstop other
+    // paths). TODO verify grok-4.6 pricing/window against xAI docs -- these are the
+    // published grok-4 numbers, applied to every grok id until a per-version table
+    // is warranted.
+    if m.contains("grok") {
+        return ModelInfo { label: "Grok", price_in: 3.0, price_out: 15.0,
+            price_cache_write: 3.0, price_cache_read: 0.75,
+            context_max: 256_000, target: 200_000 };
     }
     // --- future: other cloud models go here ---
     ModelInfo { label: "?", price_in: 15.0, price_out: 75.0,
@@ -330,9 +351,9 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     // transcripts and let idle ones stay until a newer session bumps them off the
     // bottom. Age is conveyed by the row's mtime-based dimming (frontend), so there
     // is no idle cutoff here at all.
-    // Each candidate is (path, mtime, is_codex). Claude and Codex sessions compete
-    // in one pool so the `n` most-recent across BOTH harnesses are what show.
-    let mut candidates: Vec<(PathBuf, u64, bool)> = Vec::new();
+    // Each candidate is (path, mtime, harness). Claude, Codex, and Cursor sessions
+    // compete in one pool so the `n` most-recent across ALL harnesses are what show.
+    let mut candidates: Vec<(PathBuf, u64, Harness)> = Vec::new();
     if let Ok(paths) = glob::glob(&pattern) {
         for entry in paths.flatten() {
             let Ok(meta) = std::fs::metadata(&entry) else { continue };
@@ -341,26 +362,30 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
                 .duration_since(UNIX_EPOCH)
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
-            candidates.push((entry, mtime, false));
+            candidates.push((entry, mtime, Harness::Claude));
         }
     }
     for (path, mtime) in crate::codex::candidates() {
-        candidates.push((path, mtime, true));
+        candidates.push((path, mtime, Harness::Codex));
+    }
+    for (path, mtime) in crate::cursor::candidates() {
+        candidates.push((path, mtime, Harness::Cursor));
     }
 
     // Sort key: the focused session (Claude via its focus sidecar, or Codex via its
     // desktop-app DB) is pinned to the very top; everything else ranks by mtime.
-    let sort_key = |p: &Path, mtime: u64, is_codex: bool| -> u64 {
-        let focused_here = if is_codex {
-            codex_focused
+    // Cursor writes no focus sidecar, so it is never pinned.
+    let sort_key = |p: &Path, mtime: u64, harness: Harness| -> u64 {
+        let focused_here = match harness {
+            Harness::Codex => codex_focused
                 .as_deref()
                 .map(|f| crate::codex::id_from_path(p) == f)
-                .unwrap_or(false)
-        } else {
-            focused
+                .unwrap_or(false),
+            Harness::Claude => focused
                 .as_deref()
                 .map(|f| p.file_stem().map(|s| s == f).unwrap_or(false))
-                .unwrap_or(false)
+                .unwrap_or(false),
+            Harness::Cursor => false,
         };
         if focused_here {
             u64::MAX
@@ -378,12 +403,12 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
 
     let mut sessions: Vec<Session> = candidates
         .into_iter()
-        .map(|(path, mtime, is_codex)| {
-            if is_codex {
+        .map(|(path, mtime, harness)| match harness {
+            Harness::Codex => {
                 crate::codex::build_session(&path, mtime, now, cfg, codex_focused.as_deref())
-            } else {
-                build_session(&path, mtime, now, cfg, labels, focused.as_deref())
             }
+            Harness::Cursor => crate::cursor::build_session(&path, mtime, now, cfg, None),
+            Harness::Claude => build_session(&path, mtime, now, cfg, labels, focused.as_deref()),
         })
         .collect();
     apply_grouping(&mut sessions);
@@ -1032,9 +1057,14 @@ pub fn session_history(id: &str) -> Vec<Sample> {
         .to_string_lossy()
         .replace('\\', "/");
     let Some(path) = glob::glob(&pattern).ok().and_then(|mut g| g.find_map(Result::ok)) else {
-        // Not a Claude transcript: it may be a Codex session (different id space
-        // and on-disk format), so let the Codex adapter reconstruct the curve.
-        return crate::codex::history(id);
+        // Not a Claude transcript: it may be a Codex or a Cursor session (each a
+        // different id space and on-disk format). Try Codex first; if that id isn't
+        // one of its rollouts (empty curve), fall through to Cursor's composer DB.
+        let codex = crate::codex::history(id);
+        if !codex.is_empty() {
+            return codex;
+        }
+        return crate::cursor::history(id);
     };
     let Ok(text) = std::fs::read_to_string(&path) else { return Vec::new() };
 

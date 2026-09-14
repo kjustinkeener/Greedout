@@ -20,7 +20,8 @@
 //! schema change).
 
 use crate::codex;
-use crate::config::{cache_db_path, claude_dir, codex_dir};
+use crate::config::{cache_db_path, claude_dir, codex_dir, cursor_dir};
+use crate::cursor;
 use crate::grouping;
 use crate::scan;
 use rusqlite::Connection;
@@ -39,7 +40,9 @@ const HARNESS: &str = "claude-code";
 /// the path is enough at every call site (the `sessions.harness` column agrees), so
 /// no extra query is needed to dispatch.
 fn enrich_for(path: &Path) -> scan::EnrichMeta {
-    if path.starts_with(codex_dir()) {
+    if path.starts_with(cursor_dir()) {
+        cursor::enrich_meta(path)
+    } else if path.starts_with(codex_dir()) {
         codex::enrich_meta(path)
     } else {
         scan::enrich_meta(path)
@@ -47,8 +50,11 @@ fn enrich_for(path: &Path) -> scan::EnrichMeta {
 }
 
 /// Parse-only enrich dispatcher: caller supplies the bytes, so this is pure CPU.
+/// (Cursor is DB-backed via the synthetic path, so it ignores `raw`.)
 fn enrich_from(path: &Path, raw: &str) -> scan::EnrichMeta {
-    if path.starts_with(codex_dir()) {
+    if path.starts_with(cursor_dir()) {
+        cursor::enrich_meta_from(path, raw)
+    } else if path.starts_with(codex_dir()) {
         codex::enrich_meta_from(path, raw)
     } else {
         scan::enrich_meta_from(path, raw)
@@ -57,7 +63,9 @@ fn enrich_from(path: &Path, raw: &str) -> scan::EnrichMeta {
 
 /// Parse-only chat-doc dispatcher (span + FTS text) from bytes the caller holds.
 fn chat_doc_from(path: &Path, raw: &str) -> (String, Option<i64>, Option<i64>) {
-    let doc = if path.starts_with(codex_dir()) {
+    let doc = if path.starts_with(cursor_dir()) {
+        cursor::read_chat_doc(path, raw)
+    } else if path.starts_with(codex_dir()) {
         codex::read_chat_doc(path, raw)
     } else {
         read_chat_doc(path, raw)
@@ -601,6 +609,27 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
                 rusqlite::params![path_str, "codex", id, project, project_path, mtime, size, title],
             )?;
         }
+        // Cursor composers. Each lives in ONE shared DB, so it has a SYNTHETIC path
+        // (see cursor.rs) that does not exist on disk: `file_stat` won't work, so the
+        // mtime comes from candidates() (the composer's createdAt) and size is 0.
+        // No workspace mapping yet, so every composer buckets under a "Cursor"
+        // project. The synthetic path is never `fresh` (its scanned_mtime stays 0),
+        // so search always disk-scans it (search_one reads the DB, not the file).
+        for (path, mtime_secs) in cursor::candidates() {
+            if cancel_flag().load(Ordering::Relaxed) {
+                break;
+            }
+            let path_str = path.to_string_lossy().to_string();
+            seen.insert(path_str.clone());
+            let id = cursor::id_from_path(&path);
+            let title = cursor::session_title(&id);
+            tx.execute(
+                "INSERT INTO sessions (path, harness, session_id, project, project_path, mtime, size_bytes, title)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT(path) DO UPDATE SET mtime=excluded.mtime, size_bytes=excluded.size_bytes",
+                rusqlite::params![path_str, "cursor", id, "Cursor", "", (mtime_secs as i64) * 1000, 0i64, title],
+            )?;
+        }
         // Drop rows whose transcript vanished (and their turns + FTS entry). The FTS
         // row is keyed by sessions.rowid, so grab the rowid before deleting the row.
         {
@@ -693,6 +722,15 @@ impl EnrichTimers {
 /// so the enrich metadata pipeline stays untouched; the OS page cache makes the
 /// re-read cheap since enrich just read the same bytes.
 fn chat_doc_for(path: &Path) -> (String, Option<i64>, Option<i64>) {
+    // Cursor lives in a DB, not a file: read it by the synthetic path's id BEFORE
+    // trying to read (nonexistent) file bytes, which would otherwise short-circuit
+    // to empty text and leave Cursor unsearchable.
+    if path.starts_with(cursor_dir()) {
+        let doc = cursor::read_chat_doc(path, "");
+        let last = doc.last_ts.as_deref().and_then(scan::iso_to_millis);
+        let first = doc.first_ts.as_deref().and_then(scan::iso_to_millis).or(last);
+        return (doc.text, first, last);
+    }
     let Ok(raw) = std::fs::read_to_string(path) else {
         return (String::new(), None, None);
     };
@@ -1182,6 +1220,7 @@ fn harness_label(h: &str) -> String {
     match h {
         "claude-code" => "Claude Code".to_string(),
         "codex" => "Codex".to_string(),
+        "cursor" => "Cursor".to_string(),
         other => other.to_string(),
     }
 }
@@ -1502,6 +1541,10 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
         // Codex rollouts too: same search over their plaintext chat (see
         // codex::read_chat_doc). Dispatched per-path below by the codex_dir prefix.
         all_paths.extend(codex::candidates().into_iter().map(|(p, _)| p));
+        // Cursor composers: their synthetic paths never exist on disk and never go
+        // `fresh`, so they are always disk-scanned here (search_one reads the DB by
+        // the id in the path, not the file bytes).
+        all_paths.extend(cursor::candidates().into_iter().map(|(p, _)| p));
         let paths: Vec<std::path::PathBuf> = all_paths
             .into_iter()
             .filter(|p| !fresh.contains(&p.to_string_lossy().to_string()))
@@ -1660,6 +1703,35 @@ fn search_one(
     terms: &[String],
     hit_groups: &HashMap<String, grouping::Group>,
 ) -> Option<SearchHit> {
+    // Cursor: no file on disk. Read the composer's chat from the DB by the id in the
+    // synthetic path and score its text directly (no raw-bytes pre-filter).
+    if path.starts_with(&cursor_dir()) {
+        let doc = cursor::read_chat_doc(path, "");
+        let lower = doc.text.to_lowercase();
+        let score = score_text(&lower, full, terms)?;
+        let id = cursor::id_from_path(path);
+        let (mtime, _size) = file_stat(path).unwrap_or((0, 0));
+        let title = doc
+            .title
+            .clone()
+            .or_else(|| doc.first_user.as_deref().map(short_title))
+            .filter(|t| !t.is_empty())
+            .unwrap_or_else(|| "Cursor".to_string());
+        let snippet = make_snippet(&doc.text, &lower, full, terms);
+        return Some(SearchHit {
+            id,
+            title,
+            project: "Cursor".to_string(),
+            project_path: String::new(),
+            size_bytes: 0,
+            mtime,
+            first_ms: mtime,
+            last_ms: mtime,
+            score,
+            snippet,
+            harness: "cursor".into(),
+        });
+    }
     let raw = std::fs::read_to_string(path).ok()?;
     let raw_lower = raw.to_lowercase();
     let present = if !full.is_empty() && raw_lower.contains(full) {

@@ -2,6 +2,7 @@ mod baseline;
 mod browse;
 mod codex;
 mod config;
+mod cursor;
 mod grouping;
 mod i18n;
 mod install;

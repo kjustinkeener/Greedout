@@ -233,6 +233,21 @@ pub fn codex_dir() -> PathBuf {
     dirs::home_dir().unwrap_or_default().join(".codex")
 }
 
+/// `%APPDATA%\Cursor`: the Cursor (Anysphere) config root. Cursor keeps every
+/// conversation in one global SQLite DB under `User\globalStorage` (see cursor.rs).
+/// Honors CURSOR_HOME if set. Uses Roaming AppData (`config_dir`), NOT Local.
+pub fn cursor_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("CURSOR_HOME") {
+        return PathBuf::from(dir);
+    }
+    dirs::config_dir().unwrap_or_default().join("Cursor")
+}
+
+/// The single global Cursor state DB (`state.vscdb`), holding all composers.
+pub fn cursor_db_path() -> PathBuf {
+    cursor_dir().join("User").join("globalStorage").join("state.vscdb")
+}
+
 /// `%LOCALAPPDATA%\Greedout`: Greedout's own data dir (config, labels, log, and
 /// the opt-in browse cache). The app reads `~/.claude` but writes only here, so
 /// nothing of ours lands inside Claude Code's config home. Public so browse.rs

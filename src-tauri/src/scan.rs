@@ -146,16 +146,15 @@ pub(crate) fn model_info(model: &str) -> ModelInfo {
             context_max: 200_000, target: 200_000 };
     }
     // --- xAI Grok (Cursor's default; e.g. "grok-4.6") ---
-    // Public grok-4 API pricing: $3 in / $15 out per MTok, cached input $0.75.
-    // 256k context window. cache-write mirrors input (Cursor logs no cache tokens
-    // and spend is a chars/4 estimate anyway, so cache rates only backstop other
-    // paths). TODO verify grok-4.6 pricing/window against xAI docs -- these are the
-    // published grok-4 numbers, applied to every grok id until a per-version table
-    // is warranted.
+    // grok-4.6 standard-tier API pricing (verified against xAI/aggregators 2026-09-14):
+    // $2 in / $6 out per MTok, cached input $0.50, 500k context window. xAI doubles all
+    // rates once a prompt crosses 200k tokens; we price the standard tier flat (Cursor
+    // logs no cache tokens and spend is a chars/4 estimate anyway, so the tiering and
+    // cache rates only backstop other paths). Applied to every grok id.
     if m.contains("grok") {
-        return ModelInfo { label: "Grok", price_in: 3.0, price_out: 15.0,
-            price_cache_write: 3.0, price_cache_read: 0.75,
-            context_max: 256_000, target: 200_000 };
+        return ModelInfo { label: "Grok", price_in: 2.0, price_out: 6.0,
+            price_cache_write: 2.0, price_cache_read: 0.50,
+            context_max: 500_000, target: 200_000 };
     }
     // --- future: other cloud models go here ---
     ModelInfo { label: "?", price_in: 15.0, price_out: 75.0,
@@ -483,12 +482,17 @@ fn apply_grouping(sessions: &mut [Session]) {
     let mut seen: std::collections::HashSet<String> =
         dirs.iter().map(|d| d.to_string_lossy().to_lowercase()).collect();
     for s in sessions.iter() {
-        if seen.insert(s.project_path.to_lowercase()) {
+        // Skip sessions with no cwd (e.g. Cursor, which has no workspace mapping): an
+        // empty path would form a group with an empty label and blank their project.
+        if !s.project_path.is_empty() && seen.insert(s.project_path.to_lowercase()) {
             dirs.push(PathBuf::from(&s.project_path));
         }
     }
     let groups = grouping::group_dirs(&dirs);
     for s in sessions.iter_mut() {
+        if s.project_path.is_empty() {
+            continue; // no cwd to group; keep the harness's own project label
+        }
         match groups.get(Path::new(&s.project_path)) {
             Some(g) => {
                 s.project = g.label.clone();

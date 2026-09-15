@@ -162,6 +162,9 @@ pub fn analyze(id: &str) -> Report {
     if is_codex(id) {
         return analyze_codex(id);
     }
+    if is_cursor(id) {
+        return analyze_cursor(id);
+    }
     let Some(path) = scan::transcript_path(id) else {
         return Report::err("No transcript found for this session yet.");
     };
@@ -555,8 +558,88 @@ fn codex_path(id: &str) -> Option<std::path::PathBuf> {
 fn blocks_for(id: &str) -> Vec<Blk> {
     if is_codex(id) {
         parse_blocks_codex(id)
+    } else if is_cursor(id) {
+        parse_blocks_cursor(id)
     } else {
         parse_blocks(id)
+    }
+}
+
+/// A Cursor composer id: not a Claude transcript, but a known Cursor composer.
+fn is_cursor(id: &str) -> bool {
+    scan::transcript_path(id).is_none()
+        && crate::cursor::candidates().iter().any(|(p, _)| crate::cursor::id_from_path(p) == id)
+}
+
+/// A Cursor composer's messages as ordered blocks. Cursor exposes only user/assistant
+/// bubbles (no thinking/tool split), so every non-empty bubble is one User or Agent
+/// block; a new turn begins at each user bubble. Timestamps are left empty (Cursor's
+/// per-bubble times are unreliable; the tile falls back to the row's own time).
+fn parse_blocks_cursor(id: &str) -> Vec<Blk> {
+    let mut blocks = Vec::new();
+    let mut turn: u32 = 0;
+    for (is_user, text, _ts) in crate::cursor::chat_blocks(id) {
+        if is_user {
+            turn += 1;
+        }
+        let label = if is_user { "User" } else { "Agent" };
+        blocks.push(Blk { turn, label: label.into(), full: text, ts: String::new() });
+    }
+    blocks
+}
+
+/// Context Explorer analysis for a Cursor composer. Cursor gives a real context-fill
+/// total (`contextTokensUsed`) but no per-category breakdown and no system-prompt or
+/// world-state visibility, so the tree is a single estimated Messages node (chars/4
+/// per bubble) reconciled to that real total, mirroring `analyze_codex`'s reconcile.
+fn analyze_cursor(id: &str) -> Report {
+    let Some((ctx, limit, model, created)) = crate::cursor::baseline_meter(id) else {
+        return Report::err("No Cursor conversation found for this session yet.");
+    };
+    let mi = scan::model_info(model.as_deref().unwrap_or(""));
+    let cost_in = mi.price_in / 1_000_000.0;
+    let cost_out = mi.price_out / 1_000_000.0;
+    let cost_rate = mi.price_cache_read / 1_000_000.0;
+
+    let blocks = parse_blocks_cursor(id);
+    let chat_est: u64 = blocks.iter().map(|b| est_tokens(b.full.len())).sum();
+
+    // Reconcile the estimated chat to Cursor's real meter when present; otherwise the
+    // raw estimate stands (factor 1) so the tree still shows something.
+    let factor = match ctx {
+        Some(t) if chat_est > 0 => t as f64 / chat_est as f64,
+        _ => 1.0,
+    };
+    let scale = |t: u64| (t as f64 * factor).round() as u64;
+    let total = ctx.unwrap_or(chat_est);
+    let max = limit.unwrap_or(mi.context_max);
+
+    let mut nodes: Vec<Node> = Vec::new();
+    if chat_est > 0 {
+        nodes.push(Node::leaf(
+            "Messages",
+            scale(chat_est),
+            "messages",
+            "the conversation so far (grows over time)",
+        ));
+    }
+
+    Report {
+        ok: true,
+        message: String::new(),
+        needs_context: false,
+        total,
+        max,
+        // Cursor's per-composer time is unreliable; leave "as of" blank rather than
+        // stamp a misleading instant.
+        captured_at: {
+            let _ = created;
+            String::new()
+        },
+        cost_rate,
+        cost_in,
+        cost_out,
+        nodes,
     }
 }
 

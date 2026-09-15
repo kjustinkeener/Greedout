@@ -30,8 +30,10 @@ use crate::config::{cursor_db_path, cursor_dir};
 use crate::scan::{downsample, model_info, parse_model_version, Sample, Session};
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OpenFlags};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, UNIX_EPOCH};
 
 /// Estimated tokens for a chunk of visible text: Cursor persists no usable per-turn
@@ -95,30 +97,102 @@ fn copy_db_to_temp() -> Option<(PathBuf, Vec<PathBuf>)> {
     Some((dst, extras))
 }
 
-/// Copy the DB to temp, open it read-only, run `f`, then clean up the temp files.
-/// Best-effort: any IO/SQL failure yields `None` so every caller degrades to "no
-/// Cursor data" rather than erroring. `PRAGMA busy_timeout` guards the brief window
-/// where even the copy could contend.
-fn with_db<T>(f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Option<T> {
-    let (tmp, extras) = copy_db_to_temp()?;
-    let result = {
-        // Open the throwaway copy READ-WRITE (not read-only): the freshest writes
-        // sit in the copied -wal, and SQLite must replay that WAL into the db to
-        // expose them, which requires write access. It is our private temp copy, so
-        // letting SQLite checkpoint it is safe; the real DB is never touched.
-        match Connection::open_with_flags(&tmp, OpenFlags::SQLITE_OPEN_READ_WRITE) {
-            Ok(conn) => {
-                let _ = conn.busy_timeout(Duration::from_millis(1000));
-                f(&conn).ok()
-            }
-            Err(_) => None,
+/// (mtime_ms, size) of the live DB and its `-wal`, so any change -- including a WAL
+/// write that leaves the main file's mtime untouched -- invalidates the snapshot.
+type Fingerprint = (u64, u64, u64, u64);
+
+fn file_stat(p: &Path) -> (u64, u64) {
+    std::fs::metadata(p)
+        .ok()
+        .map(|m| {
+            let ms = m
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            (ms, m.len())
+        })
+        .unwrap_or((0, 0))
+}
+
+fn db_fingerprint() -> Option<Fingerprint> {
+    let src = cursor_db_path();
+    std::fs::metadata(&src).ok()?; // absent => Cursor not installed
+    let (m1, s1) = file_stat(&src);
+    let (m2, s2) = file_stat(&sidecar(&src, "-wal"));
+    Some((m1, s1, m2, s2))
+}
+
+struct Snapshot {
+    path: PathBuf,
+    fp: Fingerprint,
+}
+
+/// A stable snapshot of the live DB, rebuilt only when its fingerprint changes. Held
+/// across polls so the many `with_db` reads in one poll (candidates + one per composer
+/// + focus) share a SINGLE copy instead of each re-copying a potentially multi-GB DB.
+static SNAP: Mutex<Option<Snapshot>> = Mutex::new(None);
+
+/// Path to a current read-only snapshot of the live DB, building one if the cached
+/// snapshot is missing or stale. The build copies the DB (+`-wal`/`-shm`), replays and
+/// truncates the WAL, then switches the copy out of WAL mode so subsequent reads can
+/// open it READ-ONLY (a WAL-mode file needs write access even to read). `None` if
+/// Cursor isn't installed or the copy fails.
+fn snapshot_path() -> Option<PathBuf> {
+    let fp = db_fingerprint()?;
+    let mut guard = SNAP.lock().ok()?;
+    if let Some(s) = guard.as_ref() {
+        if s.fp == fp && s.path.exists() {
+            return Some(s.path.clone());
         }
-    }; // conn dropped here, so the temp file is no longer open when we remove it
-    let _ = std::fs::remove_file(&tmp);
+    }
+    // Stale or absent: build a fresh snapshot. The lock is held across the copy so a
+    // concurrent caller waits and then reuses the result rather than copying again.
+    let (tmp, extras) = copy_db_to_temp()?;
+    // Open READ-WRITE once to fold the copied WAL into the file and drop WAL mode, so
+    // every later read can open the file read-only without needing to write a -shm.
+    let built = match Connection::open_with_flags(&tmp, OpenFlags::SQLITE_OPEN_READ_WRITE) {
+        Ok(conn) => {
+            let _ = conn.busy_timeout(Duration::from_millis(1000));
+            let _ = conn.pragma_update(None, "wal_checkpoint", "TRUNCATE");
+            let _ = conn.pragma_update(None, "journal_mode", "DELETE");
+            true
+        }
+        Err(_) => false,
+    };
+    // The RW conn is dropped; SQLite has removed the temp's own -wal/-shm, and the
+    // copies we made are folded in -- clean up any that linger.
     for e in extras {
         let _ = std::fs::remove_file(e);
     }
-    result
+    if !built {
+        let _ = std::fs::remove_file(&tmp);
+        return None;
+    }
+    // Retire the previous snapshot file (best-effort: a read-only reader may still hold
+    // it briefly on Windows; a failed delete just leaks one temp until the next build).
+    if let Some(old) = guard.take() {
+        let _ = std::fs::remove_file(&old.path);
+    }
+    *guard = Some(Snapshot { path: tmp.clone(), fp });
+    Some(tmp)
+}
+
+/// Open the shared read-only snapshot, run `f`, and return its result. Best-effort:
+/// any IO/SQL failure yields `None` so every caller degrades to "no Cursor data"
+/// rather than erroring.
+fn with_db<T>(f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Option<T> {
+    let path = snapshot_path()?;
+    // The snapshot is a plain (non-WAL) copy, so a read-only open needs no write access
+    // and many such opens can share the one file concurrently.
+    match Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY) {
+        Ok(conn) => {
+            let _ = conn.busy_timeout(Duration::from_millis(1000));
+            f(&conn).ok()
+        }
+        Err(_) => None,
+    }
 }
 
 /// The DB file's mtime in epoch seconds, the shared fallback recency for composers
@@ -269,6 +343,130 @@ fn composer_info(id: &str) -> Option<ComposerInfo> {
     })
 }
 
+// --- composer -> workspace folder mapping (project attribution) ---
+
+/// Percent-decode a byte string (`%3A` -> `:`). Cursor's `workspace.json` stores the
+/// folder as a URI whose drive colon and any spaces are percent-encoded.
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hi = (bytes[i + 1] as char).to_digit(16);
+            let lo = (bytes[i + 2] as char).to_digit(16);
+            if let (Some(h), Some(l)) = (hi, lo) {
+                out.push((h * 16 + l) as u8);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Convert a `file://` folder URI (`file:///c%3A/claude-local/App`) into a native
+/// Windows path (`C:\claude-local\App`). None if it isn't a local file URI.
+fn file_uri_to_path(uri: &str) -> Option<String> {
+    // `file:///c%3A/...` = scheme + empty authority + a path starting `/c%3A/...`.
+    let rest = uri.strip_prefix("file://")?;
+    let rest = rest.strip_prefix('/').unwrap_or(rest); // drop the slash before the drive
+    let decoded = percent_decode(rest);
+    if decoded.is_empty() {
+        return None;
+    }
+    let mut path = decoded.replace('/', "\\");
+    // Uppercase a leading drive letter so the folder matches the other harnesses' cwds.
+    if path.as_bytes().get(1) == Some(&b':') {
+        if let Some(first) = path.get_mut(0..1) {
+            first.make_ascii_uppercase();
+        }
+    }
+    Some(path)
+}
+
+/// The real folder for a `workspaceStorage/<hash>` workspace, from its `workspace.json`
+/// `folder` (single-root) or `workspace` (`.code-workspace`) URI. None for the
+/// `empty-window` pseudo-workspace or an unreadable/rootless entry.
+fn workspace_folder(hash: &str) -> Option<String> {
+    if hash.is_empty() || hash == "empty-window" {
+        return None;
+    }
+    let wj = cursor_dir().join("User").join("workspaceStorage").join(hash).join("workspace.json");
+    let raw = std::fs::read_to_string(&wj).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let uri = v
+        .get("folder")
+        .or_else(|| v.get("workspace"))
+        .and_then(serde_json::Value::as_str)?;
+    file_uri_to_path(uri)
+}
+
+/// composerId -> real workspace folder path, cached per DB fingerprint. Source: the
+/// global `composerHeaders` table maps each composer to a `workspaceId` (a
+/// `workspaceStorage/<hash>` name), and each hash's `workspace.json` gives the folder.
+/// Composers with no open folder (`workspaceId` == "empty-window", or a missing
+/// workspace.json) are omitted, so they keep the friendly "Cursor" bucket.
+static WS_MAP: Mutex<Option<(Fingerprint, HashMap<String, String>)>> = Mutex::new(None);
+
+fn workspace_map() -> HashMap<String, String> {
+    let fp = db_fingerprint();
+    if let (Some(fp), Ok(guard)) = (fp, WS_MAP.lock()) {
+        if let Some((cached_fp, map)) = guard.as_ref() {
+            if *cached_fp == fp {
+                return map.clone();
+            }
+        }
+    }
+    // Rebuild: composerHeaders is a real table in the snapshot (global DB). A build
+    // that lacks it just errors here, yielding an empty map (all rows keep "Cursor").
+    let mut hash_folder: HashMap<String, String> = HashMap::new();
+    let map = with_db(|conn| {
+        let mut stmt = conn.prepare(
+            "SELECT composerId, workspaceId FROM composerHeaders
+             WHERE workspaceId IS NOT NULL AND workspaceId <> '' AND workspaceId <> 'empty-window'",
+        )?;
+        let rows =
+            stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+        let mut out: HashMap<String, String> = HashMap::new();
+        for (composer, hash) in rows.flatten() {
+            // Resolve each distinct hash's folder once.
+            let folder = match hash_folder.get(&hash) {
+                Some(f) => Some(f.clone()),
+                None => {
+                    let f = workspace_folder(&hash);
+                    if let Some(ref f) = f {
+                        hash_folder.insert(hash.clone(), f.clone());
+                    }
+                    f
+                }
+            };
+            if let Some(folder) = folder {
+                out.insert(composer, folder);
+            }
+        }
+        Ok(out)
+    })
+    .unwrap_or_default();
+    if let (Some(fp), Ok(mut guard)) = (fp, WS_MAP.lock()) {
+        *guard = Some((fp, map.clone()));
+    }
+    map
+}
+
+/// `(project, project_path)` for a composer: its mapped workspace folder (basename +
+/// full path) when known, else the friendly "Cursor" bucket with an empty path.
+fn project_for(id: &str) -> (String, String) {
+    match workspace_map().get(id) {
+        Some(folder) if !folder.is_empty() => {
+            (crate::scan::last_component(folder), folder.clone())
+        }
+        _ => ("Cursor".to_string(), String::new()),
+    }
+}
+
 // --- public adapter surface (mirrors codex.rs) ---
 
 /// Every Cursor composer, as a `(synthetic_path, mtime_secs)` pair for the poll
@@ -320,10 +518,9 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, focused: O
         None => (None, None, None, 0.0, None),
     };
 
-    // No workspace mapping yet (see cwd_of), so every composer buckets under a single
-    // friendly "Cursor" project rather than an opaque composer uuid.
-    let project = "Cursor".to_string();
-    let project_path = String::new();
+    // Real workspace folder when the composer maps to one (global composerHeaders ->
+    // workspaceStorage/<hash>/workspace.json); else the friendly "Cursor" bucket.
+    let (project, project_path) = project_for(&id);
 
     // One user-set target drives the gauge budget across harnesses; the model still
     // sets the hard window and label.
@@ -430,9 +627,9 @@ pub fn enrich_meta(path: &Path) -> crate::scan::EnrichMeta {
     out.turn_count = info.turns.len() as u64;
     out.turns = info.turns;
     out.title = info.title;
-    // No project mapping yet; leave cwd None so browse keeps the Pass-1 "Cursor"
-    // bucket rather than overwriting it.
-    out.cwd = None;
+    // Real workspace folder when mapped, so browse Pass-2 refines the project from it;
+    // unmapped composers report None and keep the Pass-1 "Cursor" bucket.
+    out.cwd = workspace_map().get(&id).cloned();
     out.has_context_usage = false;
     if let Some(m) = &info.model {
         let mi = model_info(m);
@@ -486,20 +683,47 @@ pub fn read_chat_doc(path: &Path, _raw: &str) -> crate::browse::ChatDoc {
     doc
 }
 
-/// Cursor's project mapping (composer -> workspace folder) is NOT resolved yet: it
-/// lives in the per-workspace `workspaceStorage/<hash>/state.vscdb` keyed by an
-/// unindexed composer list (recon says ~1/3 of composers are unmapped anyway). Until
-/// that is built, every composer buckets under the friendly "Cursor" project, so we
-/// report no cwd here. Kept for adapter-surface parity with codex.rs; callers use
-/// the "Cursor" bucket directly rather than invoking it.
+/// The composer's real workspace folder (its project cwd), or None when it maps to no
+/// open folder (`empty-window`) and thus keeps the friendly "Cursor" bucket. Kept for
+/// adapter-surface parity with codex.rs; build_session/enrich resolve the folder inline.
 #[allow(dead_code)]
-pub fn cwd_of(_path: &Path) -> Option<String> {
-    None
+pub fn cwd_of(path: &Path) -> Option<String> {
+    workspace_map().get(&id_from_path(path)).cloned()
 }
 
-/// The composer's `name` from its `composerData` row, if any.
-pub(crate) fn session_title(id: &str) -> Option<String> {
-    with_db(|conn| Ok(fetch_meter(conn, id).map(|(_, _, _, t)| t).unwrap_or(None))).flatten()
+/// The composer's title and a treemap size-analog, in a single DB read. Cursor rows
+/// have no file on disk, so a synthetic path reports 0 bytes and the byte-sized browse
+/// treemap would give the whole harness zero area. We size a composer by its context
+/// magnitude instead -- tokens * 4, the bytes a transcript of that context would take
+/// -- so the Cursor tile is present and comparably scaled. Returns `(title, bytes)`.
+pub(crate) fn title_and_size(id: &str) -> (Option<String>, i64) {
+    with_db(|conn| {
+        let (ctx, _lim, _created, title) =
+            fetch_meter(conn, id).unwrap_or((None, None, None, None));
+        Ok((title, (ctx.unwrap_or(0) as i64) * 4))
+    })
+    .unwrap_or((None, 0))
+}
+
+/// Ordered `(is_user, text, ts_ms)` for a composer's non-empty bubbles, feeding the
+/// Context Explorer's estimated Messages tree. User bubbles carry `type == 1`.
+pub(crate) fn chat_blocks(id: &str) -> Vec<(bool, String, Option<i64>)> {
+    with_db(|conn| {
+        Ok(fetch_bubbles(conn, id)?
+            .into_iter()
+            .filter(|b| !b.text.trim().is_empty())
+            .map(|b| (b.btype == 1, b.text, b.ts))
+            .collect())
+    })
+    .unwrap_or_default()
+}
+
+/// The composer's real context fill, its window, and model for the Context Explorer
+/// analysis: `(ctx_tokens, ctx_limit, model, created_ms)`. None if the composer is
+/// absent from the DB.
+pub(crate) fn baseline_meter(id: &str) -> Option<(Option<u64>, Option<u64>, Option<String>, Option<i64>)> {
+    let info = composer_info(id)?;
+    Some((info.ctx, info.ctx_limit, info.model, info.created_ms))
 }
 
 #[cfg(test)]
@@ -522,6 +746,28 @@ mod tests {
         assert_eq!(id_from_path(&p), id);
         // A non-composer stem is returned whole.
         assert_eq!(id_from_path(Path::new("C:/x/tiny.cursor")), "tiny");
+    }
+
+    #[test]
+    fn file_uri_decodes_to_windows_path() {
+        assert_eq!(
+            file_uri_to_path("file:///c%3A/claude-local/MoonPool/public-repos/MoonPool").as_deref(),
+            Some("C:\\claude-local\\MoonPool\\public-repos\\MoonPool")
+        );
+        // Percent-encoded space, lowercase drive uppercased.
+        assert_eq!(
+            file_uri_to_path("file:///d%3A/My%20Code/app").as_deref(),
+            Some("D:\\My Code\\app")
+        );
+        // Not a file URI.
+        assert_eq!(file_uri_to_path("vscode-remote://ssh/x"), None);
+    }
+
+    #[test]
+    fn percent_decode_leaves_bare_and_trailing_percent() {
+        assert_eq!(percent_decode("a%3Ab"), "a:b");
+        assert_eq!(percent_decode("plain"), "plain");
+        assert_eq!(percent_decode("tail%"), "tail%");
     }
 
     #[test]

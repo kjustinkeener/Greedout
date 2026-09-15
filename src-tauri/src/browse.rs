@@ -622,12 +622,14 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
             let path_str = path.to_string_lossy().to_string();
             seen.insert(path_str.clone());
             let id = cursor::id_from_path(&path);
-            let title = cursor::session_title(&id);
+            // Synthetic paths report 0 bytes; size the tile by context magnitude so the
+            // Cursor harness/project/session tiles are visible in the byte-sized treemap.
+            let (title, size_bytes) = cursor::title_and_size(&id);
             tx.execute(
                 "INSERT INTO sessions (path, harness, session_id, project, project_path, mtime, size_bytes, title)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                  ON CONFLICT(path) DO UPDATE SET mtime=excluded.mtime, size_bytes=excluded.size_bytes",
-                rusqlite::params![path_str, "cursor", id, "Cursor", "", (mtime_secs as i64) * 1000, 0i64, title],
+                rusqlite::params![path_str, "cursor", id, "Cursor", "", (mtime_secs as i64) * 1000, size_bytes, title],
             )?;
         }
         // Drop rows whose transcript vanished (and their turns + FTS entry). The FTS
@@ -1718,11 +1720,16 @@ fn search_one(
             .filter(|t| !t.is_empty())
             .unwrap_or_else(|| "Cursor".to_string());
         let snippet = make_snippet(&doc.text, &lower, full, terms);
+        // Real workspace folder when the composer maps to one; else the "Cursor" bucket.
+        let (project, project_path) = match cursor::cwd_of(path) {
+            Some(cwd) if !cwd.is_empty() => (scan::last_component(&cwd), cwd),
+            _ => ("Cursor".to_string(), String::new()),
+        };
         return Some(SearchHit {
             id,
             title,
-            project: "Cursor".to_string(),
-            project_path: String::new(),
+            project,
+            project_path,
             size_bytes: 0,
             mtime,
             first_ms: mtime,

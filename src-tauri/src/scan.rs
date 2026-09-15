@@ -275,6 +275,36 @@ fn now_secs() -> u64 {
         .unwrap_or(0)
 }
 
+/// Resolve which harness owns focus, as a code: 0 none, 1 Claude, 2 Codex, 3 Cursor.
+///
+/// `app` is the frontmost app's code (from the foreground exe, or the remembered last
+/// app when the foreground is some other window). Each `*_ts` is that harness's
+/// selection timestamp if it currently has a focused session, else None. When the
+/// frontmost app has a focused session it wins outright; otherwise the newest
+/// selection timestamp wins (ties resolve Claude > Codex > Cursor by array order).
+fn pick_focus(app: u8, claude_ts: Option<u64>, codex_ts: Option<u64>, cursor_ts: Option<u64>) -> u8 {
+    match app {
+        2 if codex_ts.is_some() => 2,
+        1 if claude_ts.is_some() => 1,
+        3 if cursor_ts.is_some() => 3,
+        _ => {
+            // Newest selection wins; strict `>` keeps the earliest entry on a tie, so
+            // equal timestamps resolve Claude > Codex > Cursor (array order).
+            let mut best = 0u8;
+            let mut best_ts: Option<u64> = None;
+            for (w, t) in [(1u8, claude_ts), (2, codex_ts), (3, cursor_ts)] {
+                if let Some(t) = t {
+                    if best_ts.map_or(true, |b| t > b) {
+                        best = w;
+                        best_ts = Some(t);
+                    }
+                }
+            }
+            best
+        }
+    }
+}
+
 /// Build the current snapshot: active sessions, newest first, capped at `n`.
 pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     let now = now_secs();
@@ -331,22 +361,12 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
         };
         // Single winner across all three harnesses; the other two are dropped so with
         // n=1 the one gauge tracks true focus across apps.
-        let winner = match app {
-            2 if codex.is_some() => 2,
-            1 if claude.is_some() => 1,
-            3 if cursor.is_some() => 3,
-            // No remembered app yet (or its session vanished): newest selection wins.
-            _ => [
-                (1u8, claude.as_ref().map(|(_, t)| *t)),
-                (2, codex.as_ref().map(|(_, t)| *t)),
-                (3, cursor.as_ref().map(|(_, t)| *t)),
-            ]
-            .into_iter()
-            .filter_map(|(w, t)| t.map(|t| (w, t)))
-            .max_by_key(|(_, t)| *t)
-            .map(|(w, _)| w)
-            .unwrap_or(0),
-        };
+        let winner = pick_focus(
+            app,
+            claude.as_ref().map(|(_, t)| *t),
+            codex.as_ref().map(|(_, t)| *t),
+            cursor.as_ref().map(|(_, t)| *t),
+        );
         if winner != 0 {
             LAST_FG.store(winner, Ordering::Relaxed);
         }
@@ -1522,6 +1542,43 @@ mod tests {
 
     fn close(a: f64, b: f64) {
         assert!((a - b).abs() < 1e-9, "expected {b}, got {a}");
+    }
+
+    #[test]
+    fn pick_focus_frontmost_app_with_a_session_wins_over_a_newer_other() {
+        // Cursor is frontmost (app=3) with an older selection; a fresher Claude
+        // selection must NOT steal focus while Cursor is the app you're looking at.
+        assert_eq!(pick_focus(3, Some(9_000), None, Some(1_000)), 3);
+        assert_eq!(pick_focus(1, Some(1_000), Some(9_000), None), 1);
+        assert_eq!(pick_focus(2, None, Some(1_000), Some(9_000)), 2);
+    }
+
+    #[test]
+    fn pick_focus_frontmost_app_without_a_session_falls_back_to_newest() {
+        // Cursor is frontmost but has no focused composer: the newest selection among
+        // the others wins instead of pinning nothing.
+        assert_eq!(pick_focus(3, Some(5_000), Some(8_000), None), 2);
+        assert_eq!(pick_focus(3, Some(8_000), Some(5_000), None), 1);
+    }
+
+    #[test]
+    fn pick_focus_unknown_app_uses_newest_timestamp() {
+        // app=0 (no foreground app, nothing remembered): pure newest-selection wins.
+        assert_eq!(pick_focus(0, Some(1_000), Some(2_000), Some(3_000)), 3);
+        assert_eq!(pick_focus(0, Some(3_000), Some(2_000), Some(1_000)), 1);
+    }
+
+    #[test]
+    fn pick_focus_none_available_is_zero() {
+        assert_eq!(pick_focus(0, None, None, None), 0);
+        assert_eq!(pick_focus(3, None, None, None), 0);
+    }
+
+    #[test]
+    fn pick_focus_timestamp_tie_prefers_claude_then_codex() {
+        // Equal timestamps resolve by array order: Claude > Codex > Cursor.
+        assert_eq!(pick_focus(0, Some(5_000), Some(5_000), Some(5_000)), 1);
+        assert_eq!(pick_focus(0, None, Some(5_000), Some(5_000)), 2);
     }
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);

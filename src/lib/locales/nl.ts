@@ -131,7 +131,7 @@ export const nl: PartialDict = {
   "install.starting": "Geïnstalleerd. greedout wordt gestart…",
   "install.pokeTip": "Beweeg erover om op te toeren · klik voor nieuwe kleuren",
 
-  "update.available": "Versie {version} is beschikbaar. Je hebt {current}.",
+  "update.available": "Versie {version} is beschikbaar.\nJe hebt {current}.",
   "update.install": "Downloaden en installeren",
   "update.downloading": "{version} wordt gedownload…",
   "update.installed": "Geïnstalleerd. Opnieuw starten…",

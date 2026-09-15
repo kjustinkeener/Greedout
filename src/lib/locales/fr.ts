@@ -131,7 +131,7 @@ export const fr: PartialDict = {
   "install.starting": "Installé. Démarrage de greedout…",
   "install.pokeTip": "Survolez pour monter en régime · cliquez pour changer de couleurs",
 
-  "update.available": "La version {version} est disponible. Vous avez la {current}.",
+  "update.available": "La version {version} est disponible.\nVous avez la {current}.",
   "update.install": "Télécharger et installer",
   "update.downloading": "Téléchargement de {version}…",
   "update.installed": "Installé. Redémarrage…",

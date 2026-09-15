@@ -130,7 +130,7 @@ export const ja: PartialDict = {
   "install.starting": "インストールしました。greedout を起動しています…",
   "install.pokeTip": "カーソルを乗せて回す · クリックで配色を変更",
 
-  "update.available": "バージョン {version} が利用可能です。現在は {current} です。",
+  "update.available": "バージョン {version} が利用可能です。\n現在は {current} です。",
   "update.install": "ダウンロードしてインストール",
   "update.downloading": "{version} をダウンロード中…",
   "update.installed": "インストールしました。再起動中…",

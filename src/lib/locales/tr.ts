@@ -131,7 +131,7 @@ export const tr: PartialDict = {
   "install.starting": "Kuruldu. greedout başlatılıyor…",
   "install.pokeTip": "Yükseltmek için imleci üzerinde tutun · renkler için tıklayın",
 
-  "update.available": "{version} sürümü mevcut. Sizde {current} var.",
+  "update.available": "{version} sürümü mevcut.\nSizde {current} var.",
   "update.install": "İndir ve yükle",
   "update.downloading": "{version} indiriliyor…",
   "update.installed": "Yüklendi. Yeniden başlatılıyor…",

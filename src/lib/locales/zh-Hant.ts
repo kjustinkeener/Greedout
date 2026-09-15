@@ -131,7 +131,7 @@ export const zhHant: PartialDict = {
   "install.starting": "已安裝。正在啟動 greedout…",
   "install.pokeTip": "停在上面即可轉起來 · 點擊更換配色",
 
-  "update.available": "有新版本 {version} 可用。目前為 {current}。",
+  "update.available": "有新版本 {version} 可用。\n目前為 {current}。",
   "update.install": "下載並安裝",
   "update.downloading": "正在下載 {version}…",
   "update.installed": "已安裝。正在重新啟動…",

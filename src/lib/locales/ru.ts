@@ -131,7 +131,7 @@ export const ru: PartialDict = {
   "install.starting": "Установлено. Запуск greedout…",
   "install.pokeTip": "Наведите курсор, чтобы раскрутить · нажмите, чтобы сменить цвета",
 
-  "update.available": "Доступна версия {version}. У вас {current}.",
+  "update.available": "Доступна версия {version}.\nУ вас {current}.",
   "update.install": "Скачать и установить",
   "update.downloading": "Загрузка {version}…",
   "update.installed": "Установлено. Перезапуск…",

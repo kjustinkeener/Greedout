@@ -130,7 +130,7 @@ export const ko: PartialDict = {
   "install.starting": "설치했습니다. greedout 시작 중…",
   "install.pokeTip": "마우스를 올려 회전 · 클릭하면 색상 변경",
 
-  "update.available": "버전 {version}을(를) 사용할 수 있습니다. 현재 {current}입니다.",
+  "update.available": "버전 {version}을(를) 사용할 수 있습니다.\n현재 {current}입니다.",
   "update.install": "다운로드 후 설치",
   "update.downloading": "{version} 다운로드 중…",
   "update.installed": "설치했습니다. 다시 시작하는 중…",

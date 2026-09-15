@@ -617,12 +617,16 @@
 <main bind:this={mainEl}>
   {#if update}
     <div class="update">
-      <span class="uicon"><Icon name={updateDone ? "check" : "arrow-up"} size={12} /></span>
-      <span class="utext">
-        {updateStatus || t("update.available", { version: update.version, current: updateCurrent })}
-      </span>
+      <div class="urow">
+        <span class="uicon"><Icon name={updateDone ? "check" : "arrow-up"} size={12} /></span>
+        <span class="utext">
+          {updateStatus || t("update.available", { version: update.version, current: updateCurrent })}
+        </span>
+      </div>
       {#if !updating && !updateDone}
-        <button class="ubtn" onclick={installUpdate}>{t("update.install")}</button>
+        <div class="uactions">
+          <button class="ubtn" onclick={installUpdate}>{t("update.install")}</button>
+        </div>
         <button
           class="udismiss"
           onclick={() => (update = null)}
@@ -676,15 +680,28 @@
      sits above the list rather than replacing anything, and it can be waved
      away. Colored with the gauge's own cyan so it reads as part of the app. */
   .update {
+    position: relative;
     display: flex;
-    align-items: center;
-    gap: 7px;
+    flex-direction: column;
+    gap: 6px;
     margin: 0 0 6px;
     padding: 6px 8px;
     border: 1px solid color-mix(in srgb, var(--g0) 55%, transparent);
     border-radius: 7px;
     background: color-mix(in srgb, var(--g0) 10%, transparent);
     font-size: 11.5px;
+  }
+  .urow {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding-right: 16px; /* keep text clear of the corner dismiss */
+  }
+  .uactions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
   }
   .uicon {
     display: grid;
@@ -700,6 +717,7 @@
     flex: 1 1 auto;
     min-width: 0;
     line-height: 1.35;
+    white-space: pre-line;
   }
   .ubtn {
     flex: 0 0 auto;
@@ -718,7 +736,9 @@
     filter: brightness(1.08);
   }
   .udismiss {
-    flex: 0 0 auto;
+    position: absolute;
+    top: 4px;
+    right: 4px;
     display: grid;
     place-items: center;
     width: 18px;

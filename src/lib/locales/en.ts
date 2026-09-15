@@ -180,7 +180,7 @@ export const en = {
   // The update banner and the manual check in About. The banner is the only
   // thing in the app that appears without the user asking for it, so it says
   // what it wants in one line and can be dismissed.
-  "update.available": "Version {version} is available. You have {current}.",
+  "update.available": "Version {version} is available.\nYou have {current}.",
   "update.install": "Download and install",
   "update.downloading": "Downloading {version}…",
   "update.installed": "Installed. Restarting…",

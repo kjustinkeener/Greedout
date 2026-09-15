@@ -4,6 +4,24 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
+## [0.2.9] - 2026-09-14
+
+### Added
+- Cursor is now a supported harness, alongside Claude Code and Codex. Greedout
+  reads Cursor's global chat database and shows each Cursor conversation as a live
+  gauge: the context fill is Cursor's own real context-window meter, and spend is
+  an estimate (Cursor does not persist per-turn token counts on current builds).
+  Cursor conversations also appear in Browse, the Context Explorer and chat search,
+  and each conversation is filed under its real workspace folder when Cursor has one
+  open (conversations with no folder group under a "Cursor" bucket).
+- When a Cursor window is frontmost, Greedout pins the conversation you last ran a
+  turn in as the focused gauge, the same OS-foreground arbitration already used to
+  choose between Claude Code and Codex.
+
+### Changed
+- Grok pricing and context window updated to grok-4.6 ($2/M input, $6/M output,
+  500K window).
+
 ## [0.2.8] - 2026-09-12
 
 ### Added

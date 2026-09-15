@@ -39,6 +39,11 @@ semver = "1"
 # Installed-font enumeration reads the Fonts registry key (see sysfonts.rs).
 winreg = "0.52"
 
+# line-tables-only keeps panic backtraces/line numbers but avoids the multi-GB PDBs
+# that full debug info generates over repeated incremental builds.
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.release]
 opt-level = "s"
 lto = true

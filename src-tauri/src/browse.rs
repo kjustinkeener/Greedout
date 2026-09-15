@@ -396,26 +396,34 @@ fn spend_summary_conn(conn: &Connection) -> rusqlite::Result<Vec<scan::SpendSumm
     // Window dedupe (first per msg_id) + local-day bucket. The `msg_id IS NULL OR
     // rn = 1` clause deliberately keeps ALL null-msg_id rows even though they share
     // one window partition -- a null id can't be deduped, so every such turn counts.
+    // Grouping is done in Rust, not SQL, so worktree/subdir dirs fold into their
+    // parent project (a path question SQL cannot answer); the dir key mirrors
+    // groups_all: COALESCE(project_path, project).
     let mut stmt = conn.prepare(
         "WITH r AS (
-           SELECT t.msg_id, t.ts, t.cost, s.project,
+           SELECT t.msg_id, t.ts, t.cost, s.project, s.project_path,
                   ROW_NUMBER() OVER (PARTITION BY t.msg_id ORDER BY t.session_path, t.ts) rn
            FROM turns t JOIN sessions s ON s.path = t.session_path
            WHERE t.cost > 0
          )
          SELECT strftime('%Y-%m-%d', ts/1000, 'unixepoch', 'localtime') AS day,
-                COALESCE(project,'') AS project, sum(cost) AS cost
-         FROM r WHERE msg_id IS NULL OR rn = 1
-         GROUP BY day, project",
+                COALESCE(project,'') AS project,
+                COALESCE(project_path, project, '') AS dir, cost
+         FROM r WHERE msg_id IS NULL OR rn = 1",
     )?;
-    let rows = stmt.query_map([], |r| {
-        Ok(scan::SpendSummary {
-            day: r.get(0)?,
-            project: r.get(1)?,
-            cost: r.get(2)?,
-        })
-    })?;
-    rows.collect()
+    let rows: Vec<(String, String, String, f64)> = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let gmap = groups_all(conn);
+    let mut acc: HashMap<(String, String), f64> = HashMap::new();
+    for (day, project, dir, cost) in rows {
+        let label = gmap.get(&dir).map(|g| g.label.clone()).unwrap_or(project);
+        *acc.entry((day, label)).or_insert(0.0) += cost;
+    }
+    Ok(acc
+        .into_iter()
+        .map(|((day, project), cost)| scan::SpendSummary { day, project, cost })
+        .collect())
 }
 
 /// The billed, deduped turns for a single local day, for the swim lanes. The
@@ -467,16 +475,33 @@ fn spend_day_conn(conn: &Connection, lo_ms: i64, hi_ms: i64) -> rusqlite::Result
     let collected: Vec<SpendRow> = rows.collect::<rusqlite::Result<_>>()?;
     // First per msg_id by the query's (session_path, ts) order, then build events.
     let deduped = dedup_first_by_msg_id(collected, |row| row.0.as_deref());
+    // Fold worktree/subdir turns into their parent project so the swim lanes match
+    // Browse (which the frontend groups by SpendEvent.project). Keyed by the dir
+    // string COALESCE(project_path, project), same key groups_all builds.
+    let gmap = groups_all(conn);
     let mut out: Vec<scan::SpendEvent> = deduped
         .into_iter()
         .filter(|r| r.2 > 0.0) // cost > 0 already SQL-filtered; belt-and-braces
         .map(|(_msg_id, ts, cost, session, project, title, mtime, harness, project_path)| {
+            let dir = project_path
+                .clone()
+                .or_else(|| project.clone())
+                .unwrap_or_default();
+            let g = gmap.get(&dir);
+            let project = g
+                .map(|g| g.label.clone())
+                .or(project)
+                .unwrap_or_default();
+            let project_path = g
+                .map(|g| g.root.to_string_lossy().to_string())
+                .or(project_path)
+                .unwrap_or_default();
             scan::SpendEvent {
                 t: ts,
                 cost,
                 session: session.unwrap_or_default(),
-                project: project.unwrap_or_default(),
-                project_path: project_path.unwrap_or_default(),
+                project,
+                project_path,
                 harness,
                 title: title.unwrap_or_default(),
                 mtime: mtime.unwrap_or(0),
@@ -485,6 +510,85 @@ fn spend_day_conn(conn: &Connection, lo_ms: i64, hi_ms: i64) -> rusqlite::Result
         .collect();
     out.sort_by_key(|e| e.t);
     Ok(out)
+}
+
+/// Upsert every Cursor composer as a session row (synthetic path, size = ctx*4 from
+/// title_and_size). Shared by the full scan's Pass 1 and the cheap on-open refresh so
+/// the two never drift. `seen`, when given, collects the paths so the scan's
+/// vanished-row cleanup does not delete live cursor rows. size_bytes is recomputed
+/// fresh every call, so a composer that was empty at first scan (size 0) heals to its
+/// real size once it accrues context.
+fn index_cursor(
+    tx: &rusqlite::Transaction,
+    mut seen: Option<&mut std::collections::HashSet<String>>,
+) -> rusqlite::Result<()> {
+    for (path, mtime_secs) in cursor::candidates() {
+        if cancel_flag().load(Ordering::Relaxed) {
+            break;
+        }
+        let path_str = path.to_string_lossy().to_string();
+        if let Some(s) = seen.as_deref_mut() {
+            s.insert(path_str.clone());
+        }
+        let id = cursor::id_from_path(&path);
+        // Synthetic paths report 0 bytes; size the tile by context magnitude so the
+        // Cursor harness/project/session tiles are visible in the byte-sized treemap.
+        let (title, size_bytes) = cursor::title_and_size(&id);
+        // Real workspace folder when the composer maps to one, so the cursor sub-tree
+        // groups by project. groups() drops rows with an empty project_path, so an
+        // unmapped composer needs the literal "Cursor" bucket path, not "".
+        let (project, project_path) = match cursor::cwd_of(&path) {
+            Some(cwd) if !cwd.is_empty() => (scan::last_component(&cwd), cwd),
+            _ => ("Cursor".to_string(), "Cursor".to_string()),
+        };
+        tx.execute(
+            "INSERT INTO sessions (path, harness, session_id, project, project_path, mtime, size_bytes, title)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+             ON CONFLICT(path) DO UPDATE SET mtime=excluded.mtime, size_bytes=excluded.size_bytes,
+                project=excluded.project, project_path=excluded.project_path",
+            rusqlite::params![path_str, "cursor", id, project, project_path, (mtime_secs as i64) * 1000, size_bytes, title],
+        )?;
+    }
+    Ok(())
+}
+
+/// Self-heal Cursor cache rows without forcing a full deep scan. The CE cache
+/// (cache.sqlite) is rewritten only by run_scan, so a composer first indexed while
+/// empty (contextTokensUsed still null -> size_bytes 0) stays 0 until the next scan.
+/// Cursor's shared state.vscdb has no per-row mtime, but its FILE mtime bumps on any
+/// composer change, so use it as a cheap gate: when the DB is newer than the last
+/// cursor refresh we stored, re-run just the cursor upsert (a few small DB reads),
+/// not the whole many-file scan. Called at the top of each browse query so cursor is
+/// current whenever the Context Explorer reads it. Silent no-op on any failure.
+fn refresh_cursor_if_changed() {
+    let Some(db_ms) = cursor::db_file_mtime_ms() else {
+        return;
+    };
+    let Ok(mut conn) = open_db() else {
+        return;
+    };
+    let last: i64 = conn
+        .query_row("SELECT value FROM meta WHERE key='cursor_db_mtime'", [], |r| {
+            r.get::<_, String>(0)
+        })
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    if db_ms <= last {
+        return;
+    }
+    let Ok(tx) = conn.transaction() else {
+        return;
+    };
+    if index_cursor(&tx, None).is_err() {
+        return;
+    }
+    let _ = tx.execute(
+        "INSERT INTO meta (key, value) VALUES ('cursor_db_mtime', ?1)
+         ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        rusqlite::params![db_ms.to_string()],
+    );
+    let _ = tx.commit();
 }
 
 /// Kick off a scan on a background thread. Pass 1 always runs; if `deep`, every
@@ -609,29 +713,11 @@ fn scan_worker(app: &tauri::AppHandle, deep: bool) -> rusqlite::Result<u64> {
                 rusqlite::params![path_str, "codex", id, project, project_path, mtime, size, title],
             )?;
         }
-        // Cursor composers. Each lives in ONE shared DB, so it has a SYNTHETIC path
-        // (see cursor.rs) that does not exist on disk: `file_stat` won't work, so the
-        // mtime comes from candidates() (the composer's createdAt) and size is 0.
-        // No workspace mapping yet, so every composer buckets under a "Cursor"
-        // project. The synthetic path is never `fresh` (its scanned_mtime stays 0),
-        // so search always disk-scans it (search_one reads the DB, not the file).
-        for (path, mtime_secs) in cursor::candidates() {
-            if cancel_flag().load(Ordering::Relaxed) {
-                break;
-            }
-            let path_str = path.to_string_lossy().to_string();
-            seen.insert(path_str.clone());
-            let id = cursor::id_from_path(&path);
-            // Synthetic paths report 0 bytes; size the tile by context magnitude so the
-            // Cursor harness/project/session tiles are visible in the byte-sized treemap.
-            let (title, size_bytes) = cursor::title_and_size(&id);
-            tx.execute(
-                "INSERT INTO sessions (path, harness, session_id, project, project_path, mtime, size_bytes, title)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-                 ON CONFLICT(path) DO UPDATE SET mtime=excluded.mtime, size_bytes=excluded.size_bytes",
-                rusqlite::params![path_str, "cursor", id, "Cursor", "", (mtime_secs as i64) * 1000, size_bytes, title],
-            )?;
-        }
+        // Cursor composers (shared DB, synthetic paths). Extracted so the cheap
+        // on-open refresh (refresh_cursor_if_changed) can re-run the exact same
+        // upsert without a full scan; `seen` keeps these paths out of the vanished-row
+        // cleanup below.
+        index_cursor(&tx, Some(&mut seen))?;
         // Drop rows whose transcript vanished (and their turns + FTS entry). The FTS
         // row is keyed by sessions.rowid, so grab the rowid before deleting the row.
         {
@@ -928,6 +1014,7 @@ fn write_enrich(
 // --- Queries ---
 
 pub fn harnesses() -> Vec<HarnessAgg> {
+    refresh_cursor_if_changed(); // cheap self-heal of stale cursor size_bytes
     let Ok(conn) = open_db() else { return Vec::new() };
     let mut stmt = match conn.prepare(
         "SELECT harness,
@@ -979,6 +1066,28 @@ fn groups(conn: &Connection, harness: &str) -> HashMap<String, grouping::Group> 
         .collect()
 }
 
+/// Like `groups`, but across every harness at once (spend spans all harnesses and
+/// grouping is path-based, harness-agnostic). Keyed by the dir string
+/// `COALESCE(project_path, project)` so Daily Spend can fold worktree/subdir turns
+/// into their parent project the same way Browse does.
+fn groups_all(conn: &Connection) -> HashMap<String, grouping::Group> {
+    let dirs: Vec<PathBuf> = conn
+        .prepare("SELECT DISTINCT COALESCE(project_path, project) FROM sessions")
+        .and_then(|mut s| {
+            s.query_map([], |r| r.get::<_, String>(0)).map(|rows| {
+                rows.flatten()
+                    .filter(|d| !d.is_empty())
+                    .map(PathBuf::from)
+                    .collect()
+            })
+        })
+        .unwrap_or_default();
+    grouping::group_dirs(&dirs)
+        .into_iter()
+        .map(|(dir, g)| (dir.to_string_lossy().to_string(), g))
+        .collect()
+}
+
 /// The directories that make up one project: its own, plus every subdirectory
 /// session folded into it. Used in place of a `project=?` filter, which matches
 /// only the sessions started in the project directory itself.
@@ -1009,6 +1118,9 @@ fn dir_params(harness: &str, dirs: &[String]) -> Vec<Box<dyn rusqlite::ToSql>> {
 }
 
 pub fn projects(harness: &str) -> Vec<ProjectAgg> {
+    if harness == "cursor" {
+        refresh_cursor_if_changed();
+    }
     let Ok(conn) = open_db() else { return Vec::new() };
     let groups = groups(&conn, harness);
     // One row per working directory, folded into projects in Rust: which
@@ -1078,6 +1190,9 @@ pub fn projects(harness: &str) -> Vec<ProjectAgg> {
 /// cancelable background pass (`run_enrich_project`) so drilling in is instant and
 /// the window can be closed while it finishes.
 pub fn sessions(harness: &str, project: &str) -> Vec<SessionMeta> {
+    if harness == "cursor" {
+        refresh_cursor_if_changed();
+    }
     let Ok(conn) = open_db() else { return Vec::new() };
     let rows = read_sessions(&conn, harness, project);
     blog!("sessions read {harness}/{project} -> {} rows", rows.len());

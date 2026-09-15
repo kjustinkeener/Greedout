@@ -194,6 +194,13 @@ fn search_first_turn(id: String, query: String) -> Option<u32> {
     baseline::search_first_turn(&id, &query)
 }
 
+/// The harness ("claude"/"codex"/"cursor") that owns a session id, so the Context
+/// Explorer opened directly on a session can navigate up to its real project.
+#[tauri::command]
+fn session_harness(id: String) -> String {
+    baseline::harness_of(&id)
+}
+
 /// Frontend trace sink: routes UI-side baseline logs into greedout.log, gated by
 /// the same `debug_logging` setting as the backend traces.
 #[tauri::command]
@@ -476,6 +483,7 @@ pub fn run() {
             clear_cache,
             browse_cancel,
             browse_harnesses,
+            session_harness,
             browse_projects,
             browse_sessions,
             browse_enrich_project,

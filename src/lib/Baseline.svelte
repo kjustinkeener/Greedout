@@ -221,6 +221,7 @@
     overrideId = h.id;
     overrideTitle = `${h.title} · ${h.project}`;
     curProject = h.project;
+    curHarness = h.harness; // keep zoom-out on the hit's own harness
     liveCtx = null;
     path = [];
     detail = null;
@@ -322,15 +323,23 @@
             if (initProject) curProject = initProject;
             pinned = true;
             zoom = "session";
+            // The launch (a gauge/Daily-Spend click) carries no harness, so resolve it
+            // from the id; without this, zoom-out defaults to Claude for a Cursor/Codex
+            // session and the breadcrumb lands on the wrong harness.
+            invoke<string>("session_harness", { id })
+              .then((h) => (curHarness = h))
+              .catch((e) => dbg("session_harness failed", e));
           } else if (initView === "project" && initProject) {
             if (haveIndex) openProject(initProject);
-            else {
-              openRoot();
-              startScan(true);
-            }
+            else openRoot();
+            // Always refresh on open (like Daily Spend), not only when the index is
+            // empty: Pass 1 re-stats every file so Claude/Codex sizes can't go stale,
+            // and Pass 2 re-enriches only the rows whose mtime changed. Cached rows
+            // paint first; the browse-progress "done" handler repaints when it lands.
+            startScan(true);
           } else {
             openRoot();
-            if (!haveIndex) startScan(true);
+            startScan(true);
           }
         }
       })
@@ -443,6 +452,7 @@
     overrideId = s.id;
     overrideTitle = `${s.title} · ${s.project}`;
     curProject = s.project;
+    curHarness = s.harness; // so zoom-out resolves this session's real harness, not the default
     liveCtx = null;
     path = [];
     loadError = null;
@@ -707,6 +717,12 @@
         loadError = null;
         showEnable = false;
         zoom = "session";
+        // Resolve the harness from the id so zoom-out stays on this session's harness.
+        if (p.id) {
+          invoke<string>("session_harness", { id: p.id })
+            .then((h) => (curHarness = h))
+            .catch((e) => dbg("session_harness failed", e));
+        }
       },
     ).then((f) => (un = f));
     return () => un?.();
@@ -890,7 +906,7 @@
     if (name === "MCP tools")
       return "Connected server tool schemas. Most load lazily; drill in for the per-server, per-tool split.";
     if (name === "Skills") return "Available skill descriptions loaded into context.";
-    if (name === "Messages") return "The conversation so far; grows over time, unlike the rest.";
+    if (name === "Messages") return "";
     return n.detail;
   }
 

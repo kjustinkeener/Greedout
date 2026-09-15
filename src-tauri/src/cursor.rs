@@ -206,6 +206,18 @@ fn db_mtime_secs() -> u64 {
         .unwrap_or(0)
 }
 
+/// The shared `state.vscdb` file mtime in epoch ms, or None if it cannot be read.
+/// The `cursorDiskKV` table has no per-row mtime, but this file mtime bumps on ANY
+/// composer change, so it is the cheap coarse "cursor data changed" gate the browse
+/// cache uses to decide it must re-read the composers (see browse::refresh_cursor_if_changed).
+pub fn db_file_mtime_ms() -> Option<i64> {
+    std::fs::metadata(cursor_db_path())
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+}
+
 // --- composer parsing ---
 
 /// One assistant/user message ("bubble") of a composer, reduced to what we price

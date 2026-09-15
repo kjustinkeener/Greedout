@@ -30,6 +30,8 @@ vi.mock("@tauri-apps/api/core", () => ({
       case "browse_projects":
       case "browse_sessions":
         return [];
+      case "session_harness":
+        return "claude-code";
       case "analyze_baseline":
         return { ok: true, message: "", needsContext: false, total: 1000, max: 200000, capturedAt: "", costRate: 0, costIn: 0, costOut: 0, nodes: [] };
       case "chat_breakdown":

@@ -90,6 +90,30 @@ fn parent_of(p: &Path) -> Option<PathBuf> {
     Some(parent.to_path_buf())
 }
 
+/// Orca fans a seed project out into many ephemeral clones under
+/// `.../orca/workspaces/<ws>/<clone>`. To the user those clones are one project,
+/// named after the workspace `<ws>`, not dozens of `quorum-fj-*` entries. They are
+/// distinct sibling directories, so the generic parent-counting rules keep them
+/// apart (their container looks like a workspace root); this special case folds
+/// every path inside a workspace directory into that directory. Returns the `<ws>`
+/// directory when `d` sits under one, else None.
+fn orca_workspace_root(d: &Path) -> Option<PathBuf> {
+    let comps: Vec<Component> = d.components().collect();
+    let seg = |c: &Component| c.as_os_str().to_string_lossy().to_lowercase();
+    for i in 0..comps.len() {
+        // `orca` immediately followed by `workspaces`; the next component is `<ws>`,
+        // the project directory. Require a component after `<ws>` so a session that
+        // ran in `<ws>` itself is left to the normal path (it is already a project).
+        if seg(&comps[i]) == "orca"
+            && comps.get(i + 1).map(&seg).as_deref() == Some("workspaces")
+            && comps.len() > i + 3
+        {
+            return Some(comps[..=i + 2].iter().collect());
+        }
+    }
+    None
+}
+
 /// Group every scanned project directory under the project it belongs to.
 ///
 /// `dirs` is the decoded working directory of each transcript folder; every one of
@@ -118,7 +142,10 @@ pub fn group_dirs(dirs: &[PathBuf]) -> HashMap<PathBuf, Group> {
 
     let mut out = HashMap::with_capacity(dirs.len());
     for d in dirs {
-        let root = root_for(d, &projects, &roots);
+        // Orca workspace clones fold into their `<ws>` directory regardless of the
+        // generic rules, which would otherwise treat the workspace as a container of
+        // independent projects.
+        let root = orca_workspace_root(d).unwrap_or_else(|| root_for(d, &projects, &roots));
         // strip_prefix is case-sensitive, and the root may be spelled differently
         // from the child, so count components instead of matching text.
         let sub = (key(d) != key(&root))
@@ -232,6 +259,26 @@ mod tests {
             assert_eq!(e.label, d);
             assert_eq!(e.sub, None);
         }
+    }
+
+    #[test]
+    fn orca_workspace_clones_fold_into_the_workspace() {
+        // Many ephemeral clones under one orca workspace are one project (`<ws>`),
+        // not one project each, even though they are distinct sibling directories.
+        let g = group(&[
+            r"C:\Users\j\orca\workspaces\sample-app\quorum-fj-0",
+            r"C:\Users\j\orca\workspaces\sample-app\quorum-fj-1",
+            r"C:\Users\j\orca\workspaces\sample-app\quorum-fj-1c31f481-2",
+            r"C:\claude-local\quorum",
+        ]);
+        for clone in ["quorum-fj-0", "quorum-fj-1", "quorum-fj-1c31f481-2"] {
+            let e = &g[&p(&format!(r"C:\Users\j\orca\workspaces\sample-app\{clone}"))];
+            assert_eq!(e.root, p(r"C:\Users\j\orca\workspaces\sample-app"));
+            assert_eq!(e.label, "sample-app");
+            assert_eq!(e.sub.as_deref(), Some(clone));
+        }
+        // A real project that merely shares the `quorum` leaf name is untouched.
+        assert_eq!(g[&p(r"C:\claude-local\quorum")].label, "quorum");
     }
 
     #[test]

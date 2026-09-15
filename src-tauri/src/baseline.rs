@@ -571,6 +571,20 @@ fn is_cursor(id: &str) -> bool {
         && crate::cursor::candidates().iter().any(|(p, _)| crate::cursor::id_from_path(p) == id)
 }
 
+/// The harness that owns a session id, as the cache's harness value
+/// ("claude"/"codex"/"cursor"). Lets the Context Explorer set its harness when it is
+/// opened directly on a session (a gauge/Daily-Spend click), so navigating up the
+/// breadcrumb resolves the session's real project instead of defaulting to Claude.
+pub fn harness_of(id: &str) -> String {
+    if is_codex(id) {
+        "codex".into()
+    } else if is_cursor(id) {
+        "cursor".into()
+    } else {
+        "claude-code".into()
+    }
+}
+
 /// A Cursor composer's messages as ordered blocks. Cursor exposes only user/assistant
 /// bubbles (no thinking/tool split), so every non-empty bubble is one User or Agent
 /// block; a new turn begins at each user bubble. Timestamps are left empty (Cursor's

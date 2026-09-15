@@ -498,6 +498,22 @@ fn apply_grouping(sessions: &mut [Session]) {
                 s.project = g.label.clone();
                 s.project_root = g.root.to_string_lossy().to_string();
                 s.sub_path = g.sub.clone().unwrap_or_default();
+                // Drop a sub-path that just re-descends into an eponymous repo
+                // (`MoonPool\public-repos\MoonPool`): the grouped root already carries
+                // the project's name, so the tail is container nesting, not a
+                // meaningful in-project subdirectory. This keeps a harness that reports
+                // the deep git-repo path (Cursor) showing the same "MoonPool" label as
+                // one that reports the container (Claude), instead of the redundant
+                // "MoonPool/public-repos/MoonPool". A real subdir (`.../src-tauri`)
+                // ends in a different name and is kept.
+                let tail_matches_label = Path::new(&s.sub_path)
+                    .components()
+                    .next_back()
+                    .map(|c| c.as_os_str().to_string_lossy().eq_ignore_ascii_case(&s.project))
+                    .unwrap_or(false);
+                if tail_matches_label {
+                    s.sub_path.clear();
+                }
             }
             None => s.project_root = s.project_path.clone(),
         }

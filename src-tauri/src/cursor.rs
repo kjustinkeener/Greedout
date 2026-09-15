@@ -308,10 +308,10 @@ pub fn candidates() -> Vec<(PathBuf, u64)> {
     .unwrap_or_default()
 }
 
-/// Build one Cursor composer row for the poll list. `focused` is always None --
-/// Cursor writes no focus sidecar, so no composer is ever pinned. Mirrors
-/// codex::build_session's shape.
-pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, _focused: Option<&str>) -> Session {
+/// Build one Cursor composer row for the poll list. `focused` is the composerId the
+/// caller resolved as frontmost (via the OS foreground gate in scan.rs), or None.
+/// Mirrors codex::build_session's shape.
+pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, focused: Option<&str>) -> Session {
     let id = id_from_path(path);
     let info = composer_info(&id);
 
@@ -340,6 +340,7 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, _focused: 
     let title = title.unwrap_or_else(|| project.clone());
     let pct = ctx.map(|c| c as f64 / target.max(1) as f64);
     let live = now.saturating_sub(mtime) as f64 <= (cfg.poll_seconds * 2.0).max(1.0);
+    let is_focused = focused == Some(id.as_str());
 
     Session {
         id,
@@ -359,17 +360,51 @@ pub fn build_session(path: &Path, mtime: u64, now: u64, cfg: &Config, _focused: 
         mtime,
         size_bytes: 0,
         cost_usd,
-        focused: false,
+        focused: is_focused,
         compact: None,
     }
 }
 
-/// Cursor has no focus sidecar (unlike Claude's `lastFocusedAt` or Codex's desktop
-/// log), so there is nothing to pin. Always None. Kept for adapter-surface parity
-/// with codex.rs; the poll loop treats Cursor as never-focused without calling it.
-#[allow(dead_code)]
+/// Cursor's "focused" composer, as `(composerId, lastUpdatedAt ms)`.
+///
+/// Cursor writes NO focus/selection event anywhere (verified 2026-09-14: not to any
+/// log under `%APPDATA%\Cursor\logs`, not to the global DB -- no `selectedComposerId`
+/// / `activeComposer` field, and the UI-state blob holds zero composer uuids), so
+/// unlike Codex we cannot read which composer the user selected. What we CAN do is
+/// what scan.rs already does for Claude/Codex: gate on the OS foreground window. When
+/// Cursor is frontmost, the composer the user is looking at is almost always the one
+/// they last ran a turn in -- the max `lastUpdatedAt`. So this returns that composer;
+/// the frontmost-is-Cursor check is the caller's (see scan.rs's follow_focus block).
+/// The timestamp is that composer's own `lastUpdatedAt` (turn time, not a focus time),
+/// used only for the timestamp-tiebreak fallback when no app is known-frontmost.
 pub fn focused_session_id() -> Option<(String, u64)> {
-    None
+    with_db(|conn| {
+        let mut stmt = conn.prepare(
+            "SELECT substr(key, length('composerData:')+1),
+                    json_extract(value,'$.lastUpdatedAt'),
+                    json_extract(value,'$.createdAt')
+             FROM cursorDiskKV
+             WHERE key >= 'composerData:' AND key < 'composerData;'",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            let id: String = r.get(0)?;
+            let updated: SqlValue = r.get(1)?;
+            let created: SqlValue = r.get(2)?;
+            Ok((id, created_to_ms(&updated).or_else(|| created_to_ms(&created))))
+        })?;
+        let mut best: Option<(String, i64)> = None;
+        for (id, ms) in rows.flatten() {
+            if id.is_empty() || id == "empty-state-draft" {
+                continue;
+            }
+            let Some(ms) = ms else { continue };
+            if best.as_ref().map(|(_, b)| ms > *b).unwrap_or(true) {
+                best = Some((id, ms));
+            }
+        }
+        Ok(best.map(|(id, ms)| (id, ms.max(0) as u64)))
+    })
+    .flatten()
 }
 
 /// Over-time curve for one composer. Cursor persists no per-turn context snapshots,

@@ -296,54 +296,68 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     // `lastFocusedAt`, Codex's desktop-log mtime, both ms), then keep only the more
     // recent -- that's the session the user is actually looking at right now. The
     // loser is dropped so with n=1 the single gauge tracks true focus across apps.
-    let (focused, codex_focused) = if cfg.follow_focus && cfg.gauge_per_harness {
+    let (focused, codex_focused, cursor_focused) = if cfg.follow_focus && cfg.gauge_per_harness {
         // One gauge PER HARNESS: pin each harness's own focused session to the top
-        // independently, so both a Claude and a Codex panel can show at once. No
-        // cross-harness tiebreak -- both winners are kept.
+        // independently, so a Claude, a Codex and a Cursor panel can show at once. No
+        // cross-harness tiebreak -- every winner is kept.
         (
             focused_session_id().map(|(id, _)| id),
             crate::codex::focused_session_id().map(|(id, _)| id),
+            crate::cursor::focused_session_id().map(|(id, _)| id),
         )
     } else if cfg.follow_focus {
         let claude = focused_session_id();
         let codex = crate::codex::focused_session_id();
-        // A bare alt-tab between the two apps writes nothing to either's logs
-        // (Claude rewrites `lastFocusedAt` only on a within-Claude thread switch;
-        // Codex logs a route line only when a DIFFERENT thread is selected), so the
-        // on-disk selection timestamps can't tell which app you just tabbed to. The
-        // OS foreground window can: if the frontmost process is one of the two apps,
-        // that app's last-selected thread is what you're looking at. Only when the
-        // foreground is neither (e.g. you clicked Greedout itself) do we fall back
-        // to whichever selection timestamp is newer.
-        // Which of the two apps was frontmost is remembered across polls (LAST_FG)
-        // so that tabbing AWAY to some third window (a browser, an editor) holds the
-        // last app you were actually in rather than flipping by stale timestamps.
+        let cursor = crate::cursor::focused_session_id();
+        // A bare alt-tab between the apps writes nothing to any of their logs (Claude
+        // rewrites `lastFocusedAt` only on a within-Claude thread switch; Codex logs a
+        // route line only when a DIFFERENT thread is selected; Cursor logs nothing on
+        // focus OR composer switch at all), so the on-disk selection timestamps can't
+        // tell which app you just tabbed to. The OS foreground window can: if the
+        // frontmost process is one of these apps, that app's active thread is what
+        // you're looking at. Only when the foreground is none of them (e.g. you clicked
+        // Greedout itself) do we fall back to whichever selection timestamp is newer.
+        // Which app was frontmost is remembered across polls (LAST_FG) so that tabbing
+        // AWAY to some other window (a browser, an editor) holds the last app you were
+        // actually in rather than flipping by stale timestamps.
         use std::sync::atomic::{AtomicU8, Ordering};
-        static LAST_FG: AtomicU8 = AtomicU8::new(0); // 0 unknown, 1 claude, 2 codex
+        static LAST_FG: AtomicU8 = AtomicU8::new(0); // 0 unknown, 1 claude, 2 codex, 3 cursor
         let fg = foreground_exe();
         let app = match fg.as_deref() {
             Some("chatgpt.exe") => 2,
             Some("claude.exe") => 1,
-            _ => LAST_FG.load(Ordering::Relaxed), // third window: keep last app
+            Some("cursor.exe") => 3,
+            _ => LAST_FG.load(Ordering::Relaxed), // other window: keep last app
         };
-        match app {
-            2 if codex.is_some() => {
-                LAST_FG.store(2, Ordering::Relaxed);
-                (None, codex.map(|(id, _)| id))
-            }
-            1 if claude.is_some() => {
-                LAST_FG.store(1, Ordering::Relaxed);
-                (claude.map(|(id, _)| id), None)
-            }
+        // Single winner across all three harnesses; the other two are dropped so with
+        // n=1 the one gauge tracks true focus across apps.
+        let winner = match app {
+            2 if codex.is_some() => 2,
+            1 if claude.is_some() => 1,
+            3 if cursor.is_some() => 3,
             // No remembered app yet (or its session vanished): newest selection wins.
-            _ => match (&claude, &codex) {
-                (Some((_, ct)), Some((_, xt))) if xt > ct => (None, codex.map(|(id, _)| id)),
-                (Some(_), Some(_)) => (claude.map(|(id, _)| id), None),
-                _ => (claude.map(|(id, _)| id), codex.map(|(id, _)| id)),
-            },
+            _ => [
+                (1u8, claude.as_ref().map(|(_, t)| *t)),
+                (2, codex.as_ref().map(|(_, t)| *t)),
+                (3, cursor.as_ref().map(|(_, t)| *t)),
+            ]
+            .into_iter()
+            .filter_map(|(w, t)| t.map(|t| (w, t)))
+            .max_by_key(|(_, t)| *t)
+            .map(|(w, _)| w)
+            .unwrap_or(0),
+        };
+        if winner != 0 {
+            LAST_FG.store(winner, Ordering::Relaxed);
+        }
+        match winner {
+            1 => (claude.map(|(id, _)| id), None, None),
+            2 => (None, codex.map(|(id, _)| id), None),
+            3 => (None, None, cursor.map(|(id, _)| id)),
+            _ => (None, None, None),
         }
     } else {
-        (None, None)
+        (None, None, None)
     };
 
     // (path, mtime) for every transcript. We keep the list ALWAYS full: rather
@@ -372,9 +386,10 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
         candidates.push((path, mtime, Harness::Cursor));
     }
 
-    // Sort key: the focused session (Claude via its focus sidecar, or Codex via its
-    // desktop-app DB) is pinned to the very top; everything else ranks by mtime.
-    // Cursor writes no focus sidecar, so it is never pinned.
+    // Sort key: the focused session is pinned to the very top; everything else ranks
+    // by mtime. Focus is resolved per harness (Claude via its focus sidecar, Codex via
+    // its desktop log, Cursor via the OS-foreground gate + most-recently-updated
+    // composer -- see the follow_focus block above).
     let sort_key = |p: &Path, mtime: u64, harness: Harness| -> u64 {
         let focused_here = match harness {
             Harness::Codex => codex_focused
@@ -385,7 +400,10 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
                 .as_deref()
                 .map(|f| p.file_stem().map(|s| s == f).unwrap_or(false))
                 .unwrap_or(false),
-            Harness::Cursor => false,
+            Harness::Cursor => cursor_focused
+                .as_deref()
+                .map(|f| crate::cursor::id_from_path(p) == f)
+                .unwrap_or(false),
         };
         if focused_here {
             u64::MAX
@@ -407,7 +425,9 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
             Harness::Codex => {
                 crate::codex::build_session(&path, mtime, now, cfg, codex_focused.as_deref())
             }
-            Harness::Cursor => crate::cursor::build_session(&path, mtime, now, cfg, None),
+            Harness::Cursor => {
+                crate::cursor::build_session(&path, mtime, now, cfg, cursor_focused.as_deref())
+            }
             Harness::Claude => build_session(&path, mtime, now, cfg, labels, focused.as_deref()),
         })
         .collect();

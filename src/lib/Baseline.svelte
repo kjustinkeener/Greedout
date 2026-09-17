@@ -102,13 +102,19 @@
   // on the slow disk path, so they wait for an explicit Enter.
   const LIVE_MIN = 3;
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
-  // Adaptive debounce: never fire the next live search faster than the slowest
-  // roundtrip seen so far, so a fast index stays snappy while a slow cache backs
-  // off on its own. Ratchets up only (never down); clamped to a usable range.
+  // Adaptive debounce: track the live search's TIME-TO-FIRST-HIT (how long until
+  // results start appearing) as an EWMA, so the debounce follows real responsiveness.
+  // It moves BOTH ways -- a warm FTS index pulls it back toward the floor, a slow
+  // cache nudges it up -- clamped to a usable range. (The old version ratcheted up
+  // only, off the whole roundtrip through "done", so one slow disk-scan tail pinned
+  // the debounce high for the rest of the session even after the index went warm.)
   const DEBOUNCE_MIN = 120;
   const DEBOUNCE_MAX = 1500;
   let liveDebounce = $state(DEBOUNCE_MIN);
   let searchStart = 0;
+  // Reset per run; set true when the first hit of the current run lands so we time
+  // to-first-hit once (not once per streamed hit).
+  let firstHitSeen = false;
   // Mutually-exclusive project filter over the results (null = all projects).
   let projectFilter = $state<string | null>(null);
   // Result ordering: "best" = relevance score (backend default), "recent" =
@@ -147,6 +153,7 @@
     searchProg = null;
     projectFilter = null;
     searchStart = performance.now();
+    firstHitSeen = false;
     invoke("browse_search", { query: q }).catch((e) => {
       dbg("browse_search failed", e);
       searching = false;
@@ -284,15 +291,23 @@
       const prev = byKey.get(key(e.payload));
       if (!prev || e.payload.score > prev.score) byKey.set(key(e.payload), e.payload);
       searchHits = [...byKey.values()].sort((a, b) => b.score - a.score);
+      // First hit of this run = real responsiveness. Fold it into the debounce EWMA
+      // (moves both directions), so the next keystroke fires near how fast results
+      // actually start, not after the whole scan finished.
+      if (!firstHitSeen) {
+        firstHitSeen = true;
+        const rt = performance.now() - searchStart;
+        const next = Math.round(0.5 * rt + 0.5 * liveDebounce);
+        liveDebounce = Math.min(DEBOUNCE_MAX, Math.max(DEBOUNCE_MIN, next));
+      }
     }).then((f) => (un1 = f));
     listen<SearchProgress>("search-progress", (e) => {
       searchProg = e.payload;
       if (e.payload.phase === "done" || e.payload.phase === "canceled") searching = false;
-      // Ratchet the live debounce toward the slowest completed roundtrip. Only a
-      // full "done" counts; a canceled run was cut short and isn't a real timing.
-      if (e.payload.phase === "done") {
-        const rt = performance.now() - searchStart;
-        if (rt > liveDebounce) liveDebounce = Math.min(rt, DEBOUNCE_MAX);
+      // A run that finished with no hits at all never timed to-first-hit; ease the
+      // debounce down so an empty/slow query doesn't leave it stuck high.
+      if (e.payload.phase === "done" && !firstHitSeen) {
+        liveDebounce = Math.max(DEBOUNCE_MIN, Math.round(liveDebounce * 0.75));
       }
     }).then((f) => (un2 = f));
     return () => {

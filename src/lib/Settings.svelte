@@ -311,14 +311,8 @@
   {:else}
     <div class="cols">
     <div class="col">
-    <label class="check" title={t("settings.followFocusTip")} oncontextmenu={(e) => resetField("follow_focus", e)}>
-      <input type="checkbox" bind:checked={cfg.follow_focus} />
-      {t("settings.followFocus")}
-    </label>
-    <label class="check" title={t("settings.gaugePerHarnessTip")} oncontextmenu={(e) => resetField("gauge_per_harness", e)}>
-      <input type="checkbox" bind:checked={cfg.gauge_per_harness} disabled={!cfg.follow_focus} />
-      {t("settings.gaugePerHarness")}
-    </label>
+    <!-- Window behavior/chrome, above the divider gap. -->
+    <div class="grp">
     <label class="check" title={t("settings.alwaysOnTopTip")} oncontextmenu={(e) => resetField("always_on_top", e)}>
       <input type="checkbox" bind:checked={cfg.always_on_top} />
       {t("settings.alwaysOnTop")}
@@ -349,9 +343,16 @@
       <input type="checkbox" bind:checked={cfg.close_to_tray} />
       {t("settings.closeToTray")}
     </label>
-    <label class="check" title={t("settings.showStatusbarTip")} oncontextmenu={(e) => resetField("show_statusbar", e)}>
-      <input type="checkbox" bind:checked={cfg.show_statusbar} />
-      {t("settings.showStatusbar")}
+    </div>
+    <!-- Greedout-specific behavior, below the gap. -->
+    <div class="grp">
+    <label class="check" title={t("settings.followFocusTip")} oncontextmenu={(e) => resetField("follow_focus", e)}>
+      <input type="checkbox" bind:checked={cfg.follow_focus} />
+      {t("settings.followFocus")}
+    </label>
+    <label class="check" title={t("settings.gaugePerHarnessTip")} oncontextmenu={(e) => resetField("gauge_per_harness", e)}>
+      <input type="checkbox" bind:checked={cfg.gauge_per_harness} disabled={!cfg.follow_focus} />
+      {t("settings.gaugePerHarness")}
     </label>
     <label class="check" title={t("settings.showPromptTip")} oncontextmenu={(e) => resetField("show_prompt", e)}>
       <input type="checkbox" bind:checked={cfg.show_prompt} />
@@ -361,6 +362,10 @@
       <input type="checkbox" bind:checked={cfg.clickable_titles} />
       {t("settings.clickableTitles")}
     </label>
+    <label class="check" title={t("settings.showStatusbarTip")} oncontextmenu={(e) => resetField("show_statusbar", e)}>
+      <input type="checkbox" bind:checked={cfg.show_statusbar} />
+      {t("settings.showStatusbar")}
+    </label>
     <label class="check" title={t("settings.checkUpdatesTip")} oncontextmenu={(e) => resetField("check_updates", e)}>
       <input type="checkbox" bind:checked={cfg.check_updates} />
       {t("settings.checkUpdates")}
@@ -369,6 +374,7 @@
       <input type="checkbox" bind:checked={cfg.debug_logging} />
       {t("settings.debugLogging")}
     </label>
+    </div>
     </div>
 
     <div class="col">
@@ -547,6 +553,12 @@
   }
   .col {
     min-width: 0;
+  }
+  /* Two toggle groups (window chrome, then Greedout behavior) split by a gap, no
+     header. The gap replaces one check's margin so the second group sits clearly
+     apart without a rule or label. */
+  .grp + .grp {
+    margin-top: 14px;
   }
   .cols .col + .col {
     border-left: 1px solid var(--edge);

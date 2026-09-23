@@ -14,20 +14,24 @@
 //! repository.
 
 use serde::{Deserialize, Serialize};
+#[cfg(windows)]
 use std::io::Read;
 use tauri::AppHandle;
 
 /// GitHub resolves `latest` to the newest published, non-draft release, so a
 /// draft release is invisible here. That is deliberate: a release is a draft
 /// until its signature has been verified against this exact public key.
+#[cfg(windows)]
 const MANIFEST_URL: &str =
     "https://github.com/kjustinkeener/Greedout/releases/latest/download/update.json";
 
 /// Base64 of the whole minisign public key file, comment line included.
+#[cfg(windows)]
 const PUBKEY_B64: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFCNEUxQ0VBNzNDOTRBNTgKUldSWVNzbHo2aHhPRzkwbmMzWUxDbTh3RjN1dkNRUGlyZVYrdkJmNGpBcFpGZHh4RXdsTW81QWQK";
 
 /// A hostile or broken manifest should not be able to make us read forever.
 /// The real exe is around 13 MB.
+#[cfg(windows)]
 const MAX_DOWNLOAD: u64 = 200 * 1024 * 1024;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -54,32 +58,52 @@ pub struct CheckResult {
 /// quietly.
 #[tauri::command]
 pub fn update_check() -> Result<CheckResult, String> {
-    let current = env!("CARGO_PKG_VERSION").to_string();
-    let body = http_get_string(MANIFEST_URL)?;
-    let info: UpdateInfo =
-        serde_json::from_str(&body).map_err(|e| format!("bad update manifest: {e}"))?;
-    let cur =
-        semver::Version::parse(&current).map_err(|e| format!("bad current version {current}: {e}"))?;
-    let new = semver::Version::parse(info.version.trim_start_matches('v'))
-        .map_err(|e| format!("bad manifest version {}: {e}", info.version))?;
-    Ok(CheckResult {
-        current,
-        available: (new > cur).then_some(info),
-    })
+    #[cfg(not(windows))]
+    return Err(
+        "Updates on Linux are delivered by the installed package or AppImage download".to_string(),
+    );
+
+    #[cfg(windows)]
+    {
+        let current = env!("CARGO_PKG_VERSION").to_string();
+        let body = http_get_string(MANIFEST_URL)?;
+        let info: UpdateInfo =
+            serde_json::from_str(&body).map_err(|e| format!("bad update manifest: {e}"))?;
+        let cur = semver::Version::parse(&current)
+            .map_err(|e| format!("bad current version {current}: {e}"))?;
+        let new = semver::Version::parse(info.version.trim_start_matches('v'))
+            .map_err(|e| format!("bad manifest version {}: {e}", info.version))?;
+        Ok(CheckResult {
+            current,
+            available: (new > cur).then_some(info),
+        })
+    }
 }
 
 /// Download, verify, replace, relaunch. On success this never returns: the
 /// replacement is already starting and this process exits.
 #[tauri::command]
 pub fn update_apply(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
-    let bytes = http_get_bytes(&info.url)?;
-    // Order matters more here than anywhere else in the app: verify before the
-    // bytes touch the disk, so a failed check leaves nothing behind to run.
-    verify_signature(&bytes, &info.signature)?;
-    self_replace_and_relaunch(&app, &bytes)
+    #[cfg(not(windows))]
+    {
+        let _ = (app, info);
+        return Err(
+            "Updates on Linux are delivered by the installed package or AppImage download"
+                .to_string(),
+        );
+    }
+    #[cfg(windows)]
+    {
+        let bytes = http_get_bytes(&info.url)?;
+        // Order matters more here than anywhere else in the app: verify before the
+        // bytes touch the disk, so a failed check leaves nothing behind to run.
+        verify_signature(&bytes, &info.signature)?;
+        self_replace_and_relaunch(&app, &bytes)
+    }
 }
 
 /// The whole security model. A download that fails this is discarded.
+#[cfg(windows)]
 fn verify_signature(data: &[u8], sig_text: &str) -> Result<(), String> {
     use base64::Engine as _;
     let pubkey_file = base64::engine::general_purpose::STANDARD
@@ -93,8 +117,8 @@ fn verify_signature(data: &[u8], sig_text: &str) -> Result<(), String> {
         .ok_or("pubkey file has no key line")?;
     let pk = minisign_verify::PublicKey::from_base64(key_line.trim())
         .map_err(|e| format!("parse pubkey: {e}"))?;
-    let sig =
-        minisign_verify::Signature::decode(sig_text).map_err(|e| format!("parse signature: {e}"))?;
+    let sig = minisign_verify::Signature::decode(sig_text)
+        .map_err(|e| format!("parse signature: {e}"))?;
     // Legacy signatures allowed: the signer may emit either a prehashed or a
     // legacy minisign signature, and both come from the same trusted key.
     // Tighten this only after pinning which form the workflow actually emits.
@@ -106,6 +130,7 @@ fn verify_signature(data: &[u8], sig_text: &str) -> Result<(), String> {
 /// renamed. So: move ourselves aside, write the new build to our own path,
 /// start it, and quit. Every failure below rolls the old exe back, because a
 /// half-applied update leaves the user with no working app at all.
+#[cfg(windows)]
 fn self_replace_and_relaunch(app: &AppHandle, new_bytes: &[u8]) -> Result<(), String> {
     let cur = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
     let old = cur.with_extension("old");
@@ -139,6 +164,7 @@ pub fn cleanup_old() {
     }
 }
 
+#[cfg(windows)]
 fn http_get_bytes(url: &str) -> Result<Vec<u8>, String> {
     let resp = ureq::get(url)
         .set("User-Agent", "Greedout-Updater")
@@ -152,6 +178,7 @@ fn http_get_bytes(url: &str) -> Result<Vec<u8>, String> {
     Ok(buf)
 }
 
+#[cfg(windows)]
 fn http_get_string(url: &str) -> Result<String, String> {
     String::from_utf8(http_get_bytes(url)?).map_err(|e| format!("response not utf8: {e}"))
 }

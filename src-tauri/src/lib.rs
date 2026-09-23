@@ -407,9 +407,12 @@ fn open_url(url: String) {
     if !scheme_ok || url.split_whitespace().count() != 1 {
         return;
     }
+    #[cfg(windows)]
     let _ = std::process::Command::new("rundll32")
         .args(["url.dll,FileProtocolHandler", &url])
         .spawn();
+    #[cfg(target_os = "linux")]
+    let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
 }
 
 #[tauri::command]
@@ -435,6 +438,7 @@ pub fn run() {
     // Three things happen before the Tauri builder exists, because none of them
     // wants a window. Add/Remove Programs invokes us as `greedout.exe
     // --uninstall`, and that path never returns.
+    #[cfg(windows)]
     if std::env::args().any(|a| a == "--uninstall") {
         install::run_uninstall();
     }

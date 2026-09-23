@@ -118,7 +118,35 @@ pub fn installed() -> Vec<String> {
     out
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+pub fn installed() -> Vec<String> {
+    use std::collections::BTreeMap;
+    use std::process::Command;
+
+    // fontconfig is the desktop-standard source of family names. Requesting the
+    // family field rather than walking directories also includes per-user fonts.
+    let Ok(out) = Command::new("fc-list").args([":", "family"]).output() else {
+        return Vec::new();
+    };
+    if !out.status.success() {
+        return Vec::new();
+    }
+    let mut names = BTreeMap::new();
+    for family in String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .flat_map(|line| line.split(','))
+    {
+        let family = family.trim();
+        if !family.is_empty() {
+            names
+                .entry(family.to_lowercase())
+                .or_insert_with(|| family.to_string());
+        }
+    }
+    names.into_values().collect()
+}
+
+#[cfg(all(not(windows), not(target_os = "linux")))]
 pub fn installed() -> Vec<String> {
     Vec::new()
 }
@@ -130,7 +158,10 @@ mod tests {
     #[test]
     fn strips_the_format_suffix_and_splits_multi_face_values() {
         assert_eq!(clean("Arial (TrueType)"), vec!["Arial"]);
-        assert_eq!(clean("Courier 10,12,15 (VGA res)"), vec!["Courier 10,12,15"]);
+        assert_eq!(
+            clean("Courier 10,12,15 (VGA res)"),
+            vec!["Courier 10,12,15"]
+        );
         assert_eq!(
             clean("Cambria & Cambria Math (TrueType)"),
             vec!["Cambria", "Cambria Math"]

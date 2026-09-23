@@ -54,23 +54,30 @@ token counts somewhere on disk.
 
 ## Platform support
 
-**Windows 10 and 11.** The app builds on other platforms, but two features are
-Windows-only and degrade to doing nothing: enumerating installed system fonts (reads the
-Fonts registry key) and detecting which session currently has focus (reads the Claude
-desktop app's packaged-app data directory). Everything else is portable in principle but
-untested elsewhere.
+**Windows 10 and 11, and 64-bit Linux.** Linux releases are provided as a Debian
+package and an AppImage, with a desktop entry, icon, and system-tray integration.
+Installed-font enumeration uses fontconfig on Linux. Detecting which Claude session
+currently has focus remains Windows-only; Linux instead orders sessions by activity.
 
 ## Install
 
-Greedout ships as a single `greedout.exe` and installs itself. Run the downloaded
-exe and it shows an install card instead of the gauge window; it copies itself to
-`%LOCALAPPDATA%\Greedout`, adds a Start Menu shortcut (a desktop one if you tick
-the box), and registers itself under Installed apps so it uninstalls the ordinary
-way.
+On Windows, Greedout ships as a single `greedout.exe` and installs itself. Run the
+downloaded exe and it shows an install card instead of the gauge window; it copies
+itself to `%LOCALAPPDATA%\Greedout`, adds a Start Menu shortcut (a desktop one if
+you tick the box), and registers itself under Installed apps so it uninstalls the
+ordinary way.
 
-Per-user, so there is no administrator prompt, and everything Greedout writes (its
-config, labels, log and the opt-in browse cache) stays inside that one folder;
-`~/.claude` is only ever read. Uninstalling removes the folder and the shortcuts.
+On 64-bit Debian/Ubuntu and compatible distributions, download the `.deb` and install
+it with `sudo apt install ./greedout_<version>_amd64.deb`. It registers Greedout in the
+desktop launcher and can be removed with `sudo apt remove greedout`. On other 64-bit
+Linux distributions, download the `.AppImage`, make it executable (`chmod +x
+Greedout_<version>_amd64.AppImage`), and run it. AppImages are portable; remove the
+file to uninstall.
+
+Everything Greedout writes (its config, labels, log and the opt-in browse cache) stays
+in its platform app-data directory; `~/.claude` is only ever read. Windows installs are
+per-user and need no administrator prompt. Linux package removal leaves configuration
+and cache data in place so reinstalling preserves preferences.
 
 Download it from [fasterdb.com/software/greedout](https://fasterdb.com/software/greedout/)
 or the [releases page](https://github.com/kjustinkeener/Greedout/releases), or build from
@@ -86,7 +93,9 @@ Prerequisites:
   the bundler needs 20+. CI pins 24 for the same reason.
 - The [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your
   platform. On Windows that means the **MSVC C++ build tools** and the **WebView2
-  runtime** (already present on Windows 11 and up-to-date Windows 10).
+  runtime** (already present on Windows 11 and up-to-date Windows 10). On Debian/Ubuntu
+  Linux, install `libwebkit2gtk-4.1-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`,
+  and `patchelf`.
 
 Then, from the repo root:
 
@@ -95,7 +104,7 @@ npm install
 npm run tauri dev
 ```
 
-To produce the release exe:
+To produce the Windows release executable:
 
 ```powershell
 npm run release
@@ -104,6 +113,12 @@ npm run release
 That is `tauri build --no-bundle`. There is deliberately no MSI or NSIS target:
 those install into Program Files, where replacing the running exe needs
 administrator rights, which is exactly what the self-installer avoids.
+
+On Linux, produce install artifacts with:
+
+```bash
+npx tauri build --bundles deb,appimage
+```
 
 ### Cutting a release
 

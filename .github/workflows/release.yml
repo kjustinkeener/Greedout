@@ -1,92 +1,88 @@
-# Tag a version, get a downloadable exe. The build is the same one `npm run
-# release` produces locally: a single self-installing executable, no bundle.
+# A published tag produces native, per-platform install artifacts. Windows keeps
+# its self-installing executable; Linux receives a Debian package and a portable
+# AppImage, both with a desktop entry and the bundled application icon.
 name: Release
 
 on:
   push:
     tags: ["v*"]
-  # Buildable by hand too, for testing the whole path without spending a tag.
-  # A draft release does not create its git tag until it is published, so a
-  # dry run leaves the repository's tags untouched.
   workflow_dispatch:
     inputs:
       tag:
-        description: "Version to build as a dry run (draft only, tag not created)"
+        description: "Version to build as a draft release"
         required: false
         default: "v0.0.0-dryrun"
 
 permissions:
-  contents: write # to create the release and attach the exe
+  contents: write
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
-
-      # One name for the version, whether it came from a tag push or from a
-      # hand-run dry run. Everything downstream reads this instead of asking
-      # again which event it was.
-      - name: Resolve the version
-        shell: bash
-        run: echo "TAG=${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}" >> "$GITHUB_ENV"
-
       - uses: actions/setup-node@v5
         with:
-          # 24, not 20: the translation gate imports the catalogs as TypeScript
-          # and relies on Node stripping the types, which older Node cannot do.
           node-version: 24
           cache: npm
-
       - run: npm ci
-
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-
       - run: npm run release
-
-      # Sign the exe and write the manifest the app polls. The signature is what
-      # lets an installed copy trust a download; without this step the app will
-      # refuse its own update, which is the correct behaviour and a confusing
-      # afternoon. This runs for dry runs too: an unsigned dry run would test
-      # the build and skip the only part that can actually break a release.
-      - name: Sign and write the update manifest
+      - name: Sign Windows executable
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          # Without this, PowerShell silently drops an empty-string argument, so
-          # --password "" vanishes, --password swallows the file path, and the
-          # signer complains that no file was given. This has cost real releases.
           $PSNativeCommandArgumentPassing = 'Standard'
-          $exe = "src-tauri/target/release/greedout.exe"
-          if (-not (Test-Path $exe)) { throw "no exe at $exe" }
-          npx tauri signer sign --private-key "$env:TAURI_SIGNING_PRIVATE_KEY" --password "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD" $exe
-          # The signer emits base64 OF the signature file; the app's verifier
-          # wants the file's text. Decode it here, once, rather than teaching
-          # every reader of the manifest about the extra layer.
-          $sigB64  = (Get-Content "$exe.sig" -Raw).Trim()
-          $minisig = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($sigB64))
-          $version = "$env:TAG".TrimStart("v")
-          $url = "https://github.com/${{ github.repository }}/releases/download/$env:TAG/greedout.exe"
-          [ordered]@{ version = $version; notes = ""; url = $url; signature = $minisig } |
-            ConvertTo-Json -Depth 3 | Set-Content -Path update.json -Encoding utf8
+          npx tauri signer sign --private-key "$env:TAURI_SIGNING_PRIVATE_KEY" --password "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD" src-tauri/target/release/greedout.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            src-tauri/target/release/greedout.exe
+            src-tauri/target/release/greedout.exe.sig
 
-      # A draft, deliberately: the app only ever sees a published release, so
-      # nothing reaches users until the signature has been verified against the
-      # public key that is actually compiled into the app. See
-      # tools/verify-release.
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install Tauri's Linux build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npx tauri build --bundles deb,appimage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+
+  publish:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Resolve release tag
+        run: echo "TAG=${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}" >> "$GITHUB_ENV"
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
           name: ${{ env.TAG }}
-          files: |
-            src-tauri/target/release/greedout.exe
-            src-tauri/target/release/greedout.exe.sig
-            update.json
+          files: release/*
           generate_release_notes: ${{ github.event_name != 'workflow_dispatch' }}
-          draft: true
+          draft: ${{ github.event_name == 'workflow_dispatch' }}

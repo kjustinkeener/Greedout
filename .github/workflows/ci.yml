@@ -58,3 +58,30 @@ jobs:
       # Backend unit tests: transcript parsers, cost dedupe, compaction handling,
       # pricing, and FTS/search helpers, against handcrafted fixtures.
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+  check-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Tauri's Linux build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm run check
+      - run: npm run test
+      - run: npm run build
+      - run: cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked

@@ -83,6 +83,6 @@ jobs:
         with:
           tag_name: ${{ env.TAG }}
           name: ${{ env.TAG }}
-          files: release/*
+          files: release/**/*
           generate_release_notes: ${{ github.event_name != 'workflow_dispatch' }}
           draft: ${{ github.event_name == 'workflow_dispatch' }}

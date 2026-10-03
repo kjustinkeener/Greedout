@@ -430,12 +430,32 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
             mtime
         }
     };
-    candidates.sort_by(|a, b| sort_key(&b.0, b.1, b.2).cmp(&sort_key(&a.0, a.1, a.2)));
+    // Ties (e.g. two focused copies of one session id) break to the newest file, so the
+    // dedupe below keeps the live copy.
+    candidates.sort_by(|a, b| {
+        (sort_key(&b.0, b.1, b.2), b.1).cmp(&(sort_key(&a.0, a.1, a.2), a.1))
+    });
     // The window's own height decides how many rows actually render (App.svelte's
     // `fit()` grows to the pool then trims to fit), so there is no user-facing count.
     // This is only a safety ceiling so a machine with hundreds of transcripts doesn't
     // build every one each poll; no realistic window shows this many rows.
     const MAX_POOL: usize = 50;
+    // The same session id can sit under two project folders (a project copied or
+    // renamed). The UI keys rows by id, and a duplicate key kills the whole window's
+    // reactivity (blank list), so keep only the first (newest/focused) of each id.
+    let mut seen_ids: HashSet<(u8, String)> = HashSet::new();
+    candidates.retain(|(p, _, h)| {
+        let tag = match h {
+            Harness::Claude => 0u8,
+            Harness::Codex => 1,
+            Harness::Cursor => 2,
+        };
+        let stem = p
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        seen_ids.insert((tag, stem))
+    });
     candidates.truncate(MAX_POOL);
 
     let mut sessions: Vec<Session> = candidates

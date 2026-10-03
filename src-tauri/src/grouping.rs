@@ -203,6 +203,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // asserts Windows drive-letter paths, which Linux does not split
     fn subdir_folds_into_its_project() {
         let g = group(&[
             r"C:\code\Greedout",
@@ -220,6 +221,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // asserts Windows drive-letter paths, which Linux does not split
     fn deep_subdir_keeps_the_whole_tail() {
         let g = group(&[
             r"C:\dev\app",
@@ -232,6 +234,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // asserts Windows drive-letter paths, which Linux does not split
     fn a_project_with_sessions_is_never_a_root() {
         // `app` holds two subdir sessions and would out-count a real root, but it
         // has sessions of its own, so both fold into it rather than splitting.
@@ -246,6 +249,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // asserts Windows drive-letter paths, which Linux does not split
     fn siblings_under_a_container_stay_separate() {
         // Nobody runs a session in `packages` itself, and it holds three projects,
         // so it is a workspace root and its children are their own projects.
@@ -262,6 +266,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // asserts Windows drive-letter paths, which Linux does not split
     fn orca_workspace_clones_fold_into_the_workspace() {
         // Many ephemeral clones under one orca workspace are one project (`<ws>`),
         // not one project each, even though they are distinct sibling directories.

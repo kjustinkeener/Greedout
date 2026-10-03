@@ -39,12 +39,26 @@ jobs:
         run: |
           $PSNativeCommandArgumentPassing = 'Standard'
           npx tauri signer sign --private-key "$env:TAURI_SIGNING_PRIVATE_KEY" --password "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD" src-tauri/target/release/greedout.exe
+      # The installed app polls releases/latest/download/update.json, so every
+      # release must carry it. The signer emits base64 OF the signature file; the
+      # app's verifier wants the file's text, so decode it once here.
+      - name: Write the update manifest
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          $exe = "src-tauri/target/release/greedout.exe"
+          $sigB64 = (Get-Content "$exe.sig" -Raw).Trim()
+          $minisig = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($sigB64))
+          $url = "https://github.com/${{ github.repository }}/releases/download/$tag/greedout.exe"
+          [ordered]@{ version = $tag.TrimStart("v"); notes = ""; url = $url; signature = $minisig } |
+            ConvertTo-Json -Depth 3 | Set-Content -Path src-tauri/target/release/update.json -Encoding utf8
       - uses: actions/upload-artifact@v4
         with:
           name: windows-release
           path: |
             src-tauri/target/release/greedout.exe
             src-tauri/target/release/greedout.exe.sig
+            src-tauri/target/release/update.json
 
   build-linux:
     runs-on: ubuntu-22.04
@@ -85,4 +99,6 @@ jobs:
           name: ${{ env.TAG }}
           files: release/**/*
           generate_release_notes: ${{ github.event_name != 'workflow_dispatch' }}
-          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          # Always a draft: the app only sees published releases, so nothing reaches
+          # users until tools/verify-release has passed on the downloaded files.
+          draft: true

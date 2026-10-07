@@ -16,6 +16,9 @@
 use serde::{Deserialize, Serialize};
 #[cfg(windows)]
 use std::io::Read;
+use std::path::Path;
+#[cfg(any(windows, test))]
+use std::path::PathBuf;
 use tauri::AppHandle;
 
 /// GitHub resolves `latest` to the newest published, non-draft release, so a
@@ -133,8 +136,7 @@ fn verify_signature(data: &[u8], sig_text: &str) -> Result<(), String> {
 #[cfg(windows)]
 fn self_replace_and_relaunch(app: &AppHandle, new_bytes: &[u8]) -> Result<(), String> {
     let cur = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
-    let old = cur.with_extension("old");
-    let _ = std::fs::remove_file(&old);
+    let old = aside_path(&cur);
     std::fs::rename(&cur, &old).map_err(|e| format!("rename self aside: {e}"))?;
     if let Err(e) = std::fs::write(&cur, new_bytes) {
         let _ = std::fs::rename(&old, &cur);
@@ -152,14 +154,49 @@ fn self_replace_and_relaunch(app: &AppHandle, new_bytes: &[u8]) -> Result<(), St
     Ok(())
 }
 
-/// Delete the copy the last update left behind. Best effort and retried every
-/// launch, because the file can still be locked moments after the old process
-/// exits. Called before the app builds anything.
+/// Where to rename `exe` aside so a new copy can take its path: `greedout.old`,
+/// after deleting any stale one. A process started before an earlier update can
+/// still be running from that `.old`, which locks it; the delete then fails and
+/// renaming onto it fails with Access denied, so step aside to `greedout.old-<pid>`
+/// instead. `cleanup_old` removes both once nothing runs from them.
+#[cfg(any(windows, test))]
+pub(crate) fn aside_path(exe: &Path) -> PathBuf {
+    let old = exe.with_extension("old");
+    let _ = std::fs::remove_file(&old);
+    if old.exists() {
+        exe.with_extension(format!("old-{}", std::process::id()))
+    } else {
+        old
+    }
+}
+
+/// Delete the copies earlier updates and reinstalls left behind. Best effort and
+/// retried every launch, because a file stays locked while anything still runs
+/// from it. Called before the app builds anything.
 pub fn cleanup_old() {
     if let Ok(cur) = std::env::current_exe() {
-        let old = cur.with_extension("old");
-        if old.exists() {
-            let _ = std::fs::remove_file(&old);
+        cleanup_old_beside(&cur);
+    }
+}
+
+/// `greedout.old` and every `greedout.old-<pid>` next to `exe`.
+fn cleanup_old_beside(exe: &Path) {
+    let old = exe.with_extension("old");
+    if old.exists() {
+        let _ = std::fs::remove_file(&old);
+    }
+    let (Some(dir), Some(stem)) = (exe.parent(), exe.file_stem().and_then(|s| s.to_str())) else {
+        return;
+    };
+    let prefix = format!("{stem}.old-");
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for e in entries.flatten() {
+            if e.file_name()
+                .to_str()
+                .is_some_and(|n| n.starts_with(&prefix))
+            {
+                let _ = std::fs::remove_file(e.path());
+            }
         }
     }
 }
@@ -181,4 +218,80 @@ fn http_get_bytes(url: &str) -> Result<Vec<u8>, String> {
 #[cfg(windows)]
 fn http_get_string(url: &str) -> Result<String, String> {
     String::from_utf8(http_get_bytes(url)?).map_err(|e| format!("response not utf8: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scratch(name: &str) -> PathBuf {
+        let n = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!("greedout-{name}-{}-{n}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn aside_path_reuses_old_after_deleting_a_stale_one() {
+        let dir = scratch("aside-stale");
+        let exe = dir.join("greedout.exe");
+        assert_eq!(aside_path(&exe), dir.join("greedout.old"));
+        std::fs::write(dir.join("greedout.old"), b"stale").unwrap();
+        assert_eq!(aside_path(&exe), dir.join("greedout.old"));
+        assert!(!dir.join("greedout.old").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// An exclusive handle stands in for a process still running from `.old`:
+    /// both make the delete fail, so the aside name must move off `.old`.
+    #[cfg(windows)]
+    #[test]
+    fn aside_path_steps_past_a_locked_old() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let dir = scratch("aside-locked");
+        let exe = dir.join("greedout.exe");
+        let old = dir.join("greedout.old");
+        std::fs::write(&old, b"running").unwrap();
+        let lock = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&old)
+            .unwrap();
+        let got = aside_path(&exe);
+        assert_eq!(
+            got,
+            dir.join(format!("greedout.old-{}", std::process::id()))
+        );
+        assert!(old.exists());
+        drop(lock);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cleanup_removes_old_and_numbered_old_only() {
+        let dir = scratch("cleanup");
+        let exe = dir.join("greedout.exe");
+        for n in [
+            "greedout.exe",
+            "greedout.old",
+            "greedout.old-1234",
+            "greedout.old-99",
+            "greedout.older",
+            "other.old-1",
+        ] {
+            std::fs::write(dir.join(n), b"x").unwrap();
+        }
+        cleanup_old_beside(&exe);
+        let mut left: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        assert_eq!(left, ["greedout.exe", "greedout.older", "other.old-1"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

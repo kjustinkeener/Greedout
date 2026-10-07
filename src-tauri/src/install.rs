@@ -14,7 +14,7 @@
 //! registry. Both ship with Windows and neither needs a crate.
 
 use serde::Serialize;
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -122,7 +122,7 @@ pub fn perform_install(desktop_shortcut: bool) -> Result<String, String> {
         let same = src.canonicalize().unwrap_or_else(|_| src.clone())
             == target.canonicalize().unwrap_or_else(|_| target.clone());
         if !same {
-            std::fs::copy(&src, &target).map_err(|e| format!("copy exe: {e}"))?;
+            replace_exe(&src, &target)?;
         }
 
         if let Some(sm) = start_menu_dir() {
@@ -138,6 +138,29 @@ pub fn perform_install(desktop_shortcut: bool) -> Result<String, String> {
     }
 }
 
+/// Copy `src` over `target`. Windows will not overwrite an exe that any process
+/// is running from, but it will rename it, so an existing target is moved aside
+/// first (to the updater's aside name, which the next launch cleans up). A failed
+/// copy moves it back, so a reinstall never leaves no exe at all.
+#[cfg(any(windows, test))]
+fn replace_exe(src: &Path, target: &Path) -> Result<(), String> {
+    let aside = if target.exists() {
+        let aside = crate::update::aside_path(target);
+        std::fs::rename(target, &aside).map_err(|e| format!("move installed exe aside: {e}"))?;
+        Some(aside)
+    } else {
+        None
+    };
+    if let Err(e) = std::fs::copy(src, target) {
+        if let Some(aside) = &aside {
+            let _ = std::fs::remove_file(target);
+            let _ = std::fs::rename(aside, target);
+        }
+        return Err(format!("copy exe: {e}"));
+    }
+    Ok(())
+}
+
 /// Hand off to the installed copy and quit.
 #[tauri::command]
 pub fn launch_installed_and_exit(app: tauri::AppHandle, exe: String) {
@@ -148,7 +171,7 @@ pub fn launch_installed_and_exit(app: tauri::AppHandle, exe: String) {
 /// Single-quoted PowerShell strings escape a quote by doubling it. Every path
 /// interpolated into a script goes through this, because a directory with an
 /// apostrophe in it is legal and would otherwise end the string early.
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 fn ps_quote(p: &Path) -> String {
     p.display().to_string().replace('\'', "''")
 }
@@ -298,11 +321,13 @@ fn remove_uninstall_key() {
 /// Uninstall, then exit. Never returns.
 ///
 /// A process cannot delete the directory it is running from, so the deletion is
-/// handed to a detached PowerShell job that stops every copy of the app, waits,
-/// and retries for about thirty seconds. It retries because a single attempt
-/// races our own exit, and it is PowerShell rather than `cmd /c` because `cmd`
-/// strips the outer quotes it is handed, unbalancing a quoted path: it then
-/// deletes nothing and, being hidden and detached, says nothing about it.
+/// handed to a detached PowerShell job that stops every copy of the app running
+/// from the install directory (a copy run from anywhere else, such as a dev
+/// build, is a separate program and keeps running), waits, and retries for about
+/// thirty seconds. It retries because a single attempt races our own exit, and it
+/// is PowerShell rather than `cmd /c` because `cmd` strips the outer quotes it is
+/// handed, unbalancing a quoted path: it then deletes nothing and, being hidden
+/// and detached, says nothing about it.
 ///
 /// If files survive, Windows shows "This program might not have uninstalled
 /// correctly". That dialog reads the filesystem, not the registry, so removing
@@ -312,18 +337,144 @@ pub fn run_uninstall() -> ! {
     remove_shortcuts();
     remove_uninstall_key();
     if let Some(dir) = install_dir() {
-        let script = format!(
-            "Get-Process -Name '{proc}' -ErrorAction SilentlyContinue | Stop-Process -Force; \
-             Start-Sleep -Milliseconds 400; \
-             for ($i = 0; $i -lt 60; $i++) {{ \
-               try {{ Remove-Item -LiteralPath '{dir}' -Recurse -Force -ErrorAction Stop; break }} \
-               catch {{ Start-Sleep -Milliseconds 500 }} }}",
-            proc = APP_NAME.to_lowercase(),
-            dir = ps_quote(&dir),
-        );
+        let script = uninstall_script(&dir);
         let _ = hidden(&mut Command::new("powershell"))
             .args(["-NoProfile", "-NonInteractive", "-Command", &script])
             .spawn();
     }
     std::process::exit(0);
+}
+
+/// PowerShell pipeline yielding every running copy of the app whose exe lives
+/// inside `dir`, and nothing else. The trailing separator keeps a folder that
+/// merely shares `dir`'s name as a prefix from matching.
+#[cfg(any(windows, test))]
+fn copy_processes_ps(dir: &Path) -> String {
+    format!(
+        "$d = '{dir}'.TrimEnd('\\') + '\\'; \
+         Get-Process -Name '{proc}' -ErrorAction SilentlyContinue | \
+         Where-Object {{ $_.Path -and $_.Path.StartsWith($d, [System.StringComparison]::OrdinalIgnoreCase) }}",
+        dir = ps_quote(dir),
+        proc = APP_NAME.to_lowercase(),
+    )
+}
+
+/// The detached uninstall job: stop this install's copies, then delete `dir`.
+#[cfg(any(windows, test))]
+fn uninstall_script(dir: &Path) -> String {
+    format!(
+        "{procs} | Stop-Process -Force -ErrorAction SilentlyContinue; \
+         Start-Sleep -Milliseconds 400; \
+         for ($i = 0; $i -lt 60; $i++) {{ \
+           try {{ Remove-Item -LiteralPath '{dir}' -Recurse -Force -ErrorAction Stop; break }} \
+           catch {{ Start-Sleep -Milliseconds 500 }} }}",
+        procs = copy_processes_ps(dir),
+        dir = ps_quote(dir),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scratch(name: &str) -> PathBuf {
+        let n = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!("greedout-{name}-{}-{n}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn uninstall_script_stops_only_this_folder_then_deletes_it() {
+        let dir = Path::new(r"C:\Users\o'brien\AppData\Local\Greedout");
+        let s = uninstall_script(dir);
+        // The quote is doubled for the single-quoted literal, in both places it appears.
+        assert!(
+            s.starts_with(r"$d = 'C:\Users\o''brien\AppData\Local\Greedout'.TrimEnd('\') + '\';")
+        );
+        assert!(s.contains(r"Remove-Item -LiteralPath 'C:\Users\o''brien\AppData\Local\Greedout'"));
+        // Stop-Process only ever sees the path-filtered set, never a bare name match.
+        let stop = s.find("| Stop-Process").unwrap();
+        assert!(s[..stop].contains("Where-Object { $_.Path -and $_.Path.StartsWith($d, "));
+        assert!(!s.contains("Stop-Process -Name"));
+        assert_eq!(s.matches("Stop-Process").count(), 1);
+    }
+
+    /// Run the real filter against a real process: a renamed copy of `ping.exe`
+    /// called `greedout.exe`, started (and killed) by this test, inside a temp
+    /// folder. The filter must select exactly that PID for its own folder, and
+    /// nothing for a folder whose name is only a prefix of it (`Mine's` vs
+    /// `Mine's-other`). Read-only otherwise: nothing is stopped.
+    #[cfg(windows)]
+    #[test]
+    fn process_filter_selects_only_processes_inside_the_folder() {
+        let base = scratch("uninst");
+        let inside = base.join("Mine's");
+        let sibling = base.join("Mine's-other");
+        std::fs::create_dir_all(&inside).unwrap();
+        std::fs::create_dir_all(&sibling).unwrap();
+        let sysroot = std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into());
+        let fake = sibling.join(EXE_NAME);
+        std::fs::copy(Path::new(&sysroot).join(r"System32\PING.EXE"), &fake).unwrap();
+        let mut child = Command::new(&fake)
+            .args(["-n", "30", "127.0.0.1"])
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let select = |dir: &Path| -> String {
+            let out = Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    &format!("{} | ForEach-Object {{ $_.Id }}", copy_processes_ps(dir)),
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            String::from_utf8_lossy(&out.stdout).trim().to_string()
+        };
+        let got_own = select(&sibling);
+        let got_prefix = select(&inside);
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = std::fs::remove_dir_all(&base);
+        assert_eq!(got_own, child.id().to_string());
+        assert_eq!(got_prefix, "", "a name-prefix folder must not match");
+    }
+
+    #[test]
+    fn replace_exe_installs_fresh_and_moves_an_existing_copy_aside() {
+        let dir = scratch("replace");
+        let src = dir.join("download.exe");
+        let target = dir.join(EXE_NAME);
+        std::fs::write(&src, b"v1").unwrap();
+        replace_exe(&src, &target).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"v1");
+        assert!(!dir.join("greedout.old").exists());
+
+        std::fs::write(&src, b"v2").unwrap();
+        replace_exe(&src, &target).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"v2");
+        assert_eq!(std::fs::read(dir.join("greedout.old")).unwrap(), b"v1");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn replace_exe_restores_the_installed_copy_when_the_copy_fails() {
+        let dir = scratch("replace-fail");
+        let target = dir.join(EXE_NAME);
+        std::fs::write(&target, b"installed").unwrap();
+        assert!(replace_exe(&dir.join("missing.exe"), &target).is_err());
+        assert_eq!(std::fs::read(&target).unwrap(), b"installed");
+        assert!(!dir.join("greedout.old").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

@@ -4,6 +4,12 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
+## [0.4.5] - 2026-10-13
+
+### Changed
+- No functional changes. Version bump to exercise the in-app update path from
+  v0.4.4, which now relaunches with `--wait-pid` and logs update timings.
+
 ## [0.4.4] - 2026-10-12
 
 ### Fixed

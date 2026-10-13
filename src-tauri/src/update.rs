@@ -97,6 +97,11 @@ pub fn update_apply(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
     }
     #[cfg(windows)]
     {
+        // A dev build or a copy run from anywhere else would swap itself, not the
+        // install the user launches from the Start menu, and leave that one stale.
+        if !crate::install::is_installed() {
+            return Err("Updates apply only to the installed copy".to_string());
+        }
         let bytes = http_get_bytes(&info.url)?;
         // Order matters more here than anywhere else in the app: verify before the
         // bytes touch the disk, so a failed check leaves nothing behind to run.
@@ -130,18 +135,11 @@ fn verify_signature(data: &[u8], sig_text: &str) -> Result<(), String> {
 }
 
 /// Windows will not let a running exe be overwritten, but it will let it be
-/// renamed. So: move ourselves aside, write the new build to our own path,
-/// start it, and quit. Every failure below rolls the old exe back, because a
-/// half-applied update leaves the user with no working app at all.
+/// renamed. So: put the new build in place beside us, start it, and quit.
 #[cfg(windows)]
 fn self_replace_and_relaunch(app: &AppHandle, new_bytes: &[u8]) -> Result<(), String> {
     let cur = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
-    let old = aside_path(&cur);
-    std::fs::rename(&cur, &old).map_err(|e| format!("rename self aside: {e}"))?;
-    if let Err(e) = std::fs::write(&cur, new_bytes) {
-        let _ = std::fs::rename(&old, &cur);
-        return Err(format!("write new exe: {e}"));
-    }
+    let old = swap_in(&cur, new_bytes)?;
     if let Err(e) = std::process::Command::new(&cur).spawn() {
         let _ = std::fs::remove_file(&cur);
         let _ = std::fs::rename(&old, &cur);
@@ -152,6 +150,45 @@ fn self_replace_and_relaunch(app: &AppHandle, new_bytes: &[u8]) -> Result<(), St
     app.cleanup_before_exit();
     app.exit(0);
     Ok(())
+}
+
+/// Replace `exe` with `new_bytes` and return where the old copy went.
+///
+/// The slow, failure-prone part (writing 13 MB and flushing it to disk) happens
+/// first, to `greedout.new`, while `exe` is still untouched. Only then do the two
+/// renames run, back to back, so the window in which a crash or power cut leaves
+/// no exe at `exe` is two metadata operations wide rather than a whole write. The
+/// `sync_all` is what makes that true: without it the renames can reach the disk
+/// before the data does, and a power cut leaves a correctly named empty file.
+/// Every failure puts the old exe back and removes the `.new`, because a
+/// half-applied update leaves the user with no working app at all.
+#[cfg(any(windows, test))]
+fn swap_in(exe: &Path, new_bytes: &[u8]) -> Result<PathBuf, String> {
+    let staged = exe.with_extension("new");
+    if let Err(e) = write_synced(&staged, new_bytes) {
+        let _ = std::fs::remove_file(&staged);
+        return Err(format!("write new exe: {e}"));
+    }
+    let old = aside_path(exe);
+    if let Err(e) = std::fs::rename(exe, &old) {
+        let _ = std::fs::remove_file(&staged);
+        return Err(format!("rename self aside: {e}"));
+    }
+    if let Err(e) = std::fs::rename(&staged, exe) {
+        let _ = std::fs::rename(&old, exe);
+        let _ = std::fs::remove_file(&staged);
+        return Err(format!("move new exe into place: {e}"));
+    }
+    Ok(old)
+}
+
+/// Write `bytes` to `path` and flush them to the disk before returning.
+#[cfg(any(windows, test))]
+fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let mut f = std::fs::File::create(path)?;
+    f.write_all(bytes)?;
+    f.sync_all()
 }
 
 /// Where to rename `exe` aside so a new copy can take its path: `greedout.old`,
@@ -179,11 +216,13 @@ pub fn cleanup_old() {
     }
 }
 
-/// `greedout.old` and every `greedout.old-<pid>` next to `exe`.
+/// `greedout.old`, every `greedout.old-<pid>`, and a `greedout.new` an update
+/// died before moving into place, next to `exe`.
 fn cleanup_old_beside(exe: &Path) {
-    let old = exe.with_extension("old");
-    if old.exists() {
-        let _ = std::fs::remove_file(&old);
+    for leftover in [exe.with_extension("old"), exe.with_extension("new")] {
+        if leftover.exists() {
+            let _ = std::fs::remove_file(&leftover);
+        }
     }
     let (Some(dir), Some(stem)) = (exe.parent(), exe.file_stem().and_then(|s| s.to_str())) else {
         return;
@@ -279,6 +318,7 @@ mod tests {
             "greedout.old",
             "greedout.old-1234",
             "greedout.old-99",
+            "greedout.new",
             "greedout.older",
             "other.old-1",
         ] {
@@ -292,6 +332,45 @@ mod tests {
             .collect();
         left.sort();
         assert_eq!(left, ["greedout.exe", "greedout.older", "other.old-1"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn swap_in_puts_the_new_exe_in_place_and_the_old_one_aside() {
+        let dir = scratch("swap");
+        let exe = dir.join("greedout.exe");
+        std::fs::write(&exe, b"v1").unwrap();
+        let old = swap_in(&exe, b"v2").unwrap();
+        assert_eq!(old, dir.join("greedout.old"));
+        assert_eq!(std::fs::read(&exe).unwrap(), b"v2");
+        assert_eq!(std::fs::read(&old).unwrap(), b"v1");
+        assert!(!dir.join("greedout.new").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A directory squatting on the `.new` name makes the staging write fail, the
+    /// way a full disk would. The running exe must not have been touched.
+    #[test]
+    fn swap_in_leaves_the_exe_alone_when_staging_fails() {
+        let dir = scratch("swap-stage");
+        let exe = dir.join("greedout.exe");
+        std::fs::write(&exe, b"v1").unwrap();
+        std::fs::create_dir(dir.join("greedout.new")).unwrap();
+        assert!(swap_in(&exe, b"v2").is_err());
+        assert_eq!(std::fs::read(&exe).unwrap(), b"v1");
+        assert!(!dir.join("greedout.old").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The rename aside fails (here because there is nothing to rename): the
+    /// staged copy must not be left behind.
+    #[test]
+    fn swap_in_removes_the_staged_copy_when_the_rename_fails() {
+        let dir = scratch("swap-rename");
+        let exe = dir.join("greedout.exe");
+        assert!(swap_in(&exe, b"v2").is_err());
+        assert!(!dir.join("greedout.new").exists());
+        assert!(!exe.exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

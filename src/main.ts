@@ -21,6 +21,9 @@ type SetupState = {
   needsSetup: boolean;
   installed: boolean;
   existing: boolean;
+  installedNewer: boolean;
+  installedVersion: string;
+  installedExe: string;
   version: string;
   installDir: string;
 };
@@ -46,6 +49,9 @@ const app = setup?.needsSetup
         version: setup.version,
         installDir: setup.installDir,
         existing: setup.existing,
+        installedNewer: setup.installedNewer,
+        installedVersion: setup.installedVersion,
+        installedExe: setup.installedExe,
       },
     })
   : mount(App, { target });

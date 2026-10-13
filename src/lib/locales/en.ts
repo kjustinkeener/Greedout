@@ -176,6 +176,11 @@ export const en = {
   "install.retry": "Try again",
   "install.starting": "Installed. Starting greedout…",
   "install.pokeTip": "Hover to rev · click to reskin",
+  // Shown instead of the install button when the installed copy is a newer
+  // version than this download.
+  "install.alreadyInstalled": "Greedout {version} is already installed",
+  "install.open": "Open Greedout",
+  "install.downgradeNote": "To install this older version, uninstall Greedout first.",
 
   // The update banner and the manual check in About. The banner is the only
   // thing in the app that appears without the user asking for it, so it says
@@ -185,6 +190,7 @@ export const en = {
   "update.downloading": "Downloading {version}…",
   "update.installed": "Installed. Restarting…",
   "update.failed": "Update failed: {error}",
+  "update.checkFailed": "Couldn't check for updates: {error}",
   "update.dismiss": "Not now",
   "update.check": "Check for updates",
   "update.checking": "Checking…",

@@ -30,17 +30,27 @@
     if (checking) return;
     checking = true;
     updateMsg = "";
+    // Two failures, worded apart: "could not check" is a network or GitHub
+    // problem and says nothing about the build, while "update failed" means one
+    // was found and could not be put in place.
+    let r: { current: string; available: UpdateInfo | null };
     try {
-      const r = await invoke<{ current: string; available: UpdateInfo | null }>("update_check");
-      if (!r.available) {
-        updateMsg = t("update.upToDate");
-      } else {
-        updateMsg = t("update.downloading", { version: r.available.version });
+      r = await invoke<{ current: string; available: UpdateInfo | null }>("update_check");
+    } catch (e) {
+      updateMsg = t("update.checkFailed", { error: String(e) });
+      checking = false;
+      return;
+    }
+    if (!r.available) {
+      updateMsg = t("update.upToDate");
+    } else {
+      updateMsg = t("update.downloading", { version: r.available.version });
+      try {
         await invoke("update_apply", { info: r.available });
         updateMsg = t("update.installed");
+      } catch (e) {
+        updateMsg = t("update.failed", { error: String(e) });
       }
-    } catch (e) {
-      updateMsg = t("update.failed", { error: String(e) });
     }
     checking = false;
   }

@@ -11,7 +11,17 @@
     version,
     installDir,
     existing,
-  }: { version: string; installDir: string; existing: boolean } = $props();
+    installedNewer,
+    installedVersion,
+    installedExe,
+  }: {
+    version: string;
+    installDir: string;
+    existing: boolean;
+    installedNewer: boolean;
+    installedVersion: string;
+    installedExe: string;
+  } = $props();
 
   let desktopShortcut = $state(true);
   let phase = $state<"idle" | "working" | "done" | "error">("idle");
@@ -182,6 +192,14 @@
       phase = "error";
     }
   }
+
+  /** The installed copy is newer than this one: hand off to it, the same way a
+   *  finished install does, rather than install an older build over it. */
+  function openInstalled() {
+    if (phase === "working") return;
+    phase = "working";
+    void invoke("launch_installed_and_exit", { exe: installedExe });
+  }
 </script>
 
 <div class="wrap" data-tauri-drag-region>
@@ -215,7 +233,21 @@
       <p class="tag">{t("about.tagline")}</p>
     </div>
 
-    {#if phase === "done"}
+    {#if installedNewer}
+      <!-- No install button at all: an older build over a newer one is never
+           what a double-click on a stale download meant. The way through is
+           spelled out, not hidden behind a second button. -->
+      <p class="state">{t("install.alreadyInstalled", { version: installedVersion })}</p>
+      <button
+        class="cta"
+        style="--cta: {ctaColor}"
+        onclick={openInstalled}
+        disabled={phase === "working"}
+      >
+        {t("install.open")}
+      </button>
+      <p class="note">{t("install.downgradeNote")}</p>
+    {:else if phase === "done"}
       <p class="state ok"><Icon name="check" size={14} /> {t("install.starting")}</p>
     {:else}
       {#if phase === "error"}
@@ -415,6 +447,11 @@
   }
   .state.err {
     color: var(--red);
+  }
+  .note {
+    margin: 13px 0 0;
+    color: var(--muted);
+    line-height: 1.45;
   }
   .foot {
     position: absolute;

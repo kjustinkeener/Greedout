@@ -196,6 +196,11 @@ inherently reveals: no session data, no identifiers, no usage. Turn off "Check f
 updates at launch" in Settings and it never asks; the button in About still works when
 you want to check by hand.
 
+The updater connects to GitHub directly and ignores proxy settings, both the system
+proxy in Windows Internet Options and `HTTP_PROXY`/`HTTPS_PROXY`. On a network that only
+lets traffic out through a proxy the launch check fails silently and the button in About
+says "Couldn't check for updates"; download the new exe from the releases page instead.
+
 A downloaded update is verified against a signing key built into the app before a single
 byte is written to disk. An update that fails that check is discarded and the running
 copy is untouched.

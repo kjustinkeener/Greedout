@@ -11,7 +11,9 @@
 //! and every update are the same file operation on the same target.
 //!
 //! Deliberately dependency-free: PowerShell for shortcuts, `reg` for the
-//! registry. Both ship with Windows and neither needs a crate.
+//! registry writes. Both ship with Windows and neither needs a crate. The one
+//! registry read goes through `winreg`, which the app already carries for the
+//! font list, rather than parsing `reg query` output.
 
 use serde::Serialize;
 #[cfg(any(windows, test))]
@@ -47,7 +49,7 @@ pub fn install_dir() -> Option<PathBuf> {
 /// and 8.3 short paths all make `starts_with` say no to a path that is in fact
 /// the install directory.
 #[cfg(windows)]
-fn is_installed() -> bool {
+pub(crate) fn is_installed() -> bool {
     let Ok(exe) = std::env::current_exe() else {
         return false;
     };
@@ -60,7 +62,7 @@ fn is_installed() -> bool {
 }
 
 #[cfg(not(windows))]
-fn is_installed() -> bool {
+pub(crate) fn is_installed() -> bool {
     false
 }
 
@@ -81,6 +83,17 @@ pub struct SetupState {
     /// A previous install exists on disk, so the card can say "update" rather
     /// than "install" instead of telling the user a lie about a fresh machine.
     pub existing: bool,
+    /// The installed copy is a newer version than this exe, so the card offers
+    /// to open it instead of installing over it. Installing an older build over
+    /// a newer one would hand the newer one's settings to a build that predates
+    /// them. False whenever the installed version cannot be read, which keeps the
+    /// card exactly as it was.
+    pub installed_newer: bool,
+    /// The installed version, from the Add/Remove Programs row. Only read while
+    /// the card is showing; empty otherwise or when unreadable.
+    pub installed_version: String,
+    /// The installed exe, for the card's "Open" button to hand off to.
+    pub installed_exe: String,
     pub version: String,
     pub install_dir: String,
 }
@@ -88,17 +101,59 @@ pub struct SetupState {
 #[tauri::command]
 pub fn setup_state() -> SetupState {
     let dir = install_dir();
+    let needs_setup = needs_setup();
+    let installed_exe = dir.as_ref().map(|d| d.join(EXE_NAME));
+    let existing = cfg!(windows) && installed_exe.as_ref().is_some_and(|e| e.exists());
+    let version = env!("CARGO_PKG_VERSION");
+    // The registry is only consulted for the card: the installed app calls this
+    // on every launch and has no use for it.
+    let installed_version = if needs_setup && existing {
+        installed_display_version().unwrap_or_default()
+    } else {
+        String::new()
+    };
     SetupState {
-        needs_setup: needs_setup(),
+        needs_setup,
         installed: cfg!(windows) && is_installed(),
-        existing: cfg!(windows)
-            && dir
-                .as_ref()
-                .map(|d| d.join(EXE_NAME).exists())
-                .unwrap_or(false),
-        version: env!("CARGO_PKG_VERSION").to_string(),
+        existing,
+        installed_newer: is_newer(&installed_version, version),
+        installed_version,
+        installed_exe: installed_exe
+            .map(|e| e.display().to_string())
+            .unwrap_or_default(),
+        version: version.to_string(),
         install_dir: dir.map(|d| d.display().to_string()).unwrap_or_default(),
     }
+}
+
+/// Is `installed` a strictly newer version than `this`? Anything unparseable,
+/// including the empty string for "could not read it", is not newer.
+fn is_newer(installed: &str, this: &str) -> bool {
+    match (
+        semver::Version::parse(installed.trim().trim_start_matches('v')),
+        semver::Version::parse(this),
+    ) {
+        (Ok(i), Ok(t)) => i > t,
+        _ => false,
+    }
+}
+
+/// `DisplayVersion` from our Add/Remove Programs row, which `register_uninstall`
+/// writes on every install. None if the key or value is missing or unreadable.
+#[cfg(windows)]
+fn installed_display_version() -> Option<String> {
+    use winreg::enums::HKEY_CURRENT_USER;
+    let key = winreg::RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey(format!(
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{APP_NAME}"
+        ))
+        .ok()?;
+    key.get_value::<String, _>("DisplayVersion").ok()
+}
+
+#[cfg(not(windows))]
+fn installed_display_version() -> Option<String> {
+    None
 }
 
 /// Copy ourselves into place, make the shortcuts, and register with Add/Remove
@@ -332,8 +387,15 @@ fn remove_uninstall_key() {
 /// If files survive, Windows shows "This program might not have uninstalled
 /// correctly". That dialog reads the filesystem, not the registry, so removing
 /// the Add/Remove entry does not silence it. It is a symptom; fix the deletion.
+///
+/// Only the installed copy uninstalls. Run with `--uninstall` from anywhere else
+/// (a dev build, a copy in Downloads) it would still delete the real install, so
+/// it touches nothing and exits with an error code instead.
 #[cfg(windows)]
 pub fn run_uninstall() -> ! {
+    if !is_installed() {
+        std::process::exit(1);
+    }
     remove_shortcuts();
     remove_uninstall_key();
     if let Some(dir) = install_dir() {
@@ -385,6 +447,16 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("greedout-{name}-{}-{n}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn is_newer_only_for_a_readable_strictly_newer_version() {
+        assert!(is_newer("0.5.0", "0.4.3"));
+        assert!(is_newer("v0.4.10", "0.4.3"));
+        assert!(!is_newer("0.4.3", "0.4.3"));
+        assert!(!is_newer("0.4.2", "0.4.3"));
+        assert!(!is_newer("", "0.4.3"));
+        assert!(!is_newer("garbage", "0.4.3"));
     }
 
     #[test]

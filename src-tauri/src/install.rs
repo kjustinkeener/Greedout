@@ -223,6 +223,48 @@ pub fn launch_installed_and_exit(app: tauri::AppHandle, exe: String) {
     app.exit(0);
 }
 
+/// The hidden window `tauri_plugin_single_instance` (2.x, without its `semver`
+/// feature) creates in the running instance: class `<identifier>-sic`, title
+/// `<identifier>-siw`, with the identifier from `tauri.conf.json`. A second
+/// launch that finds it forwards to it and exits, so finding it first is how we
+/// learn, before the plugin acts, that Greedout is already running.
+#[cfg(windows)]
+const RUNNING_CLASS: windows::core::PCWSTR = windows::core::w!("com.fasterdb.greedout-sic");
+#[cfg(windows)]
+const RUNNING_TITLE: windows::core::PCWSTR = windows::core::w!("com.fasterdb.greedout-siw");
+
+/// A bare launch of a download that is not installed yet, while Greedout runs.
+/// The single-instance plugin would only bring the running window forward, so
+/// the install card never shows and the install silently never happens. Say so
+/// in a native message box (no Tauri window exists yet) and exit instead.
+///
+/// Installed copies keep the plugin's forwarding, which covers Start Menu
+/// launches, the install card's hand-off and update relaunches; so does any
+/// launch with arguments. Dev builds never need setup, so they are unaffected.
+#[cfg(windows)]
+pub fn exit_if_running_and_not_installed() {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        FindWindowW, MessageBoxW, MB_ICONINFORMATION, MB_OK, MB_SETFOREGROUND,
+    };
+    if !needs_setup() || std::env::args_os().len() > 1 {
+        return;
+    }
+    let running =
+        unsafe { FindWindowW(RUNNING_CLASS, RUNNING_TITLE) }.is_ok_and(|hwnd| !hwnd.is_invalid());
+    if !running {
+        return;
+    }
+    unsafe {
+        MessageBoxW(
+            None,
+            windows::core::w!("Close Greedout, then run the downloaded file again."),
+            windows::core::w!("Greedout"),
+            MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
+        );
+    }
+    std::process::exit(1);
+}
+
 /// Single-quoted PowerShell strings escape a quote by doubling it. Every path
 /// interpolated into a script goes through this, because a directory with an
 /// apostrophe in it is legal and would otherwise end the string early.
@@ -457,6 +499,24 @@ mod tests {
         assert!(!is_newer("0.4.2", "0.4.3"));
         assert!(!is_newer("", "0.4.3"));
         assert!(!is_newer("garbage", "0.4.3"));
+    }
+
+    /// The running-instance probe hardcodes the plugin's window names; they must
+    /// follow the identifier, or a renamed identifier would silently disable it.
+    #[cfg(windows)]
+    #[test]
+    fn running_probe_names_follow_the_bundle_identifier() {
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let id = conf["identifier"].as_str().unwrap();
+        assert_eq!(
+            unsafe { RUNNING_CLASS.to_string() }.unwrap(),
+            format!("{id}-sic")
+        );
+        assert_eq!(
+            unsafe { RUNNING_TITLE.to_string() }.unwrap(),
+            format!("{id}-siw")
+        );
     }
 
     #[test]

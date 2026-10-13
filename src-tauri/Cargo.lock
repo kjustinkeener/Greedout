@@ -1434,6 +1434,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-single-instance",
  "ureq",
+ "windows 0.61.3",
  "winreg 0.52.0",
 ]
 

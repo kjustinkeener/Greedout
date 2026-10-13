@@ -435,13 +435,17 @@ fn set_locale(app: tauri::AppHandle, locale: String, resolved: String) -> Result
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Three things happen before the Tauri builder exists, because none of them
-    // wants a window. Add/Remove Programs invokes us as `greedout.exe
-    // --uninstall`, and that path never returns.
+    // These happen before the Tauri builder exists, because none of them wants a
+    // window. Add/Remove Programs invokes us as `greedout.exe --uninstall`, and
+    // that path never returns.
     #[cfg(windows)]
     if std::env::args().any(|a| a == "--uninstall") {
         install::run_uninstall();
     }
+    // A download launched while Greedout runs says to close it first and exits,
+    // before it can touch the running copy's files below.
+    #[cfg(windows)]
+    install::exit_if_running_and_not_installed();
     // Then sweep up the copy a self-update left beside us last time, before
     // anything else can hold a handle on this directory.
     update::cleanup_old();

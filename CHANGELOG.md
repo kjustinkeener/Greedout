@@ -4,6 +4,68 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
+## [0.4.4] - 2026-10-12
+
+### Fixed
+- The installed copy now records its own version on every launch, so the
+  downgrade card no longer shows a stale version after an update.
+- The installer's "already running" message now says Greedout or the installer
+  is running.
+- Startup cleanup no longer deletes a staged update that is still fresh, so a
+  second launch cannot break an update in progress.
+
+### Changed
+- The updater and the installer hand-off relaunch with `--wait-pid`, so the new
+  copy waits for the old one to exit. Update phase timings are logged to
+  `update-timing.log`.
+
+## [0.4.3] - 2026-10-12
+
+### Fixed
+- Update and reinstall step aside from locked exes, and uninstall only stops
+  Greedout's own processes.
+
+### Added
+- Installed-copy guards, a staged swap and a downgrade card in the installer and
+  updater.
+
+## [0.4.2] - 2026-10-03
+
+### Fixed
+- The gauge no longer goes blank when one session id exists under two project
+  folders; duplicates are collapsed to the newest file.
+- Releases include `update.json` again and are published as drafts first, so
+  in-app auto-update works.
+
+## [0.4.1] - 2026-09-23
+
+### Fixed
+- Nested Linux release artifacts are published correctly.
+
+## [0.4.0] - 2026-09-23
+
+### Added
+- Linux packages (AppImage and deb) and desktop support.
+
+## [0.3.2] - 2026-09-16
+
+### Fixed
+- Context Explorer search is debounced off time-to-first-hit.
+
+### Changed
+- Settings toggles are split into window and Greedout groups.
+
+## [0.3.1] - 2026-09-15
+
+### Fixed
+- Update banner layout in the narrow window.
+
+## [0.3.0] - 2026-09-15
+
+### Added
+- Freshness and project grouping for Cursor in the Context Explorer and Daily
+  Spend.
+
 ## [0.2.9] - 2026-09-14
 
 ### Added

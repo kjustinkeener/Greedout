@@ -138,6 +138,18 @@ fn is_newer(installed: &str, this: &str) -> bool {
     }
 }
 
+/// Keep the Add/Remove Programs `DisplayVersion` equal to the running build. Only a
+/// fresh install writes it, so after a self-update it would go on naming the old
+/// version and the downgrade guard would compare against that. Called on every
+/// launch of the installed copy; a no-op for a dev build or one run from elsewhere.
+#[cfg(windows)]
+pub fn sync_display_version() {
+    let current = env!("CARGO_PKG_VERSION");
+    if is_installed() && installed_display_version().as_deref() != Some(current) {
+        reg_add("DisplayVersion", "REG_SZ", current);
+    }
+}
+
 /// `DisplayVersion` from our Add/Remove Programs row, which `register_uninstall`
 /// writes on every install. None if the key or value is missing or unreadable.
 #[cfg(windows)]
@@ -219,7 +231,12 @@ fn replace_exe(src: &Path, target: &Path) -> Result<(), String> {
 /// Hand off to the installed copy and quit.
 #[tauri::command]
 pub fn launch_installed_and_exit(app: tauri::AppHandle, exe: String) {
-    let _ = hidden(&mut Command::new(&exe)).spawn();
+    // `--wait-pid`: the installed copy waits for this card to exit before it builds
+    // anything, so it never meets the single-instance lock this process still holds.
+    let _ = hidden(&mut Command::new(&exe))
+        .arg("--wait-pid")
+        .arg(std::process::id().to_string())
+        .spawn();
     app.exit(0);
 }
 
@@ -257,7 +274,7 @@ pub fn exit_if_running_and_not_installed() {
     unsafe {
         MessageBoxW(
             None,
-            windows::core::w!("Close Greedout, then run the downloaded file again."),
+            windows::core::w!("Greedout (or this installer) is already running. Close it, then run the downloaded file again."),
             windows::core::w!("Greedout"),
             MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
         );

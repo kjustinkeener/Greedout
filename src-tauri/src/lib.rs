@@ -554,6 +554,8 @@ pub fn run() {
 
             let cfg = config::load_config();
             log_line(&cfg, "greedout started");
+            #[cfg(windows)]
+            std::thread::spawn(install::sync_display_version);
             app.manage(LastGood(Mutex::new(None)));
 
             // Reflect the taskbar setting (overrides the static config default).

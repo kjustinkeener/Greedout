@@ -244,11 +244,26 @@ pub fn cleanup_old() {
 
 /// `greedout.old`, every `greedout.old-<pid>`, and a `greedout.new` an update
 /// died before moving into place, next to `exe`.
+/// True for an existing file last modified over two minutes ago.
+fn is_stale(path: &Path) -> bool {
+    std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .is_some_and(|age| age > std::time::Duration::from_secs(120))
+}
+
 fn cleanup_old_beside(exe: &Path) {
-    for leftover in [exe.with_extension("old"), exe.with_extension("new")] {
-        if leftover.exists() {
-            let _ = std::fs::remove_file(&leftover);
-        }
+    let old = exe.with_extension("old");
+    if old.exists() {
+        let _ = std::fs::remove_file(&old);
+    }
+    // A fresh `.new` may belong to an update staging right now in another process
+    // (a second launch runs this before the single-instance check), so only a stale
+    // one, left by an update that died, is swept.
+    let staged = exe.with_extension("new");
+    if is_stale(&staged) {
+        let _ = std::fs::remove_file(&staged);
     }
     let (Some(dir), Some(stem)) = (exe.parent(), exe.file_stem().and_then(|s| s.to_str())) else {
         return;
@@ -350,6 +365,14 @@ mod tests {
         ] {
             std::fs::write(dir.join(n), b"x").unwrap();
         }
+        // Only a stale `.new` is swept; age this one past the cutoff.
+        let stale = std::time::SystemTime::now() - std::time::Duration::from_secs(600);
+        std::fs::File::options()
+            .write(true)
+            .open(dir.join("greedout.new"))
+            .unwrap()
+            .set_modified(stale)
+            .unwrap();
         cleanup_old_beside(&exe);
         let mut left: Vec<String> = std::fs::read_dir(&dir)
             .unwrap()
@@ -397,6 +420,16 @@ mod tests {
         assert!(swap_in(&exe, b"v2").is_err());
         assert!(!dir.join("greedout.new").exists());
         assert!(!exe.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn cleanup_keeps_a_fresh_staged_new() {
+        let dir = scratch("cleanup-fresh");
+        let exe = dir.join("greedout.exe");
+        std::fs::write(dir.join("greedout.new"), b"staging").unwrap();
+        cleanup_old_beside(&exe);
+        assert!(dir.join("greedout.new").exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

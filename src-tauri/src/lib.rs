@@ -434,6 +434,29 @@ fn set_locale(app: tauri::AppHandle, locale: String, resolved: String) -> Result
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Block (up to ~10 s) until the process named by `--wait-pid <pid>` is gone.
+fn wait_for_relaunch_parent() {
+    let args: Vec<String> = std::env::args().collect();
+    let Some(pid) = args
+        .iter()
+        .position(|a| a == "--wait-pid")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|p| p.parse::<u32>().ok())
+    else {
+        return;
+    };
+    use sysinfo::{Pid, ProcessesToUpdate, System};
+    let target = Pid::from_u32(pid);
+    let mut sys = System::new();
+    for _ in 0..200 {
+        sys.refresh_processes(ProcessesToUpdate::Some(&[target]), true);
+        if sys.process(target).is_none() {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
 pub fn run() {
     // These happen before the Tauri builder exists, because none of them wants a
     // window. Add/Remove Programs invokes us as `greedout.exe --uninstall`, and
@@ -442,6 +465,9 @@ pub fn run() {
     if std::env::args().any(|a| a == "--uninstall") {
         install::run_uninstall();
     }
+    // A self-update relaunch passes `--wait-pid <old pid>`: hold off until the copy
+    // it replaces has exited, so we don't collide with its single-instance lock.
+    wait_for_relaunch_parent();
     // A download launched while Greedout runs says to close it first and exits,
     // before it can touch the running copy's files below.
     #[cfg(windows)]

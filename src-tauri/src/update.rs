@@ -102,10 +102,30 @@ pub fn update_apply(app: AppHandle, info: UpdateInfo) -> Result<(), String> {
         if !crate::install::is_installed() {
             return Err("Updates apply only to the installed copy".to_string());
         }
+        let t0 = std::time::Instant::now();
         let bytes = http_get_bytes(&info.url)?;
+        let t_download = t0.elapsed();
         // Order matters more here than anywhere else in the app: verify before the
         // bytes touch the disk, so a failed check leaves nothing behind to run.
         verify_signature(&bytes, &info.signature)?;
+        let t_verify = t0.elapsed();
+        // Kept in its own file (the main log is truncated each launch) so a slow
+        // update can be diagnosed from the next run.
+        let _ = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(crate::config::app_dir().join("update-timing.log"))
+            .and_then(|mut f| {
+                use std::io::Write;
+                writeln!(
+                    f,
+                    "{} -> {}: download {:?}, verified at {:?}",
+                    env!("CARGO_PKG_VERSION"),
+                    info.version,
+                    t_download,
+                    t_verify
+                )
+            });
         self_replace_and_relaunch(&app, &bytes)
     }
 }
@@ -140,7 +160,13 @@ fn verify_signature(data: &[u8], sig_text: &str) -> Result<(), String> {
 fn self_replace_and_relaunch(app: &AppHandle, new_bytes: &[u8]) -> Result<(), String> {
     let cur = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
     let old = swap_in(&cur, new_bytes)?;
-    if let Err(e) = std::process::Command::new(&cur).spawn() {
+    // `--wait-pid`: the new copy waits for this process to exit before it builds
+    // anything, so it never meets the single-instance lock we still hold.
+    if let Err(e) = std::process::Command::new(&cur)
+        .arg("--wait-pid")
+        .arg(std::process::id().to_string())
+        .spawn()
+    {
         let _ = std::fs::remove_file(&cur);
         let _ = std::fs::rename(&old, &cur);
         return Err(format!("relaunch: {e}"));

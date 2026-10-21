@@ -458,6 +458,29 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     });
     candidates.truncate(MAX_POOL);
 
+    if cfg.debug_logging {
+        let top: Vec<String> = candidates
+            .iter()
+            .take(3)
+            .map(|(p, m, _)| {
+                format!(
+                    "{}@{}",
+                    p.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(),
+                    m
+                )
+            })
+            .collect();
+        crate::config::debug_log(
+            cfg,
+            &format!(
+                "focus claude={focused:?} codex={codex_focused:?} cursor={cursor_focused:?} \
+                 sidecar_dirs={:?} top=[{}]",
+                claude_sessions_dirs(),
+                top.join(", ")
+            ),
+        );
+    }
+
     let mut sessions: Vec<Session> = candidates
         .into_iter()
         .map(|(path, mtime, harness)| match harness {
@@ -1012,21 +1035,28 @@ fn scan_tail_buf(buf: &[u8], partial_start: bool) -> Tailed {
 /// a freshly-opened session on the next poll -- before it has written any turn to
 /// its transcript (the old symptom: a session stayed invisible until you sent a
 /// prompt and its mtime moved).
-/// The folder holding the Claude desktop app's per-session sidecar files.
-///
-/// The desktop app is packaged (MSIX), so it writes under its package's private
-/// store, NOT the plain `%APPDATA%\Claude` (which a non-packaged reader like us
-/// sees as empty). We therefore prefer the package overlay
-/// `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude-code-sessions`,
-/// and fall back to plain `%APPDATA%\Claude\claude-code-sessions` for a future
-/// non-packaged Claude install.
-fn claude_sessions_dir() -> Option<PathBuf> {
+/// Every folder that may hold the Claude desktop app's per-session sidecar files,
+/// most preferred first. Different Claude versions keep them in different places, and
+/// an install can have more than one, so all existing folders are returned:
+/// 1. `%LOCALAPPDATA%\Claude-Data\<package family>\claude-code-sessions` (newer builds,
+///    user data outside the MSIX package store),
+/// 2. `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude\claude-code-sessions`
+///    (older packaged builds; a non-packaged reader sees plain `%APPDATA%` as empty),
+/// 3. plain `%APPDATA%\Claude\claude-code-sessions` (a non-packaged install).
+fn claude_sessions_dirs() -> Vec<PathBuf> {
+    let mut dirs_found: Vec<PathBuf> = Vec::new();
     if let Some(local) = dirs::data_local_dir() {
-        let pkgs = local.join("Packages");
-        if let Ok(entries) = std::fs::read_dir(&pkgs) {
+        if let Ok(entries) = std::fs::read_dir(local.join("Claude-Data")) {
             for e in entries.flatten() {
-                let name = e.file_name();
-                if name.to_string_lossy().starts_with("Claude_") {
+                let cand = e.path().join("claude-code-sessions");
+                if cand.is_dir() {
+                    dirs_found.push(cand);
+                }
+            }
+        }
+        if let Ok(entries) = std::fs::read_dir(local.join("Packages")) {
+            for e in entries.flatten() {
+                if e.file_name().to_string_lossy().starts_with("Claude_") {
                     let cand = e
                         .path()
                         .join("LocalCache")
@@ -1034,14 +1064,19 @@ fn claude_sessions_dir() -> Option<PathBuf> {
                         .join("Claude")
                         .join("claude-code-sessions");
                     if cand.is_dir() {
-                        return Some(cand);
+                        dirs_found.push(cand);
                     }
                 }
             }
         }
     }
-    let plain = dirs::config_dir()?.join("Claude").join("claude-code-sessions");
-    plain.is_dir().then_some(plain)
+    if let Some(cfg) = dirs::config_dir() {
+        let plain = cfg.join("Claude").join("claude-code-sessions");
+        if plain.is_dir() {
+            dirs_found.push(plain);
+        }
+    }
+    dirs_found
 }
 
 /// Lowercased file name of the process that owns the OS foreground window
@@ -1101,24 +1136,32 @@ fn foreground_exe() -> Option<String> {
 /// Returns `(session id, lastFocusedAt in ms)` so the caller can compare Claude
 /// focus freshness against Codex's and pick a single globally-focused session.
 fn focused_session_id() -> Option<(String, u64)> {
-    let base = claude_sessions_dir()?;
-    // The glob crate matches unreliably across multiple `\`-separated wildcard
-    // segments on Windows; forward slashes match fine and Windows accepts them.
-    let pattern = base
-        .join("*")
-        .join("*")
-        .join("local_*.json")
-        .to_string_lossy()
-        .replace('\\', "/");
-
+    // A sidecar present in more than one folder (same `local_<uuid>.json` name) counts
+    // once, from the most preferred folder, even if the other copy is newer.
+    let mut seen_names: HashSet<std::ffi::OsString> = HashSet::new();
     let mut best: Option<(u64, String)> = None;
-    for path in glob::glob(&pattern).ok()?.flatten() {
-        let Ok(text) = std::fs::read_to_string(&path) else { continue };
-        let Ok(v) = serde_json::from_str::<Value>(&text) else { continue };
-        let focused_at = v.get("lastFocusedAt").and_then(Value::as_u64).unwrap_or(0);
-        let Some(cli) = v.get("cliSessionId").and_then(Value::as_str) else { continue };
-        if best.as_ref().map(|(t, _)| focused_at > *t).unwrap_or(true) {
-            best = Some((focused_at, cli.to_string()));
+    for base in claude_sessions_dirs() {
+        // The glob crate matches unreliably across multiple `\`-separated wildcard
+        // segments on Windows; forward slashes match fine and Windows accepts them.
+        let pattern = base
+            .join("*")
+            .join("*")
+            .join("local_*.json")
+            .to_string_lossy()
+            .replace('\\', "/");
+        let Ok(paths) = glob::glob(&pattern) else { continue };
+        for path in paths.flatten() {
+            let Some(name) = path.file_name() else { continue };
+            if !seen_names.insert(name.to_os_string()) {
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(&path) else { continue };
+            let Ok(v) = serde_json::from_str::<Value>(&text) else { continue };
+            let focused_at = v.get("lastFocusedAt").and_then(Value::as_u64).unwrap_or(0);
+            let Some(cli) = v.get("cliSessionId").and_then(Value::as_str) else { continue };
+            if best.as_ref().map(|(t, _)| focused_at > *t).unwrap_or(true) {
+                best = Some((focused_at, cli.to_string()));
+            }
         }
     }
     best.map(|(t, id)| (id, t))

@@ -84,9 +84,9 @@
 
   // Clicking the dials reads a copied /usage report off the clipboard to calibrate
   // them. The clipboard is read here and nowhere else.
-  // The outcome is a brief glow on the dials: the gauge's 20% green on success, a
-  // faster 100% red on failure. A fresh key restarts the animation on every click.
-  let pulse = $state<{ ok: boolean; id: number; color: string } | null>(null);
+  // The outcome is a single brief glow on the dials: the gauge's 20% green on
+  // success, a faster 100% red on failure.
+  let dialsEl = $state<HTMLButtonElement>();
   async function calibrate() {
     let ok = true;
     try {
@@ -94,7 +94,12 @@
     } catch {
       ok = false;
     }
-    pulse = { ok, id: (pulse?.id ?? 0) + 1, color: gaugeColor(ok ? 0.2 : 1) };
+    const c = gaugeColor(ok ? 0.2 : 1);
+    const lit = `drop-shadow(0 0 5px ${c}) drop-shadow(0 0 10px ${c})`;
+    dialsEl?.animate(
+      [{ filter: "drop-shadow(0 0 0 transparent)" }, { filter: lit, offset: 0.35 }, { filter: "drop-shadow(0 0 0 transparent)" }],
+      { duration: ok ? 900 : 450, easing: "ease-out" },
+    );
   }
 </script>
 
@@ -142,23 +147,14 @@
         >
       </div>
       {#if limits}
-        {#key pulse?.id}
-          <button
-            type="button"
-            class="dials"
-            class:ok={pulse?.ok}
-            class:fail={pulse && !pulse.ok}
-            style:--glow={pulse?.color}
-            onclick={calibrate}
-          >
-            <div class="dial" title={limitTip("5h", limits.fiveHour)}>
-              <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} />
-            </div>
-            <div class="dial" title={limitTip("week", limits.weekly)}>
-              <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} />
-            </div>
-          </button>
-        {/key}
+        <button type="button" class="dials" bind:this={dialsEl} onclick={calibrate}>
+          <div class="dial" title={limitTip("5h", limits.fiveHour)}>
+            <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} />
+          </div>
+          <div class="dial" title={limitTip("week", limits.weekly)}>
+            <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} />
+          </div>
+        </button>
       {/if}
     </div>
   </div>
@@ -401,22 +397,6 @@
     color: inherit;
     font: inherit;
     cursor: pointer;
-  }
-  .dials.ok,
-  .dials.fail {
-    animation: glow 0.9s ease-out;
-  }
-  .dials.fail {
-    animation-duration: 0.45s;
-  }
-  @keyframes glow {
-    0%,
-    100% {
-      filter: drop-shadow(0 0 0 transparent);
-    }
-    35% {
-      filter: drop-shadow(0 0 5px var(--glow)) drop-shadow(0 0 10px var(--glow));
-    }
   }
   .dials .dial {
     flex: 0 1 76px;

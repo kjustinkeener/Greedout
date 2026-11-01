@@ -108,8 +108,11 @@ fn get_limits() -> limits::Limits {
 /// Calibrate the limit dials from a `/usage` report on the clipboard. Reads the
 /// clipboard only here, on the user's click.
 #[tauri::command]
-fn calibrate_limits(app: tauri::AppHandle) -> Result<limits::Limits, String> {
-    limits::calibrate_from_clipboard(&app)
+async fn calibrate_limits(app: tauri::AppHandle) -> Result<limits::Limits, String> {
+    // Scanning transcripts can take a moment; keep it off the main thread.
+    tauri::async_runtime::spawn_blocking(move || limits::calibrate_from_clipboard(&app))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// The full context/spend curve for one session, rebuilt from its transcript,

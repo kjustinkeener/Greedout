@@ -245,16 +245,21 @@ fn window(cost: f64, budget: f64, end: Option<i64>, len: i64, now: i64) -> Limit
     }
 }
 
+type Gathered = (Vec<(i64, f64)>, Option<i64>, Option<i64>);
+
 /// Estimate both windows from local transcripts and the saved calibration.
 fn estimate(now: i64) -> Limits {
-    let calib = load_calib();
-    let (events, r5, r7) = gather(now);
+    estimate_from(&gather(now), &load_calib(), now)
+}
+
+fn estimate_from(gathered: &Gathered, calib: &Calib, now: i64) -> Limits {
+    let (events, r5, r7) = (&gathered.0, gathered.1, gathered.2);
 
     // 5-hour window: it opens with the first message after the previous one closed
     // and lasts five hours. A reset in the future, from a `/usage` report or a
     // recorded limit event, pins the end exactly.
     let mut start: Option<i64> = None;
-    for (t, _) in &events {
+    for (t, _) in events {
         if start.map_or(true, |s| *t >= s + H5_MS) {
             start = Some(*t);
         }
@@ -337,13 +342,13 @@ fn parse_report(text: &str) -> Option<Report> {
 }
 
 /// Fold a pasted `/usage` report into the saved calibration.
-fn calibrate(text: &str, now: i64) -> Result<(), String> {
+fn calibrate(text: &str, gathered: &Gathered, now: i64) -> Result<Calib, String> {
     let report = parse_report(text).ok_or("not a /usage report")?;
     let at = report.at.unwrap_or(now);
     if now - at > D7_MS {
         return Err("that /usage report is too old".into());
     }
-    let (events, _, _) = gather(now);
+    let events = &gathered.0;
     let spent = |end: i64, len: i64| -> f64 {
         events.iter().filter(|(t, _)| *t >= end - len && *t < end && *t <= at).map(|(_, c)| c).sum()
     };
@@ -365,7 +370,8 @@ fn calibrate(text: &str, now: i64) -> Result<(), String> {
         let extra = pairs.len().saturating_sub(KEEP_PAIRS);
         pairs.drain(..extra);
     }
-    save_calib(&calib)
+    save_calib(&calib)?;
+    Ok(calib)
 }
 
 fn publish(app: &tauri::AppHandle, out: &Limits) {
@@ -382,8 +388,12 @@ pub fn calibrate_from_clipboard(app: &tauri::AppHandle) -> Result<Limits, String
         .and_then(|mut c| c.get_text())
         .map_err(|_| "could not read the clipboard".to_string())?;
     let now = now_ms();
-    calibrate(&text, now)?;
-    let out = estimate(now);
+    let started = std::time::Instant::now();
+    let gathered = gather(now);
+    let scanned = started.elapsed();
+    let calib = calibrate(&text, &gathered, now)?;
+    let out = estimate_from(&gathered, &calib, now);
+    config::debug_log(&config::load_config(), &format!("limits calibrate: scan {scanned:?}, total {:?}", started.elapsed()));
     publish(app, &out);
     Ok(out)
 }

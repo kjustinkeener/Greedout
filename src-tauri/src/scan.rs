@@ -758,7 +758,7 @@ fn line_id_cost(line: &str) -> Option<(Option<String>, f64)> {
 /// usage record: `(message id, ctx tokens, USD cost, model id)`. Folds what used
 /// to be three separate `serde_json::from_str` calls (ctx, model, id+cost) into a
 /// single parse. Returns None for non-assistant records or missing usage.
-fn assistant_usage(v: &Value) -> Option<(Option<String>, u64, f64, Option<String>)> {
+pub(crate) fn assistant_usage(v: &Value) -> Option<(Option<String>, u64, f64, Option<String>)> {
     if v.get("type").and_then(Value::as_str) != Some("assistant") {
         return None;
     }
@@ -1492,7 +1492,7 @@ fn parse_post_tokens(line: &str) -> Option<u64> {
 /// them: one per prompt they send, not one per streamed assistant/tool record
 /// (a single reply emits a dozen of those). Cheap string checks only -- this
 /// runs on every line of the tail buffer.
-fn is_user_prompt(line: &str) -> bool {
+pub(crate) fn is_user_prompt(line: &str) -> bool {
     line.contains("\"type\":\"user\"")
         && !line.contains("\"tool_result\"")
         && !line.contains("\"isCompactSummary\"")

@@ -6,6 +6,7 @@ mod cursor;
 mod grouping;
 mod i18n;
 mod install;
+mod ledger;
 mod limits;
 mod update;
 mod scan;

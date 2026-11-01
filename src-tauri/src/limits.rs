@@ -7,10 +7,15 @@
 //! report pairs a real percentage with the local spend at that moment, and the
 //! budget is fitted across the saved pairs. Until one exists the dials show
 //! elapsed time only.
+//!
+//! Per-turn costs of every recent transcript are kept in `limits.sqlite`, so a
+//! launch re-reads only files that changed since the last run instead of the whole
+//! week of transcripts.
 
 use crate::config;
 use crate::scan;
 use serde::{Deserialize, Serialize};
+use rusqlite::{params, Connection};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek, SeekFrom};
@@ -91,6 +96,72 @@ fn fit_budget(pairs: &[Pair]) -> f64 {
     } else {
         0.0
     }
+}
+
+fn db_path() -> PathBuf {
+    config::app_dir().join("limits.sqlite")
+}
+
+/// The per-turn store. Its own file, apart from the opt-in browse cache: that one
+/// is deleted by "Clear cache" and its existence means "the index is built".
+fn open_db() -> Option<Connection> {
+    let _ = std::fs::create_dir_all(config::app_dir());
+    let conn = Connection::open(db_path()).ok()?;
+    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;").ok()?;
+    conn.execute_batch(SCHEMA).ok()?;
+    Some(conn)
+}
+
+const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS files (
+        path TEXT PRIMARY KEY, mtime INTEGER NOT NULL, len INTEGER NOT NULL,
+        offset INTEGER NOT NULL, reset5 INTEGER, reset7 INTEGER
+     );
+     CREATE TABLE IF NOT EXISTS turns (
+        path TEXT NOT NULL, msg_id TEXT, ts INTEGER NOT NULL, cost REAL NOT NULL
+     );
+     CREATE INDEX IF NOT EXISTS idx_turns_path ON turns(path);";
+
+/// Everything stored from earlier runs, so the first scan only has to look at
+/// files whose size or mtime moved.
+fn load_cache(conn: &Connection) -> HashMap<PathBuf, Cached> {
+    let mut out: HashMap<PathBuf, Cached> = HashMap::new();
+    let files = conn.prepare("SELECT path, mtime, len, offset, reset5, reset7 FROM files").and_then(|mut st| {
+        st.query_map([], |r| {
+            let data = FileData { turns: Vec::new(), reset_5h: r.get(4)?, reset_7d: r.get(5)? };
+            Ok((PathBuf::from(r.get::<_, String>(0)?), Cached { mtime: r.get(1)?, len: r.get::<_, i64>(2)? as u64, offset: r.get::<_, i64>(3)? as u64, data }))
+        })
+        .map(|rows| rows.flatten().collect::<Vec<_>>())
+    });
+    out.extend(files.unwrap_or_default());
+    // rowid order keeps each file's turns in the order they were appended, which
+    // `save_file` relies on to know how many are already stored.
+    let turns = conn.prepare("SELECT path, msg_id, ts, cost FROM turns ORDER BY rowid").and_then(|mut st| {
+        st.query_map([], |r| Ok((PathBuf::from(r.get::<_, String>(0)?), (r.get::<_, Option<String>>(1)?, r.get::<_, i64>(2)?, r.get::<_, f64>(3)?))))
+            .map(|rows| rows.flatten().collect::<Vec<_>>())
+    });
+    for (p, t) in turns.unwrap_or_default() {
+        if let Some(c) = out.get_mut(&p) {
+            c.data.turns.push(t);
+        }
+    }
+    out
+}
+
+/// Store a file's new state. `kept` is how many of its turns were already stored
+/// (None = the file was re-read from the top, so its stored turns are replaced).
+fn save_file(tx: &Connection, p: &Path, c: &Cached, kept: Option<usize>) {
+    let path = p.to_string_lossy();
+    let from = kept.unwrap_or_else(|| {
+        let _ = tx.execute("DELETE FROM turns WHERE path = ?1", params![path]);
+        0
+    });
+    for (id, t, cost) in &c.data.turns[from..] {
+        let _ = tx.execute("INSERT INTO turns (path, msg_id, ts, cost) VALUES (?1, ?2, ?3, ?4)", params![path, id, t, cost]);
+    }
+    let _ = tx.execute(
+        "INSERT OR REPLACE INTO files (path, mtime, len, offset, reset5, reset7) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![path, c.mtime, c.len as i64, c.offset as i64, c.data.reset_5h, c.data.reset_7d],
+    );
 }
 
 #[derive(Clone, Default)]
@@ -184,8 +255,10 @@ fn gather(now: i64) -> (Vec<(i64, f64)>, Option<i64>, Option<i64>) {
     let root = config::claude_dir().join("projects");
     let pattern = root.join("**").join("*.jsonl").to_string_lossy().replace('\\', "/");
     let cutoff = now - D7_MS - 24 * 3600 * 1000;
+    let db = open_db();
     let mut guard = FILES.lock().unwrap_or_else(|e| e.into_inner());
-    let cache = guard.get_or_insert_with(HashMap::new);
+    let cache = guard.get_or_insert_with(|| db.as_ref().map(load_cache).unwrap_or_default());
+    let tx = db.as_ref().and_then(|c| c.unchecked_transaction().ok());
     let mut live: HashSet<PathBuf> = HashSet::new();
     if let Ok(paths) = glob::glob(&pattern) {
         for p in paths.flatten() {
@@ -203,13 +276,28 @@ fn gather(now: i64) -> (Vec<(i64, f64)>, Option<i64>, Option<i64>) {
             let fresh = cache.get(&p).is_some_and(|c| c.mtime == mtime && c.len == md.len());
             if !fresh {
                 let old = cache.remove(&p);
+                let kept = old.as_ref().filter(|c| md.len() >= c.offset).map(|c| c.data.turns.len());
                 if let Some(c) = refresh(&p, old, mtime, md.len()) {
+                    if let Some(tx) = &tx {
+                        save_file(tx, &p, &c, kept);
+                    }
                     cache.insert(p, c);
                 }
             }
         }
     }
-    cache.retain(|p, _| live.contains(p));
+    let gone: Vec<PathBuf> = cache.keys().filter(|p| !live.contains(*p)).cloned().collect();
+    for p in &gone {
+        cache.remove(p);
+        if let Some(tx) = &tx {
+            let path = p.to_string_lossy();
+            let _ = tx.execute("DELETE FROM turns WHERE path = ?1", params![path]);
+            let _ = tx.execute("DELETE FROM files WHERE path = ?1", params![path]);
+        }
+    }
+    if let Some(tx) = tx {
+        let _ = tx.commit();
+    }
 
     // Resumed and compacted transcripts re-append whole turns, so dedupe by message
     // id across every file, the same rule the Daily Spend totals use.
@@ -367,6 +455,11 @@ fn calibrate(text: &str, gathered: &Gathered, now: i64) -> Result<Calib, String>
     }
     for pairs in [&mut calib.five, &mut calib.week] {
         pairs.retain(|p| now - p.at < PAIR_TTL_MS);
+        // Pasting the same report again replaces its reading rather than adding a copy.
+        pairs.reverse();
+        let mut seen = HashSet::new();
+        pairs.retain(|p| seen.insert(p.at));
+        pairs.reverse();
         let extra = pairs.len().saturating_sub(KEEP_PAIRS);
         pairs.drain(..extra);
     }
@@ -443,6 +536,33 @@ mod tests {
         );
         assert_eq!(d.reset_5h, Some(2_000_000));
         assert_eq!(d.reset_7d, Some(5_000));
+    }
+
+    #[test]
+    fn stored_turns_round_trip_and_append() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        let p = Path::new("a.jsonl");
+        let turn = |id: &str, t, c| (Some(id.to_string()), t, c);
+        let mut c = Cached {
+            mtime: 1,
+            len: 10,
+            offset: 10,
+            data: FileData { turns: vec![turn("m1", 100, 0.5)], reset_5h: Some(7), reset_7d: None },
+        };
+        save_file(&conn, p, &c, None);
+        // The file grew: only the new turn is appended.
+        c.data.turns.push(turn("m2", 200, 0.25));
+        c.len = 20;
+        c.offset = 20;
+        save_file(&conn, p, &c, Some(1));
+        let loaded = load_cache(&conn);
+        let got = &loaded[p];
+        assert_eq!((got.len, got.offset, got.data.reset_5h), (20, 20, Some(7)));
+        assert_eq!(got.data.turns, c.data.turns);
+        // Re-read from the top replaces the stored turns instead of doubling them.
+        save_file(&conn, p, &c, None);
+        assert_eq!(load_cache(&conn)[p].data.turns.len(), 2);
     }
 
     #[test]

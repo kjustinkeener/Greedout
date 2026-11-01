@@ -40,7 +40,8 @@ export const limitTip = (kind: "5h" | "week", w: LimitWindow): string => {
       ? t("tip.limitElapsed", { pct: pctStr(w.elapsed), left: leftStr(w.resetsAt - Date.now()) })
       : t("tip.limitNoClock"),
   );
-  lines.push(t("tip.limitHow"), t("tip.limitClick"));
+  lines.push(t("tip.limitHow"));
+  if (w.pct != null) lines.push(t("tip.limitClick"));
   return lines.join("\n");
 };
 

@@ -79,7 +79,7 @@ export const en = {
   "tip.limit5h": "5-hour limit",
   "tip.limitWeek": "Weekly limit",
   "tip.limitEst": "{name}: about {pct} used, {cost} of the {budget} budget.",
-  "tip.limitUncal": "{name}: not calibrated yet. Run /usage, copy its output, then click here.",
+  "tip.limitUncal": "{name}: not calibrated yet. Run /usage, press its copy button, then click here.",
   "tip.limitElapsed": "{pct} of the window has passed; resets in {left}.",
   "tip.limitNoClock": "Window start unknown.",
   "tip.limitHow": "Outer bar: time through the window. Inner bar: share of the limit used.",

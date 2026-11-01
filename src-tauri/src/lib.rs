@@ -6,6 +6,7 @@ mod cursor;
 mod grouping;
 mod i18n;
 mod install;
+mod limits;
 mod update;
 mod scan;
 mod stats;
@@ -96,6 +97,19 @@ fn get_sessions() -> Vec<Session> {
     let cfg = config::load_config();
     let labels = config::load_labels();
     scan::scan(&cfg, &labels)
+}
+
+/// The latest 5-hour and weekly plan-limit readings (also pushed on "limits").
+#[tauri::command]
+fn get_limits() -> limits::Limits {
+    limits::latest()
+}
+
+/// Calibrate the limit dials from a `/usage` report on the clipboard. Reads the
+/// clipboard only here, on the user's click.
+#[tauri::command]
+fn calibrate_limits(app: tauri::AppHandle) -> Result<limits::Limits, String> {
+    limits::calibrate_from_clipboard(&app)
 }
 
 /// The full context/spend curve for one session, rebuilt from its transcript,
@@ -493,6 +507,8 @@ pub fn run() {
             update::update_check,
             update::update_apply,
             get_sessions,
+            get_limits,
+            calibrate_limits,
             get_history,
             get_compact_summary,
             get_spend_summary,
@@ -609,6 +625,7 @@ pub fn run() {
             let _ = tray.set_visible(cfg.show_in_tray);
             app.manage(TrayState(Mutex::new(tray)));
 
+            limits::spawn(app.handle().clone());
             let handle = app.handle().clone();
             // Background poll loop: rescan every poll_seconds and push a snapshot.
             std::thread::spawn(move || {

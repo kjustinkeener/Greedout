@@ -35,6 +35,8 @@ ureq = "2"
 minisign-verify = "0.2"
 semver = "1"
 
+arboard = { version = "3", default-features = false }
+
 [target.'cfg(windows)'.dependencies]
 # Installed-font enumeration reads the Fonts registry key (see sysfonts.rs).
 winreg = "0.52"

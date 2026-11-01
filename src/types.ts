@@ -68,6 +68,20 @@ export interface SpendSummary {
   cost: number; // summed estimated USD cost for this day + project
 }
 
+// Mirror of the Rust `limits::LimitWindow`: one plan-limit window (5-hour or weekly).
+export interface LimitWindow {
+  pct: number | null; // estimated share used, 0..1+; null until calibrated from /usage
+  cost: number; // USD spent inside the window
+  budget: number; // USD the estimate treats as 100%; 0 until calibrated
+  elapsed: number | null; // fraction of the window elapsed, 0..1; null when its start is unknown
+  resetsAt: number | null; // window end, epoch ms
+}
+
+export interface Limits {
+  fiveHour: LimitWindow;
+  weekly: LimitWindow;
+}
+
 // What the history graph reports while a line is hovered; the focus panel swaps
 // its big spend readout for these values.
 export interface HistHover {

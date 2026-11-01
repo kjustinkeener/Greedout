@@ -2,7 +2,7 @@
   import { onMount, tick } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { invoke } from "@tauri-apps/api/core";
-  import type { Session, Sample } from "./types";
+  import type { Session, Sample, Limits } from "./types";
   import Row from "./lib/Row.svelte";
   import FocusPanel from "./lib/FocusPanel.svelte";
   import StatusBar from "./lib/StatusBar.svelte";
@@ -349,6 +349,7 @@
   const MAX_SAMPLES = 300;
 
   let sessions = $state<Session[]>([]);
+  let limits = $state<Limits | null>(null);
   let error = $state<string | null>(null);
   // Auto-fit: render only as many rows as fit the window so the list fills the
   // space and never shows a scrollbar. `mainEl` is the scroll container (kept at
@@ -509,6 +510,7 @@
     let unlistenPrompt: (() => void) | undefined;
     let unlistenLinks: (() => void) | undefined;
     let unlistenLocale: (() => void) | undefined;
+    let unlistenLimits: (() => void) | undefined;
     window.addEventListener("wheel", onWheel, { passive: false });
     (async () => {
       try {
@@ -537,6 +539,8 @@
         // Prime with an immediate snapshot, then stream updates.
         record(await invoke<Session[]>("get_sessions"));
         unlisten = await listen<Session[]>("sessions", (e) => record(e.payload));
+        limits = await invoke<Limits>("get_limits");
+        unlistenLimits = await listen<Limits>("limits", (e) => (limits = e.payload));
         // Settings (separate window) pushes a live dim-hours preview on change.
         unlistenDim = await listen<number>("dim-hours", (e) => (dimHours = e.payload));
         // Settings (separate window) toggles the status bar live.
@@ -556,6 +560,7 @@
     })();
     return () => {
       unlisten?.();
+      unlistenLimits?.();
       unlistenOpacity?.();
       unlistenDim?.();
       unlistenTheme?.();
@@ -648,6 +653,7 @@
         <FocusPanel
           session={s}
           samples={history.get(s.id) ?? []}
+          {limits}
           onRename={() => rename(s)}
           onOpenSession={() => openSession(s)}
           onOpenProject={() => openProject(s)}

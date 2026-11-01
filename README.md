@@ -196,6 +196,11 @@ inherently reveals: no session data, no identifiers, no usage. Turn off "Check f
 updates at launch" in Settings and it never asks; the button in About still works when
 you want to check by hand.
 
+The two limit dials under the spend figure read the clipboard once, only when you click
+them, to calibrate from a copied `/usage` report. Nothing is read in the background and
+the report never leaves your machine; the saved readings live in
+`limit_calibration.json` beside the config.
+
 The updater connects to GitHub directly and ignores proxy settings, both the system
 proxy in Windows Internet Options and `HTTP_PROXY`/`HTTPS_PROXY`. On a network that only
 lets traffic out through a proxy the launch check fails silently and the button in About

@@ -1,15 +1,18 @@
 <script lang="ts">
-  import type { Session, Sample, HistHover } from "../types";
+  import type { Session, Sample, HistHover, Limits } from "../types";
   import Speedo from "./Speedo.svelte";
+  import LimitDial from "./LimitDial.svelte";
   import History from "./History.svelte";
   import Icon from "./Icon.svelte";
   import { gaugeColor, spendFor, spendOverride, themeTick } from "./theme";
-  import { agoTip, ctxTip, limitsTip, modelTip, sizeTip, moneyTip, spendTip } from "./tips";
+  import { agoTip, ctxTip, limitsTip, limitTip, modelTip, sizeTip, moneyTip, spendTip } from "./tips";
   import { t } from "./i18n.svelte";
+  import { invoke } from "@tauri-apps/api/core";
 
   let {
     session,
     samples,
+    limits = null,
     onRename,
     onOpenSession,
     onOpenProject,
@@ -19,6 +22,8 @@
   }: {
     session: Session;
     samples: Sample[];
+    /** Plan-limit readings for the two dials under the spend figure. */
+    limits?: Limits | null;
     onRename: () => void;
     onOpenSession: () => void;
     onOpenProject: () => void;
@@ -76,6 +81,21 @@
     if (hov.line === "cost") return "var(--yellow)";
     return hov.pct == null ? "var(--muted)" : gaugeColor(hov.pct);
   });
+
+  // Clicking the dials reads a copied /usage report off the clipboard to calibrate
+  // them. The clipboard is read here and nowhere else.
+  let note = $state("");
+  let noteTimer: ReturnType<typeof setTimeout> | undefined;
+  async function calibrate() {
+    try {
+      await invoke("calibrate_limits");
+      note = t("main.limitDone");
+    } catch (e) {
+      note = String(e);
+    }
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => (note = ""), 4000);
+  }
 </script>
 
 <div class="panel">
@@ -114,13 +134,24 @@
 
   <div class="gauge">
     <div class="speedo" title={ctxTip()}><Speedo pct={session.pct} ctx={session.ctx} target={session.target} {fmtK} /></div>
-    <div class="spend" title={hov ? moneyTip() : spendTip(session.costUsd)}>
-      <span class="lbl"
-        >{hov ? hov.label : t("main.spend")}{#if hov}<span class="at">{hov.time}</span>{/if}</span
-      >
-      <span class="val" style:color={hov ? hovColor : spendColor}
-        >{hov ? hov.value : fmtUsd(session.costUsd)}</span
-      >
+    <div class="spend">
+      <div class="figure" title={hov ? moneyTip() : spendTip(session.costUsd)}>
+        {#if hov}<span class="lbl">{hov.label}<span class="at">{hov.time}</span></span>{/if}
+        <span class="val" style:color={hov ? hovColor : spendColor}
+          >{hov ? hov.value : fmtUsd(session.costUsd)}</span
+        >
+      </div>
+      {#if limits}
+        <button type="button" class="dials" onclick={calibrate}>
+          <div class="dial" title={limitTip("5h", limits.fiveHour)}>
+            <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} />
+          </div>
+          <div class="dial" title={limitTip("week", limits.weekly)}>
+            <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} />
+          </div>
+        </button>
+        {#if note}<span class="note">{note}</span>{/if}
+      {/if}
     </div>
   </div>
 
@@ -345,15 +376,45 @@
     gap: 2px;
     margin-left: -20px;
   }
+  .spend .figure {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .dials {
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .note {
+    font-size: calc(10px * var(--size-ui));
+    color: var(--muted);
+    text-align: center;
+  }
+  .dials .dial {
+    flex: 0 1 76px;
+    min-width: 0;
+  }
+  /* Shown only while a graph line is hovered; floats above the number so the
+     dials below never shift as the readout swaps. */
   .spend .lbl {
+    position: absolute;
+    bottom: 100%;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-size: calc(9px * var(--size-ui));
     white-space: nowrap;
   }
-  /* Clock time of the hovered point, kept on the label line so the block's
-     height never changes as the readout swaps. */
+  /* Clock time of the hovered point, kept on the label line. */
   .spend .at {
     margin-left: 4px;
     opacity: 0.75;

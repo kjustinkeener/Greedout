@@ -788,7 +788,7 @@ fn post_tokens_from(v: &Value) -> Option<u64> {
 /// Parse one assistant line once into `(timestamp_millis, ctx, cost)` for the
 /// history backfill -- avoids re-parsing the same JSON separately for ctx,
 /// timestamp, and cost. Returns None for non-assistant lines or missing fields.
-fn history_row(line: &str) -> Option<(Option<String>, i64, u64, f64)> {
+pub(crate) fn history_row(line: &str) -> Option<(Option<String>, i64, u64, f64)> {
     let v: Value = serde_json::from_str(line).ok()?;
     if v.get("type").and_then(Value::as_str) != Some("assistant") {
         return None;

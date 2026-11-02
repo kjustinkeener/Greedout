@@ -105,20 +105,18 @@
   // The outcome is a single brief glow on the dials: the gauge's 20% green on
   // success, a faster 100% red on failure.
   let dialsEl = $state<HTMLButtonElement>();
-  // Right-clicking a dial offers to forget the /usage readings behind it.
-  let menu = $state<{ kind: "5h" | "7d"; x: number; y: number } | null>(null);
-  function openMenu(kind: "5h" | "7d", e: MouseEvent) {
+  // Right-clicking a dial offers to forget the /usage readings behind both dials.
+  let menu = $state<{ x: number; y: number } | null>(null);
+  function openMenu(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     // The item is about 130px wide; keep it inside the window.
-    menu = { kind, x: Math.min(e.clientX, window.innerWidth - 140), y: Math.min(e.clientY, window.innerHeight - 30) };
+    menu = { x: Math.min(e.clientX, window.innerWidth - 140), y: Math.min(e.clientY, window.innerHeight - 30) };
   }
   async function clearUsage() {
-    const kind = menu?.kind;
     menu = null;
-    if (!kind) return;
     try {
-      await invoke("clear_limit", { kind });
+      await invoke("clear_limits");
     } catch {
       // Nothing to report; the dial keeps its last reading.
     }
@@ -191,10 +189,10 @@
       </div>
       {#if limits}
         <button type="button" class="dials" bind:this={dialsEl} onclick={calibrate}>
-          <div class="dial" class:dim={dialHov && dialHov.label !== "5h"} oncontextmenu={(e) => openMenu("5h", e)} role="presentation">
+          <div class="dial" class:dim={dialHov && dialHov.label !== "5h"} oncontextmenu={(e) => openMenu(e)} role="presentation">
             <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} onHover={hoverDial("5h")} />
           </div>
-          <div class="dial" class:dim={dialHov && dialHov.label !== "7d"} oncontextmenu={(e) => openMenu("7d", e)} role="presentation">
+          <div class="dial" class:dim={dialHov && dialHov.label !== "7d"} oncontextmenu={(e) => openMenu(e)} role="presentation">
             <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} onHover={hoverDial("7d")} />
           </div>
         </button>

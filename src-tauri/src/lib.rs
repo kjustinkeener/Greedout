@@ -116,10 +116,10 @@ async fn calibrate_limits(app: tauri::AppHandle) -> Result<limits::Limits, Strin
         .map_err(|e| e.to_string())?
 }
 
-/// Drop the saved `/usage` readings behind one limit dial ("5h" or "7d").
+/// Drop the saved `/usage` readings behind both limit dials.
 #[tauri::command]
-async fn clear_limit(app: tauri::AppHandle, kind: String) -> Result<limits::Limits, String> {
-    tauri::async_runtime::spawn_blocking(move || limits::clear(&app, &kind))
+async fn clear_limits(app: tauri::AppHandle) -> Result<limits::Limits, String> {
+    tauri::async_runtime::spawn_blocking(move || limits::clear(&app))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -517,7 +517,7 @@ pub fn run() {
             get_sessions,
             get_limits,
             calibrate_limits,
-            clear_limit,
+            clear_limits,
             get_history,
             get_compact_summary,
             get_spend_summary,

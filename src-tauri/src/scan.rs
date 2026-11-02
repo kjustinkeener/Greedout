@@ -248,7 +248,7 @@ pub struct Sample {
 }
 
 /// What a single backward tail-scan yields.
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Tailed {
     ctx: Option<u64>,
     model: Option<String>,
@@ -608,8 +608,8 @@ fn build_session(
         .unwrap_or_default();
     let is_focused = focused == Some(id.as_str());
 
-    let t = tail_scan(path).unwrap_or_default();
     let size_bytes = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+    let t = tail_scan_cached(path, mtime, size_bytes);
     let cost_usd = cumulative_cost(&id, path);
 
     // Project name: prefer the exact cwd from the transcript; fall back to
@@ -960,6 +960,26 @@ fn tail_scan(path: &Path) -> Option<Tailed> {
         }
         win = win.saturating_mul(8);
     }
+}
+
+/// `tail_scan` result per transcript, reused while the file's mtime and length are
+/// unchanged: an idle session's tail cannot have changed, so polling it again would
+/// only re-read the same bytes.
+fn tail_scan_cached(path: &Path, mtime: u64, len: u64) -> Tailed {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, (u64, u64, Tailed)>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Ok(c) = cache.lock() {
+        if let Some((m, l, t)) = c.get(path) {
+            if *m == mtime && *l == len {
+                return t.clone();
+            }
+        }
+    }
+    let t = tail_scan(path).unwrap_or_default();
+    if let Ok(mut c) = cache.lock() {
+        c.insert(path.to_path_buf(), (mtime, len, t.clone()));
+    }
+    t
 }
 
 /// Scan one trailing buffer backward for the newest of each target record.

@@ -9,19 +9,16 @@
     pct,
     elapsed,
     hint,
-    usageWord,
-    windowWord,
+    onHover,
   }: {
     label: string;
     pct: number | null;
     elapsed: number | null;
     /** Shown in place of the percentage until the dial is calibrated. */
     hint: string;
-    /** Captions for the hover read-out: "47% usage", "40% window". */
-    usageWord: string;
-    windowWord: string;
+    /** Called with the usage and window shares while the pointer is over the dial, null after. */
+    onHover: (h: { usage: number; window: number | null; color: string } | null) => void;
   } = $props();
-  let hovered = $state(false);
 
   const CX = 60,
     CY = 60,
@@ -64,8 +61,8 @@
   class="dial"
   role="img"
   aria-label={label}
-  onmouseenter={() => (hovered = true)}
-  onmouseleave={() => (hovered = false)}
+  onmouseenter={() => pct != null && onHover({ usage: pct, window: elapsed, color: useColor })}
+  onmouseleave={() => onHover(null)}
 >
   <path d={arc(R_TIME, 0, 1)} fill="none" stroke="var(--track)" stroke-width={W} stroke-linecap="round" />
   <path d={arc(R_USE, 0, 1)} fill="none" stroke="var(--track)" stroke-width={W} stroke-linecap="round" />
@@ -75,14 +72,7 @@
   {#if use > 0}
     <path d={arc(R_USE, 0, use)} fill="none" stroke={useColor} stroke-width={W} stroke-linecap="round" />
   {/if}
-  {#if hovered && pct != null}
-    <text x={CX} y="54" text-anchor="middle" class="read">{Math.round(pct * 100)}% {usageWord}</text>
-    <text x={CX} y="68" text-anchor="middle" class="read">
-      {elapsed == null ? "-" : Math.round(time * 100) + "%"} {windowWord}
-    </text>
-  {:else}
-    <text x={CX} y="66" text-anchor="middle" class="pct" class:over class:hint={pct == null}>{pctText}</text>
-  {/if}
+  <text x={CX} y="66" text-anchor="middle" class="pct" class:over class:hint={pct == null}>{pctText}</text>
   <text x={CX} y="94" text-anchor="middle" class="sub">{label}</text>
 </svg>
 
@@ -100,14 +90,6 @@
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;
   }
-  .read {
-    font-size: calc(9px * var(--size-num));
-    font-weight: var(--w-bold);
-    fill: var(--fg);
-    font-family: var(--font-num);
-    font-size-adjust: var(--font-num-adj);
-    font-variant-numeric: tabular-nums;
-  }
   .pct.hint {
     font-size: calc(13px * var(--size-num));
     fill: var(--muted);
@@ -116,8 +98,8 @@
     fill: var(--red);
   }
   .sub {
-    font-size: calc(10px * var(--size-num));
-    fill: var(--muted);
+    font-size: calc(14px * var(--size-num));
+    fill: var(--fg);
     font-family: var(--font-num);
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;

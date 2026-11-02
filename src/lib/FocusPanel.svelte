@@ -82,6 +82,18 @@
     return hov.pct == null ? "var(--muted)" : gaugeColor(hov.pct);
   });
 
+  // Hovering a limit dial also takes over the big number: its usage share over the
+  // share of its window elapsed, in the dial's own colour.
+  let dialHov = $state<{ label: string; usage: number; window: number | null; color: string } | null>(null);
+  const pctText = (n: number | null) => (n == null ? "-" : `${Math.round(n * 100)}%`);
+  let dialValue = $derived(dialHov ? `${pctText(dialHov.usage)} / ${pctText(dialHov.window)}` : "");
+  let dialColor = $derived.by(() => {
+    void $themeTick;
+    return spendOverride() ?? dialHov?.color ?? "var(--yellow)";
+  });
+  const hoverDial = (label: string) => (h: { usage: number; window: number | null; color: string } | null) =>
+    (dialHov = h && { label, ...h });
+
   // Clicking the dials reads a copied /usage report off the clipboard to calibrate
   // them. The clipboard is read here and nowhere else.
   // The outcome is a single brief glow on the dials: the gauge's 20% green on
@@ -141,18 +153,19 @@
     <div class="speedo" title={ctxTip()}><Speedo pct={session.pct} ctx={session.ctx} target={session.target} {fmtK} /></div>
     <div class="spend">
       <div class="figure" title={hov ? moneyTip() : spendTip(session.costUsd)}>
-        {#if hov}<span class="lbl">{hov.label}<span class="at">{hov.time}</span></span>{/if}
-        <span class="val" style:color={hov ? hovColor : spendColor}
-          >{hov ? hov.value : fmtUsd(session.costUsd)}</span
+        {#if dialHov}<span class="lbl">{dialHov.label} {t("main.limitUsage")} / {t("main.limitWindow")}</span>
+        {:else if hov}<span class="lbl">{hov.label}<span class="at">{hov.time}</span></span>{/if}
+        <span class="val" style:color={dialHov ? dialColor : hov ? hovColor : spendColor}
+          >{dialHov ? dialValue : hov ? hov.value : fmtUsd(session.costUsd)}</span
         >
       </div>
       {#if limits}
         <button type="button" class="dials" bind:this={dialsEl} onclick={calibrate}>
           <div class="dial" title={limitTip("5h", limits.fiveHour)}>
-            <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} usageWord={t("main.limitUsage")} windowWord={t("main.limitWindow")} />
+            <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} onHover={hoverDial("5h")} />
           </div>
           <div class="dial" title={limitTip("week", limits.weekly)}>
-            <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} usageWord={t("main.limitUsage")} windowWord={t("main.limitWindow")} />
+            <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} onHover={hoverDial("7d")} />
           </div>
         </button>
       {/if}

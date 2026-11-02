@@ -36,7 +36,7 @@ use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use memchr::memmem;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Instant, UNIX_EPOCH};
 
@@ -234,6 +234,60 @@ pub(crate) struct Parsed {
     pub model: Option<String>,
     /// `(subagent id, tool call id)` pairs read off tool results.
     agents: Vec<(String, String)>,
+    /// Usage lines seen before this parse's first event that did not start a turn of
+    /// their own. When the parse is the next part of a split file, they may continue
+    /// the previous part's last turn (see `append`).
+    heads: Vec<Head>,
+}
+
+/// A usage line that comes before any event in a parse.
+struct Head {
+    id: Vec<u8>,
+    end: u64,
+    spawns: Option<String>,
+    /// The line went on to start the parse's first event, a turn.
+    starts_turn: bool,
+}
+
+impl Parsed {
+    /// Join the parse of the part of a file that follows this one, as if one parse
+    /// had read both. A streamed message can straddle the cut: its lines at the top
+    /// of the next part then continue the last turn here instead of starting one.
+    fn append(&mut self, mut next: Parsed) {
+        let mut evs = std::mem::take(&mut next.evs).into_iter().peekable();
+        for h in next.heads.drain(..) {
+            if let Some(Ev::Turn { id: Some(last), end, spawns, .. }) = self.evs.last_mut() {
+                if last.as_bytes() == h.id.as_slice() {
+                    if h.starts_turn {
+                        // The turn it started, and the lines that continued it there,
+                        // belong to the earlier turn.
+                        if let Some(Ev::Turn { end: e, spawns: s, .. }) = evs.next() {
+                            *end = e;
+                            add_spawns(spawns, s);
+                        }
+                    } else {
+                        *end = Some(h.end);
+                        add_spawns(spawns, h.spawns);
+                    }
+                }
+            }
+        }
+        self.evs.extend(evs);
+        self.resets.five = self.resets.five.max(next.resets.five);
+        self.resets.seven = self.resets.seven.max(next.resets.seven);
+        self.cwd = self.cwd.take().or(next.cwd);
+        self.title = next.title.or(self.title.take());
+        self.model = next.model.or(self.model.take());
+        self.agents.extend(next.agents);
+    }
+}
+
+fn add_spawns(spawns: &mut Option<String>, more: Option<String>) {
+    let Some(more) = more else { return };
+    *spawns = Some(match spawns.take() {
+        Some(s) => format!("{s} {more}"),
+        None => more,
+    });
 }
 
 /// Pull every `"rate_limit_info":{...}` object out of a line and keep the newest
@@ -381,25 +435,30 @@ fn has(needle: &memmem::Finder<'_>, hay: &[u8]) -> bool {
 /// first is costed. When `raw` continues the turn just before it, widen that turn
 /// (and note any subagent calls) without parsing the line.
 fn extends_turn(raw: &[u8], end: u64, evs: &mut [Ev]) -> bool {
-    let n = &*NEEDLES;
-    let Some(i) = n.msg_id.find(raw) else { return false };
-    let from = i + 6;
-    let Some(len) = memchr::memchr(b'"', &raw[from..]) else { return false };
-    let id = &raw[from..from + len];
+    let Some(id) = message_id(raw) else { return false };
     let Some(Ev::Turn { id: Some(last), end: last_end, spawns, .. }) = evs.last_mut() else { return false };
     if last.as_bytes() != id {
         return false;
     }
     *last_end = Some(end);
-    if has(&n.task_call, raw) || has(&n.agent_call, raw) {
-        if let Some(more) = serde_json::from_slice::<Value>(raw).ok().and_then(|v| spawn_ids(&v)) {
-            *spawns = Some(match spawns.take() {
-                Some(s) => format!("{s} {more}"),
-                None => more,
-            });
-        }
-    }
+    add_spawns(spawns, spawn_json(raw));
     true
+}
+
+/// The `msg_` id of an assistant line.
+fn message_id(raw: &[u8]) -> Option<&[u8]> {
+    let from = NEEDLES.msg_id.find(raw)? + 6;
+    let len = memchr::memchr(b'"', &raw[from..])?;
+    Some(&raw[from..from + len])
+}
+
+/// The subagent calls of an assistant line; only lines that launch one are parsed whole.
+fn spawn_json(raw: &[u8]) -> Option<String> {
+    let n = &*NEEDLES;
+    (has(&n.task_call, raw) || has(&n.agent_call, raw))
+        .then(|| serde_json::from_slice::<Value>(raw).ok())
+        .flatten()
+        .and_then(|v| spawn_ids(&v))
 }
 
 /// The ids of the tool calls in an assistant message that launch subagents.
@@ -496,6 +555,13 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
                 continue;
             }
             lap!(3);
+            let mut head_noted = false;
+            if out.evs.is_empty() {
+                if let Some(id) = message_id(raw) {
+                    out.heads.push(Head { id: id.to_vec(), end: pos, spawns: spawn_json(raw), starts_turn: false });
+                    head_noted = true;
+                }
+            }
             let typed = serde_json::from_slice::<AssistantLine>(raw);
             lap!(4);
             if let Ok(a) = typed {
@@ -514,11 +580,13 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
                         );
                         lap!(5);
                         // Only messages that launch a subagent need the whole record.
-                        let spawns = (has(&n.task_call, raw) || has(&n.agent_call, raw))
-                            .then(|| serde_json::from_slice::<Value>(raw).ok())
-                            .flatten()
-                            .and_then(|v| spawn_ids(&v));
+                        let spawns = spawn_json(raw);
                         lap!(6);
+                        if head_noted {
+                            if let Some(h) = out.heads.last_mut() {
+                                h.starts_turn = true;
+                            }
+                        }
                         out.evs.push(Ev::Turn {
                             id: msg.and_then(|m| m.id),
                             ts,
@@ -786,6 +854,73 @@ fn read_parse(path: &Path, work: &Work, parse: ParseFn, buf: &mut Vec<u8>) -> Op
     Some((parsed, end))
 }
 
+/// Unread parts bigger than this are cut into pieces that are parsed side by side.
+const SPLIT_OVER: u64 = 64 << 20;
+const PIECE: u64 = 32 << 20;
+
+/// Where to cut the unread part of a big file so every piece holds whole lines:
+/// `from`, then the start of the first line at or after each equal share, then the
+/// end of the last complete line. `None` when there is nothing complete to read.
+fn split_points(path: &Path, from: u64) -> Option<Vec<u64>> {
+    let mut f = std::fs::File::open(path).ok()?;
+    let eof = f.metadata().ok()?.len();
+    let mut chunk = vec![0u8; 64 << 10];
+    // The end of the last complete line, found from the back.
+    let mut end = from;
+    let mut pos = eof;
+    while pos > from {
+        let a = pos.saturating_sub(chunk.len() as u64).max(from);
+        let part = &mut chunk[..(pos - a) as usize];
+        f.seek(SeekFrom::Start(a)).ok()?;
+        f.read_exact(part).ok()?;
+        if let Some(i) = memchr::memrchr(b'\n', part) {
+            end = a + i as u64 + 1;
+            break;
+        }
+        pos = a;
+    }
+    if end <= from {
+        return None;
+    }
+    let pieces = (end - from).div_ceil(PIECE);
+    let mut points = vec![from];
+    for k in 1..pieces {
+        // The line start at or after the share's first byte, so a line belongs to the
+        // piece it starts in.
+        let mut at = (from + (end - from) * k / pieces - 1).max(*points.last()?);
+        let cut = loop {
+            if at >= end {
+                break end;
+            }
+            let n = chunk.len().min((end - at) as usize);
+            f.seek(SeekFrom::Start(at)).ok()?;
+            f.read_exact(&mut chunk[..n]).ok()?;
+            if let Some(i) = memchr::memchr(b'\n', &chunk[..n]) {
+                break at + i as u64 + 1;
+            }
+            at += n as u64;
+        };
+        points.push(cut);
+    }
+    points.push(end);
+    Some(points)
+}
+
+/// Read bytes `from..to` of a conversation file into `buf`.
+fn read_range(path: &Path, from: u64, to: u64, buf: &mut Vec<u8>) -> Option<()> {
+    let t0 = Instant::now();
+    let mut f = std::fs::File::open(path).ok()?;
+    f.seek(SeekFrom::Start(from)).ok()?;
+    let t_open = Instant::now();
+    buf.clear();
+    buf.reserve((to - from) as usize);
+    f.take(to - from).read_to_end(buf).ok()?;
+    READ_OPEN_NS.fetch_add((t_open - t0).as_nanos() as u64, Ordering::Relaxed);
+    READ_BYTES_NS.fetch_add(t_open.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    FILE_READ_NS.fetch_add(t0.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    (buf.len() as u64 == to - from).then_some(())
+}
+
 /// Write a parsed conversation file into the database.
 fn finish_file(
     tx: &Connection,
@@ -922,7 +1057,6 @@ fn collect_level(dir: &Path, files: &mut Vec<(PathBuf, std::fs::Metadata)>, dirs
 
 /// Every Claude Code transcript under `root`, subagent runs included.
 fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
-    let mut files = 0;
     let t = Instant::now();
     let mut paths = collect_parallel(root);
     paths.sort_by(|a, b| a.0.cmp(&b.0));
@@ -961,42 +1095,117 @@ fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
     }
     PLAN_NS.fetch_add(t_plan.elapsed().as_nanos() as u64, Ordering::Relaxed);
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(8);
-    for batch in jobs.chunks(64) {
-        let next = AtomicUsize::new(0);
-        let t_batch = Instant::now();
-        let mut done: Vec<Option<(Parsed, usize)>> = std::thread::scope(|s| {
-            let workers: Vec<_> = (0..threads)
-                .map(|_| {
-                    s.spawn(|| {
-                        let mut local = Vec::new();
-                        let mut buf = Vec::new();
-                        loop {
-                            let i = next.fetch_add(1, Ordering::Relaxed);
-                            let Some(job) = batch.get(i) else { break };
-                            let parse = |buf: &[u8], base: u64, _m: Option<&str>| parse_claude(buf, base, job.sidechain);
-                            local.push((i, read_parse(&job.path, &job.work, &parse, &mut buf)));
-                        }
-                        local
-                    })
-                })
-                .collect();
-            let mut slots: Vec<Option<(Parsed, usize)>> = (0..batch.len()).map(|_| None).collect();
-            for w in workers {
-                for (i, r) in w.join().unwrap_or_default() {
-                    slots[i] = r;
-                }
-            }
-            slots
-        });
-        BATCH_NS.fetch_add(t_batch.elapsed().as_nanos() as u64, Ordering::Relaxed);
-        for (job, slot) in batch.iter().zip(done.iter_mut()) {
-            let Some((parsed, end)) = slot.take() else { continue };
-            let fallback = || scan::decode_project_dir(&job.folder);
-            finish_file(tx, CLAUDE, &job.path, &job.work, &job.key, &parsed, end, &job.sid, job.agent.as_deref(), &fallback)?;
-            files += 1;
+    // Big files are cut into line-aligned pieces so no single file bounds the scan.
+    let t_cut = Instant::now();
+    let cuts: Vec<Option<Vec<u64>>> = jobs
+        .iter()
+        .map(|j| {
+            let unread = (j.work.len as u64).saturating_sub(j.work.from);
+            if unread > SPLIT_OVER { split_points(&j.path, j.work.from) } else { None }
+        })
+        .collect();
+    PLAN_NS.fetch_add(t_cut.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    // One task per file, or per piece of a big one.
+    struct Task {
+        job: usize,
+        part: usize,
+        range: Option<(u64, u64)>,
+        size: u64,
+    }
+    let mut tasks: Vec<Task> = Vec::new();
+    for (job, j) in jobs.iter().enumerate() {
+        match &cuts[job] {
+            Some(points) => tasks.extend(points.windows(2).enumerate().map(|(part, w)| Task {
+                job,
+                part,
+                range: Some((w[0], w[1])),
+                size: w[1] - w[0],
+            })),
+            None => tasks.push(Task { job, part: 0, range: None, size: (j.work.len as u64).saturating_sub(j.work.from) }),
         }
     }
-    Ok(files)
+    // Workers share one queue, so no thread waits on a batch's biggest file. Within each
+    // window of 256 files the biggest tasks go first; the windows themselves stay in
+    // path order so the stores below can start while later files are still being parsed.
+    tasks.sort_by_key(|t| (t.job / 256, std::cmp::Reverse(t.size)));
+    let next = AtomicUsize::new(0);
+    let stop = AtomicBool::new(false);
+    let t_batch = Instant::now();
+    let stored: rusqlite::Result<usize> = std::thread::scope(|s| {
+        let (sender, results) = std::sync::mpsc::channel();
+        for _ in 0..threads {
+            let sender = sender.clone();
+            let (jobs, tasks, next, stop) = (&jobs, &tasks, &next, &stop);
+            s.spawn(move || {
+                let mut buf = Vec::new();
+                while !stop.load(Ordering::Relaxed) {
+                    let Some(task) = tasks.get(next.fetch_add(1, Ordering::Relaxed)) else { break };
+                    let job = &jobs[task.job];
+                    let done = match task.range {
+                        Some((a, b)) => read_range(&job.path, a, b, &mut buf).map(|()| {
+                            let t = Instant::now();
+                            let parsed = parse_claude(&buf, a, job.sidechain);
+                            FILE_PARSE_NS.fetch_add(t.elapsed().as_nanos() as u64, Ordering::Relaxed);
+                            (parsed, 0)
+                        }),
+                        None => {
+                            let parse = |buf: &[u8], base: u64, _m: Option<&str>| parse_claude(buf, base, job.sidechain);
+                            read_parse(&job.path, &job.work, &parse, &mut buf)
+                        }
+                    };
+                    if sender.send((task.job, task.part, done)).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+        drop(sender);
+        // A file is stored once all its pieces are in, and after every file before it.
+        let mut pieces: Vec<Vec<Option<(Parsed, usize)>>> =
+            cuts.iter().map(|c| (0..c.as_ref().map_or(1, |p| p.len() - 1)).map(|_| None).collect()).collect();
+        let mut missing: Vec<usize> = pieces.iter().map(Vec::len).collect();
+        let mut failed = vec![false; jobs.len()];
+        let mut slots: Vec<Option<Option<(Parsed, usize)>>> = (0..jobs.len()).map(|_| None).collect();
+        let mut upto = 0;
+        let mut files = 0;
+        for (i, part, result) in results {
+            match result {
+                Some(r) => pieces[i][part] = Some(r),
+                None => failed[i] = true,
+            }
+            missing[i] -= 1;
+            if missing[i] == 0 {
+                slots[i] = Some(if failed[i] {
+                    None
+                } else {
+                    let mut all = pieces[i].drain(..).flatten();
+                    let (mut parsed, mut end) = all.next().unwrap_or_default();
+                    for (next, _) in all {
+                        parsed.append(next);
+                    }
+                    if let Some(points) = &cuts[i] {
+                        end = (points[points.len() - 1] - jobs[i].work.from) as usize;
+                    }
+                    Some((parsed, end))
+                });
+            }
+            while let Some(slot) = slots.get_mut(upto).and_then(Option::take) {
+                let job = &jobs[upto];
+                upto += 1;
+                let Some((parsed, end)) = slot else { continue };
+                let fallback = || scan::decode_project_dir(&job.folder);
+                let r = finish_file(tx, CLAUDE, &job.path, &job.work, &job.key, &parsed, end, &job.sid, job.agent.as_deref(), &fallback);
+                if let Err(e) = r {
+                    stop.store(true, Ordering::Relaxed);
+                    return Err(e);
+                }
+                files += 1;
+            }
+        }
+        Ok(files)
+    });
+    BATCH_NS.fetch_add(t_batch.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    stored
 }
 
 /// The given Codex rollout transcripts.
@@ -1705,6 +1914,74 @@ mod tests {
 
     fn q<T: rusqlite::types::FromSql>(conn: &Connection, sql: &str) -> T {
         conn.query_row(sql, [], |r| r.get(0)).unwrap()
+    }
+
+    /// Everything a parse yields, as text, so two parses can be compared.
+    fn fingerprint(p: &Parsed) -> String {
+        let evs: Vec<String> = p
+            .evs
+            .iter()
+            .map(|e| match e {
+                Ev::Compact => "compact".to_string(),
+                Ev::Prompt { off, ts } => format!("prompt {off:?} {ts}"),
+                Ev::Turn { id, ts, cost, model, start, end, spawns, bubble } => {
+                    format!("turn {id:?} {ts} {cost} {model:?} {start:?} {end:?} {spawns:?} {bubble:?}")
+                }
+            })
+            .collect();
+        format!("{evs:?} {:?} {:?} {:?} {:?} {:?} {:?}", p.resets.five, p.resets.seven, p.cwd, p.title, p.model, p.agents)
+    }
+
+    #[test]
+    fn parts_of_a_file_parse_as_the_whole_file_does() {
+        let spawn = |id: &str, ts: &str, call: &str| {
+            format!(
+                "{{\"type\":\"assistant\",\"timestamp\":\"{ts}\",\"message\":{{\"id\":\"{id}\",\"model\":\"claude-opus-4-1\",\"content\":[{{\"type\":\"tool_use\",\"id\":\"{call}\",\"name\":\"Task\"}}],\"usage\":{{\"input_tokens\":10,\"output_tokens\":10}}}}}}\n"
+            )
+        };
+        let mut text = String::new();
+        text.push_str("{\"type\":\"custom-title\",\"customTitle\":\"first\"}\n");
+        text.push_str("{\"type\":\"system\",\"cwd\":\"/work\",\"x\":{\"rate_limit_info\":{\"rateLimitType\":\"five_hour\",\"resetsAt\":100}}}\n");
+        text.push_str(&turn("msg_0", "2026-10-01T00:00:00.000Z"));
+        text.push_str(&spawn("msg_1", "2026-10-01T00:00:01.000Z", "toolu_a"));
+        text.push_str(&turn("msg_1", "2026-10-01T00:00:02.000Z"));
+        text.push_str(&spawn("msg_1", "2026-10-01T00:00:03.000Z", "toolu_b"));
+        text.push_str("{\"type\":\"assistant\",\"message\":{\"id\":\"msg_1\",\"usage\":{\"input_tokens\":1}}}\n");
+        text.push_str(&spawn("msg_1", "2026-10-01T00:00:04.000Z", "toolu_c"));
+        text.push_str(&prompt("2026-10-01T00:01:00.000Z"));
+        text.push_str(&turn("msg_1", "2026-10-01T00:01:01.000Z"));
+        text.push_str(&turn("msg_1", "2026-10-01T00:01:02.000Z"));
+        text.push_str("{\"type\":\"custom-title\",\"customTitle\":\"second\"}\n");
+        text.push_str("{\"type\":\"system\",\"cwd\":\"/later\",\"x\":{\"rate_limit_info\":{\"rateLimitType\":\"five_hour\",\"resetsAt\":200}}}\n");
+        text.push_str(&turn("msg_2", "2026-10-01T00:01:03.000Z"));
+        text.push_str("{\"type\":\"system\",\"subtype\":\"compact_boundary\"}\n");
+        text.push_str(&turn("msg_2", "2026-10-01T00:02:00.000Z"));
+        let bytes = text.as_bytes();
+        let whole = fingerprint(&parse_claude(bytes, 0, false));
+        let starts: Vec<usize> =
+            std::iter::once(0).chain(bytes.iter().enumerate().filter(|(_, b)| **b == b'\n').map(|(i, _)| i + 1)).collect();
+        let parts = |cuts: &[usize]| {
+            let mut edges = vec![0];
+            edges.extend_from_slice(cuts);
+            edges.push(bytes.len());
+            let mut parsed: Option<Parsed> = None;
+            for w in edges.windows(2) {
+                let next = parse_claude(&bytes[w[0]..w[1]], w[0] as u64, false);
+                match parsed.as_mut() {
+                    Some(p) => p.append(next),
+                    None => parsed = Some(next),
+                }
+            }
+            fingerprint(&parsed.unwrap())
+        };
+        for &a in &starts {
+            assert_eq!(parts(&[a]), whole, "cut at {a}");
+            for &b in &starts {
+                if b >= a {
+                    assert_eq!(parts(&[a, b]), whole, "cuts at {a} and {b}");
+                }
+            }
+        }
     }
 
     #[test]

@@ -305,6 +305,7 @@ struct Needles {
     command_message: memmem::Finder<'static>,
     local_stdout: memmem::Finder<'static>,
     local_stderr: memmem::Finder<'static>,
+    msg_id: memmem::Finder<'static>,
     task_call: memmem::Finder<'static>,
     agent_call: memmem::Finder<'static>,
 }
@@ -365,6 +366,7 @@ static NEEDLES: LazyLock<Needles> = LazyLock::new(|| {
         command_message: f("<command-message>"),
         local_stdout: f("<local-command-stdout>"),
         local_stderr: f("<local-command-stderr>"),
+        msg_id: f("\"id\":\"msg_"),
         task_call: f("\"name\":\"Task\""),
         agent_call: f("\"name\":\"Agent\""),
     }
@@ -372,6 +374,31 @@ static NEEDLES: LazyLock<Needles> = LazyLock::new(|| {
 
 fn has(needle: &memmem::Finder<'_>, hay: &[u8]) -> bool {
     needle.find(hay).is_some()
+}
+
+/// A message streamed over several lines repeats its usage on each, and only the
+/// first is costed. When `raw` continues the turn just before it, widen that turn
+/// (and note any subagent calls) without parsing the line.
+fn extends_turn(raw: &[u8], end: u64, evs: &mut [Ev]) -> bool {
+    let n = &*NEEDLES;
+    let Some(i) = n.msg_id.find(raw) else { return false };
+    let from = i + 6;
+    let Some(len) = memchr::memchr(b'"', &raw[from..]) else { return false };
+    let id = &raw[from..from + len];
+    let Some(Ev::Turn { id: Some(last), end: last_end, spawns, .. }) = evs.last_mut() else { return false };
+    if last.as_bytes() != id {
+        return false;
+    }
+    *last_end = Some(end);
+    if has(&n.task_call, raw) || has(&n.agent_call, raw) {
+        if let Some(more) = serde_json::from_slice::<Value>(raw).ok().and_then(|v| spawn_ids(&v)) {
+            *spawns = Some(match spawns.take() {
+                Some(s) => format!("{s} {more}"),
+                None => more,
+            });
+        }
+    }
+    true
 }
 
 /// The ids of the tool calls in an assistant message that launch subagents.
@@ -441,6 +468,9 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
             continue;
         }
         if has(&n.usage, raw) && has(&n.assistant, raw) {
+            if extends_turn(raw, pos, &mut out.evs) {
+                continue;
+            }
             let t = Instant::now();
             if let Ok(a) = serde_json::from_slice::<AssistantLine>(raw) {
                 let msg = a.message;

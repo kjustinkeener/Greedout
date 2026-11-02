@@ -97,13 +97,8 @@
     if (dialHov?.window == null) return "var(--muted)";
     return spendOverride() || gaugeColor(Math.max(0, Math.min(1, dialHov.window)));
   });
-  // TEMPORARY (screenshots): keep the hover text for 10 s after the mouse leaves.
-  let hovTimer: ReturnType<typeof setTimeout> | undefined;
-  const hoverDial = (label: string) => (h: { usage: number | null; window: number | null; color: string } | null) => {
-    clearTimeout(hovTimer);
-    if (h) dialHov = { label, ...h };
-    else hovTimer = setTimeout(() => (dialHov = null), 10000);
-  };
+  const hoverDial = (label: string) => (h: { usage: number | null; window: number | null; color: string } | null) =>
+    (dialHov = h && { label, ...h });
 
   // Clicking the dials reads a copied /usage report off the clipboard to calibrate
   // them. The clipboard is read here and nowhere else.

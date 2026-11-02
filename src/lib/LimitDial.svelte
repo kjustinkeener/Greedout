@@ -97,7 +97,7 @@
     display: block;
   }
   .pct {
-    font-size: calc(18px * var(--size-num));
+    font-size: calc(23px * var(--size-num));
     font-weight: var(--w-bold);
     fill: var(--fg);
     font-family: var(--font-num);

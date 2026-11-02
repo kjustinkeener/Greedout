@@ -305,6 +305,44 @@ struct Needles {
     command_message: memmem::Finder<'static>,
     local_stdout: memmem::Finder<'static>,
     local_stderr: memmem::Finder<'static>,
+    task_call: memmem::Finder<'static>,
+    agent_call: memmem::Finder<'static>,
+}
+
+/// The fields of an assistant line that we keep, so the rest (message text, tool
+/// input, which is most of the bytes) is skipped rather than built into a tree.
+#[derive(serde::Deserialize)]
+struct AssistantLine {
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    timestamp: Option<String>,
+    message: Option<AssistantMessage>,
+    usage: Option<TokenCounts>,
+}
+
+#[derive(serde::Deserialize)]
+struct AssistantMessage {
+    id: Option<String>,
+    model: Option<String>,
+    usage: Option<TokenCounts>,
+}
+
+/// A count that is missing or not a whole number reads as 0.
+#[derive(serde::Deserialize, Default)]
+struct TokenCounts {
+    #[serde(default, deserialize_with = "count")]
+    input_tokens: u64,
+    #[serde(default, deserialize_with = "count")]
+    output_tokens: u64,
+    #[serde(default, deserialize_with = "count")]
+    cache_creation_input_tokens: u64,
+    #[serde(default, deserialize_with = "count")]
+    cache_read_input_tokens: u64,
+}
+
+fn count<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
+    use serde::Deserialize;
+    Ok(Value::deserialize(d)?.as_u64().unwrap_or(0))
 }
 
 static NEEDLES: LazyLock<Needles> = LazyLock::new(|| {
@@ -327,6 +365,8 @@ static NEEDLES: LazyLock<Needles> = LazyLock::new(|| {
         command_message: f("<command-message>"),
         local_stdout: f("<local-command-stdout>"),
         local_stderr: f("<local-command-stderr>"),
+        task_call: f("\"name\":\"Task\""),
+        agent_call: f("\"name\":\"Agent\""),
     }
 });
 
@@ -402,18 +442,33 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
         }
         if has(&n.usage, raw) && has(&n.assistant, raw) {
             let t = Instant::now();
-            if let Ok(v) = serde_json::from_str::<Value>(&line) {
-                if let Some((id, _ctx, cost, model)) = scan::assistant_usage(&v) {
+            if let Ok(a) = serde_json::from_slice::<AssistantLine>(raw) {
+                let msg = a.message;
+                let usage = msg.as_ref().and_then(|m| m.usage.as_ref()).or(a.usage.as_ref());
+                if let (Some("assistant"), Some(u)) = (a.kind.as_deref(), usage) {
                     // A turn with no timestamp cannot be placed on a day.
-                    if let Some(ts) = v.get("timestamp").and_then(Value::as_str).and_then(scan::iso_to_millis) {
+                    if let Some(ts) = a.timestamp.as_deref().and_then(scan::iso_to_millis) {
+                        let model = msg.as_ref().and_then(|m| m.model.clone());
+                        let cost = scan::token_cost(
+                            model.as_deref().unwrap_or(""),
+                            u.input_tokens,
+                            u.output_tokens,
+                            u.cache_creation_input_tokens,
+                            u.cache_read_input_tokens,
+                        );
+                        // Only messages that launch a subagent need the whole record.
+                        let spawns = (has(&n.task_call, raw) || has(&n.agent_call, raw))
+                            .then(|| serde_json::from_slice::<Value>(raw).ok())
+                            .flatten()
+                            .and_then(|v| spawn_ids(&v));
                         out.evs.push(Ev::Turn {
-                            id,
+                            id: msg.and_then(|m| m.id),
                             ts,
                             cost,
                             model,
                             start: Some(start),
                             end: Some(pos),
-                            spawns: spawn_ids(&v),
+                            spawns,
                             bubble: None,
                         });
                     }

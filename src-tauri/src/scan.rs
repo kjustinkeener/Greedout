@@ -754,6 +754,16 @@ fn line_id_cost(line: &str) -> Option<(Option<String>, f64)> {
     Some((id, cost))
 }
 
+/// Dollar price of one message's token counts.
+pub(crate) fn token_cost(model: &str, input: u64, output: u64, cache_write: u64, cache_read: u64) -> f64 {
+    let p = model_info(model);
+    (input as f64 * p.price_in
+        + output as f64 * p.price_out
+        + cache_write as f64 * p.price_cache_write
+        + cache_read as f64 * p.price_cache_read)
+        / 1_000_000.0
+}
+
 /// Extract everything the enrich pass needs from ONE already-parsed assistant
 /// usage record: `(message id, ctx tokens, USD cost, model id)`. Folds what used
 /// to be three separate `serde_json::from_str` calls (ctx, model, id+cost) into a
@@ -767,12 +777,13 @@ pub(crate) fn assistant_usage(v: &Value) -> Option<(Option<String>, u64, f64, Op
     let get = |k: &str| u.get(k).and_then(Value::as_u64).unwrap_or(0);
     let ctx = get("input_tokens") + get("cache_creation_input_tokens") + get("cache_read_input_tokens");
     let model = msg.and_then(|m| m.get("model")).and_then(Value::as_str);
-    let p = model_info(model.unwrap_or(""));
-    let cost = (get("input_tokens") as f64 * p.price_in
-        + get("output_tokens") as f64 * p.price_out
-        + get("cache_creation_input_tokens") as f64 * p.price_cache_write
-        + get("cache_read_input_tokens") as f64 * p.price_cache_read)
-        / 1_000_000.0;
+    let cost = token_cost(
+        model.unwrap_or(""),
+        get("input_tokens"),
+        get("output_tokens"),
+        get("cache_creation_input_tokens"),
+        get("cache_read_input_tokens"),
+    );
     let id = msg.and_then(|m| m.get("id")).and_then(Value::as_str).map(str::to_string);
     Some((id, ctx, cost, model.map(str::to_string)))
 }

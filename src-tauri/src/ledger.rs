@@ -35,7 +35,7 @@ use serde_json::Value;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use memchr::memmem;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Instant, UNIX_EPOCH};
 
@@ -778,12 +778,63 @@ fn collect_jsonl(dir: &Path, out: &mut Vec<(PathBuf, std::fs::Metadata)>) {
     }
 }
 
+/// `collect_jsonl` over a whole projects folder, with the per-session folders
+/// (thousands of them) read by several threads: listing a directory is a system
+/// call, so the work spreads well.
+fn collect_parallel(root: &Path) -> Vec<(PathBuf, std::fs::Metadata)> {
+    let mut found = Vec::new();
+    let mut units: Vec<PathBuf> = Vec::new();
+    // Project folders hold transcripts directly, plus one folder per session.
+    let mut projects = Vec::new();
+    collect_level(root, &mut found, &mut projects);
+    for project in &projects {
+        collect_level(project, &mut found, &mut units);
+    }
+    let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(8);
+    let next = AtomicUsize::new(0);
+    std::thread::scope(|s| {
+        let workers: Vec<_> = (0..threads)
+            .map(|_| {
+                s.spawn(|| {
+                    let mut local = Vec::new();
+                    loop {
+                        let i = next.fetch_add(1, Ordering::Relaxed);
+                        let Some(dir) = units.get(i) else { break };
+                        collect_jsonl(dir, &mut local);
+                    }
+                    local
+                })
+            })
+            .collect();
+        for w in workers {
+            found.extend(w.join().unwrap_or_default());
+        }
+    });
+    found
+}
+
+/// One directory's transcripts into `files`, its subfolders into `dirs`.
+fn collect_level(dir: &Path, files: &mut Vec<(PathBuf, std::fs::Metadata)>, dirs: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for e in entries.flatten() {
+        let path = e.path();
+        match e.file_type() {
+            Ok(t) if t.is_dir() && e.file_name() != "tool-results" => dirs.push(path),
+            Ok(t) if t.is_file() && path.extension().is_some_and(|x| x == "jsonl") => {
+                if let Ok(md) = e.metadata() {
+                    files.push((path, md));
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Every Claude Code transcript under `root`, subagent runs included.
 fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
     let mut files = 0;
     let t = Instant::now();
-    let mut paths = Vec::new();
-    collect_jsonl(root, &mut paths);
+    let mut paths = collect_parallel(root);
     paths.sort_by(|a, b| a.0.cmp(&b.0));
     WALK_NS.fetch_add(t.elapsed().as_nanos() as u64, Ordering::Relaxed);
     // Debug builds only: GREEDOUT_MAX_FILES=200 reads just that many Claude files, so a

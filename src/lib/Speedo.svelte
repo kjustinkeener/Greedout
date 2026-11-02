@@ -121,7 +121,7 @@
   }
   .sub {
     font-size: calc(8.5px * var(--size-num));
-    fill: var(--muted);
+    fill: color-mix(in srgb, var(--muted) 55%, var(--fg));
     font-family: var(--font-num);
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;

@@ -4,6 +4,25 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
+## [0.4.7] - 2026-11-01
+
+### Added
+- 5-hour and weekly limit dials beside the context gauge, calibrated from a copied
+  `/usage` report. Hover a dial for its usage and window shares, colored like the
+  main gauge; right-click either dial to clear the saved usage readings.
+- One ledger database now serves the limit dials and Daily Spend, covering Claude
+  Code, Codex and Cursor.
+
+### Changed
+- The speedo percentage and context size take the same color as the spend figure.
+- Startup is much faster: the first scan builds two sessions, then sizes the list
+  from the free space in the window and pulls only the rows that fit. A poll costs
+  about 30 ms, down from about 300 ms, and the first one about 140 ms, down from
+  almost 6 s.
+- Transcript scanning is faster: sessions resume their cost from the ledger, idle
+  sessions reuse their last tail read, and the focus and transcript lookups skip
+  per-file work.
+
 ## [0.4.6] - 2026-10-21
 
 ### Fixed

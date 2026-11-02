@@ -52,7 +52,19 @@
     const pace = elapsed != null && elapsed > 0 ? pct / elapsed : null;
     return gaugeColor(clamp(pace == null ? pct : pace / HOT_PACE));
   });
-  let pctText = $derived(pct == null ? hint : Math.round(pct * 100) + "%");
+  // The window bar uses the main gauge's colour sweep: short segments coloured by
+  // their position along the dial, drawn only as far as the window has elapsed.
+  const SEG = 60;
+  let timeSegs = $derived.by(() => {
+    void $themeTick;
+    const n = Math.ceil(time * SEG);
+    return Array.from({ length: n }, (_, i) => {
+      const f0 = i / SEG,
+        f1 = Math.min((i + 1) / SEG, time);
+      return { d: arc(R_TIME, f0, f1), color: gaugeColor((f0 + f1) / 2) };
+    });
+  });
+  let pctText =$derived(pct == null ? hint : Math.round(pct * 100) + "%");
   let over = $derived(pct != null && pct >= 1);
 </script>
 
@@ -67,7 +79,9 @@
   <path d={arc(R_TIME, 0, 1)} fill="none" stroke="var(--track)" stroke-width={W} stroke-linecap="round" />
   <path d={arc(R_USE, 0, 1)} fill="none" stroke="var(--track)" stroke-width={W} stroke-linecap="round" />
   {#if elapsed != null && time > 0}
-    <path d={arc(R_TIME, 0, time)} fill="none" stroke="var(--fg)" stroke-opacity="0.75" stroke-width={W} stroke-linecap="round" />
+    {#each timeSegs as s}
+      <path d={s.d} fill="none" stroke={s.color} stroke-width={W} stroke-linecap="round" />
+    {/each}
   {/if}
   {#if use > 0}
     <path d={arc(R_USE, 0, use)} fill="none" stroke={useColor} stroke-width={W} stroke-linecap="round" />

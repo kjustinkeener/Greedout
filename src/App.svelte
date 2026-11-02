@@ -394,6 +394,7 @@
   // Cheap (list is small) and free of oscillation. Runs whenever the snapshot or
   // the container height changes.
   let fitting = false;
+  let lastPool = 0;
   async function fit() {
     if (!mainEl || fitting) return;
     fitting = true;
@@ -410,6 +411,13 @@
       if (visible < sessions.length) {
         visible++;
         await tick();
+      }
+      // Tell the backend how many rows to build: what fits plus a margin. When every
+      // row fit there may be room for more, so ask for extra to let the list grow.
+      const want = visible >= sessions.length ? sessions.length + 5 : visible + 3;
+      if (want !== lastPool) {
+        lastPool = want;
+        invoke("set_pool", { n: want }).catch(() => {});
       }
     } finally {
       fitting = false;

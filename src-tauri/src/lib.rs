@@ -116,6 +116,12 @@ async fn calibrate_limits(app: tauri::AppHandle) -> Result<limits::Limits, Strin
         .map_err(|e| e.to_string())?
 }
 
+/// The window reports how many session rows it wants built each poll.
+#[tauri::command]
+fn set_pool(n: usize) {
+    scan::set_pool(n);
+}
+
 /// Drop the saved `/usage` readings behind both limit dials.
 #[tauri::command]
 async fn clear_limits(app: tauri::AppHandle) -> Result<limits::Limits, String> {
@@ -518,6 +524,7 @@ pub fn run() {
             get_limits,
             calibrate_limits,
             clear_limits,
+            set_pool,
             get_history,
             get_compact_summary,
             get_spend_summary,

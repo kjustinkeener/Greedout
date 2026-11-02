@@ -304,6 +304,16 @@ fn pick_focus(app: u8, claude_ts: Option<u64>, codex_ts: Option<u64>, cursor_ts:
     }
 }
 
+/// How many sessions each scan builds. Starts small; the window reports what it
+/// needs (rows that fit plus a margin) and the pool follows.
+static POOL: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(12);
+const POOL_MIN: usize = 6;
+const POOL_MAX: usize = 50;
+
+pub fn set_pool(n: usize) {
+    POOL.store(n.clamp(POOL_MIN, POOL_MAX), std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Build the current snapshot: active sessions, newest first, capped at `n`.
 pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     let now = now_secs();
@@ -451,9 +461,9 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     });
     // The window's own height decides how many rows actually render (App.svelte's
     // `fit()` grows to the pool then trims to fit), so there is no user-facing count.
-    // This is only a safety ceiling so a machine with hundreds of transcripts doesn't
-    // build every one each poll; no realistic window shows this many rows.
-    const MAX_POOL: usize = 50;
+    // The frontend reports how many rows it wants (see `set_pool`); building only
+    // those keeps each poll and the first poll cheap.
+    let max_pool = POOL.load(std::sync::atomic::Ordering::Relaxed);
     // The same session id can sit under two project folders (a project copied or
     // renamed). The UI keys rows by id, and a duplicate key kills the whole window's
     // reactivity (blank list), so keep only the first (newest/focused) of each id.
@@ -470,7 +480,7 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
             .unwrap_or_default();
         seen_ids.insert((tag, stem))
     });
-    candidates.truncate(MAX_POOL);
+    candidates.truncate(max_pool);
 
     if crate::config::debug_enabled() {
         let top: Vec<String> = candidates

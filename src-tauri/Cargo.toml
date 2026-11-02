@@ -49,6 +49,11 @@ windows = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsA
 [profile.dev]
 debug = "line-tables-only"
 
+# Dependencies (serde_json, bundled SQLite) are compiled once, so optimizing them
+# makes transcript scans in dev builds several times faster at no rebuild cost.
+[profile.dev.package."*"]
+opt-level = 3
+
 [profile.release]
 opt-level = "s"
 lto = true

@@ -256,6 +256,27 @@ pub fn calibrate_from_clipboard(app: &tauri::AppHandle) -> Result<Limits, String
     Ok(out)
 }
 
+/// Forget the saved `/usage` readings of one limit ("5h" or "7d"), so its dial is
+/// uncalibrated again until the next report is pasted.
+pub fn clear(app: &tauri::AppHandle, kind: &str) -> Result<Limits, String> {
+    let mut calib = load_calib();
+    match kind {
+        "5h" => {
+            calib.five.clear();
+            calib.five_reset = 0;
+        }
+        "7d" => {
+            calib.week.clear();
+            calib.week_reset = 0;
+        }
+        _ => return Err(format!("unknown limit: {kind}")),
+    }
+    save_calib(&calib)?;
+    let out = estimate(now_ms());
+    publish(app, &out);
+    Ok(out)
+}
+
 /// Background loop: refresh the estimate (cheap, cached per file), publishing each
 /// result as the "limits" event.
 pub fn spawn(app: tauri::AppHandle) {

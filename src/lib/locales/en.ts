@@ -78,6 +78,7 @@ export const en = {
   "tip.gauge": "context fill gauge",
   "main.limitDone": "Calibrated from /usage",
   "main.limitHint": "/usage",
+  "main.clearUsage": "Clear usage data",
   "main.limitUsage": "usage",
   "main.limitWindow": "window",
   "tip.history": "context and spend over time",

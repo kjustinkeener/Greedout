@@ -105,7 +105,7 @@
     font-variant-numeric: tabular-nums;
   }
   .pct.hint {
-    font-size: calc(43px * var(--size-num));
+    font-size: calc(42px * var(--size-num));
     fill: var(--muted);
   }
   .pct.over {

@@ -714,7 +714,6 @@ fn plan_file(
     md: &std::fs::Metadata,
     key: &str,
 ) -> rusqlite::Result<Option<Work>> {
-    let t_start = Instant::now();
     let (mtime, len) = (mtime_ms(md), md.len() as i64);
     let row: Option<Row> = tx
         .prepare_cached("SELECT id, path, mtime, len, COALESCE(offset, 0), model FROM sessions WHERE harness = ?1 AND key = ?2")?
@@ -747,7 +746,6 @@ fn plan_file(
             Some(Work { existing: None, from: 0, model: None, mtime, len })
         }
     };
-    FILE_LOOKUP_NS.fetch_add(t_start.elapsed().as_nanos() as u64, Ordering::Relaxed);
     Ok(work)
 }
 
@@ -927,6 +925,7 @@ fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
         folder: String,
         work: Work,
     }
+    let t_plan = Instant::now();
     let mut jobs = Vec::new();
     for (p, md) in paths.into_iter().take(cap) {
         let rel = p.strip_prefix(root).unwrap_or(&p);
@@ -940,9 +939,11 @@ fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
         let folder = rel.components().next().map(|c| c.as_os_str().to_string_lossy().to_string()).unwrap_or_default();
         jobs.push(Job { path: p, key, sid, agent, sidechain, folder, work });
     }
+    PLAN_NS.fetch_add(t_plan.elapsed().as_nanos() as u64, Ordering::Relaxed);
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(8);
     for batch in jobs.chunks(64) {
         let next = AtomicUsize::new(0);
+        let t_batch = Instant::now();
         let mut done: Vec<Option<(Parsed, usize)>> = std::thread::scope(|s| {
             let workers: Vec<_> = (0..threads)
                 .map(|_| {
@@ -966,6 +967,7 @@ fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
             }
             slots
         });
+        BATCH_NS.fetch_add(t_batch.elapsed().as_nanos() as u64, Ordering::Relaxed);
         for (job, slot) in batch.iter().zip(done.iter_mut()) {
             let Some((parsed, end)) = slot.take() else { continue };
             let fallback = || scan::decode_project_dir(&job.folder);
@@ -1063,7 +1065,8 @@ fn sync_cursor(tx: &Connection) -> rusqlite::Result<usize> {
 
 // Time inside `sync_file`, split by what it was doing; `sync` logs and resets them.
 static WALK_NS: AtomicU64 = AtomicU64::new(0);
-static FILE_LOOKUP_NS: AtomicU64 = AtomicU64::new(0);
+static PLAN_NS: AtomicU64 = AtomicU64::new(0);
+static BATCH_NS: AtomicU64 = AtomicU64::new(0);
 static FILE_READ_NS: AtomicU64 = AtomicU64::new(0);
 static FILE_PARSE_NS: AtomicU64 = AtomicU64::new(0);
 static FILE_STORE_NS: AtomicU64 = AtomicU64::new(0);
@@ -1338,15 +1341,16 @@ fn sync(conn: &Connection) -> rusqlite::Result<()> {
     config::debug_log(
         &config::load_config(),
         &format!(
-            "ledger sync: {files} files changed in {:?} [{}] (walk and stat {:.0}ms; files: lookup {:.0}ms, read {:.0}ms, parse {:.0}ms, store {:.0}ms) \
+            "ledger sync: {files} files changed in {:?} [{}] (claude files, wall: walk {:.0}ms, plan {:.0}ms, read and parse {:.0}ms, store {:.0}ms; thread time: read {:.0}ms, parse {:.0}ms) \
              (parse of {} lines: utf8 {:.0}ms, line-kind scans {:.0}ms, assistant json {:.0}ms, other json {:.0}ms)",
             started.elapsed(),
             ph.line(),
             take_ms(&WALK_NS),
-            take_ms(&FILE_LOOKUP_NS),
+            take_ms(&PLAN_NS),
+            take_ms(&BATCH_NS),
+            take_ms(&FILE_STORE_NS),
             take_ms(&FILE_READ_NS),
             take_ms(&FILE_PARSE_NS),
-            take_ms(&FILE_STORE_NS),
             PARSE_LINES.swap(0, Ordering::Relaxed),
             take_ms(&PARSE_UTF8_NS),
             take_ms(&PARSE_SCAN_NS),

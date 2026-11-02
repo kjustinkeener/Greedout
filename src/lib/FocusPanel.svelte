@@ -5,7 +5,7 @@
   import History from "./History.svelte";
   import Icon from "./Icon.svelte";
   import { gaugeColor, spendFor, spendOverride, themeTick } from "./theme";
-  import { agoTip, ctxTip, limitsTip, modelTip, sizeTip, moneyTip, spendTip } from "./tips";
+  import { agoTip, limitsTip, modelTip, sizeTip, moneyTip, spendTip } from "./tips";
   import { t } from "./i18n.svelte";
   import { invoke } from "@tauri-apps/api/core";
 
@@ -156,7 +156,7 @@
   </div>
 
   <div class="gauge">
-    <div class="speedo" title={ctxTip()}><Speedo pct={session.pct} ctx={session.ctx} target={session.target} {fmtK} /></div>
+    <div class="speedo"><Speedo pct={session.pct} ctx={session.ctx} target={session.target} {fmtK} /></div>
     <div class="spend">
       <div class="figure" title={hov ? moneyTip() : spendTip(session.costUsd)}>
         {#if dialHov}<span class="lbl below"><span class="who">{dialHov.label}</span> <span style:color={dialColor}>{t("main.limitUsage")}</span> / <span style:color={windowColor}>{t("main.limitWindow")}</span></span>

@@ -1,5 +1,5 @@
 //! The conversation ledger: every Claude Code, Codex and Cursor conversation, read
-//! once and kept in `ledger.sqlite` as a hierarchy of tables, each level nested in
+//! once and kept in `cache.sqlite` as a hierarchy of tables, each level nested in
 //! the one above and each storing its own totals.
 //!
 //!   harnesses    Claude Code, Codex, Cursor
@@ -159,7 +159,7 @@ CREATE TABLE windows (
 static DB: Mutex<Option<Connection>> = Mutex::new(None);
 
 fn db_path() -> PathBuf {
-    config::app_dir().join("ledger.sqlite")
+    config::app_dir().join("cache.sqlite")
 }
 
 fn open() -> rusqlite::Result<Connection> {

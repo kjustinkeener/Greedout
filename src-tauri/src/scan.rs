@@ -307,6 +307,7 @@ fn pick_focus(app: u8, claude_ts: Option<u64>, codex_ts: Option<u64>, cursor_ts:
 /// Build the current snapshot: active sessions, newest first, capped at `n`.
 pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     let now = now_secs();
+    let t_start = std::time::Instant::now();
     // Forward slashes are REQUIRED: the glob crate treats `\` as an escape, so a
     // backslash `projects\*\*.jsonl` silently matches nothing on Windows (only the
     // focus-forced session would ever show). Same fix as session_history().
@@ -386,6 +387,7 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     // is no idle cutoff here at all.
     // Each candidate is (path, mtime, harness). Claude, Codex, and Cursor sessions
     // compete in one pool so the `n` most-recent across ALL harnesses are what show.
+    let t_focus = t_start.elapsed();
     let mut candidates: Vec<(PathBuf, u64, Harness)> = Vec::new();
     if let Ok(paths) = glob::glob(&pattern) {
         for entry in paths.flatten() {
@@ -398,12 +400,14 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
             candidates.push((entry, mtime, Harness::Claude));
         }
     }
+    let t_glob = t_start.elapsed();
     for (path, mtime) in crate::codex::candidates() {
         candidates.push((path, mtime, Harness::Codex));
     }
     for (path, mtime) in crate::cursor::candidates() {
         candidates.push((path, mtime, Harness::Cursor));
     }
+    let t_cands = t_start.elapsed();
 
     // Sort key: the focused session is pinned to the very top; everything else ranks
     // by mtime. Focus is resolved per harness (Claude via its focus sidecar, Codex via
@@ -481,19 +485,46 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
         );
     }
 
+    let t_sorted = t_start.elapsed();
+    let mut slow: Vec<(std::time::Duration, String)> = Vec::new();
     let mut sessions: Vec<Session> = candidates
         .into_iter()
-        .map(|(path, mtime, harness)| match harness {
-            Harness::Codex => {
-                crate::codex::build_session(&path, mtime, now, cfg, codex_focused.as_deref())
+        .map(|(path, mtime, harness)| {
+            let t0 = std::time::Instant::now();
+            let s = match harness {
+                Harness::Codex => {
+                    crate::codex::build_session(&path, mtime, now, cfg, codex_focused.as_deref())
+                }
+                Harness::Cursor => {
+                    crate::cursor::build_session(&path, mtime, now, cfg, cursor_focused.as_deref())
+                }
+                Harness::Claude => build_session(&path, mtime, now, cfg, labels, focused.as_deref()),
+            };
+            if cfg.debug_logging {
+                slow.push((t0.elapsed(), format!("{} {}MB", &s.id[..s.id.len().min(8)], s.size_bytes / 1_048_576)));
             }
-            Harness::Cursor => {
-                crate::cursor::build_session(&path, mtime, now, cfg, cursor_focused.as_deref())
-            }
-            Harness::Claude => build_session(&path, mtime, now, cfg, labels, focused.as_deref()),
+            s
         })
         .collect();
+    let t_built = t_start.elapsed();
     apply_grouping(&mut sessions);
+    if cfg.debug_logging {
+        slow.sort_by(|a, b| b.0.cmp(&a.0));
+        let top: Vec<String> = slow.iter().take(5).map(|(d, s)| format!("{s} {d:?}")).collect();
+        crate::config::debug_log(
+            cfg,
+            &format!(
+                "scan phases: focus {t_focus:?}, glob {:?}, codex+cursor {:?}, sort {:?}, build {:?} (slowest: {}), group {:?}, total {:?}",
+                t_glob - t_focus,
+                t_cands - t_glob,
+                t_sorted - t_cands,
+                t_built - t_sorted,
+                top.join("; "),
+                t_start.elapsed() - t_built,
+                t_start.elapsed()
+            ),
+        );
+    }
     sessions
 }
 

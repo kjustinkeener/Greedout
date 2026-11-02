@@ -90,12 +90,12 @@
   // at the end of the outer bar.
   let dialColor = $derived.by(() => {
     void $themeTick;
-    return spendOverride() ?? dialHov?.color ?? "var(--yellow)";
+    return spendOverride() || dialHov?.color || "var(--yellow)";
   });
   let windowColor = $derived.by(() => {
     void $themeTick;
     if (dialHov?.window == null) return "var(--muted)";
-    return spendOverride() ?? gaugeColor(Math.max(0, Math.min(1, dialHov.window)));
+    return spendOverride() || gaugeColor(Math.max(0, Math.min(1, dialHov.window)));
   });
   const hoverDial = (label: string) => (h: { usage: number; window: number | null; color: string } | null) =>
     (dialHov = h && { label, ...h });

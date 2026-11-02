@@ -103,7 +103,7 @@
 
   <!-- readouts in the bottom gap -->
   <text x={CX} y="82" text-anchor="middle" class="pct" style:fill={readColor}>{pctText}</text>
-  <text x={CX} y="95" text-anchor="middle" class="sub" style:fill={readColor}>{fmtK(ctx)}/{fmtK(target)}</text>
+  <text x={CX} y="95" text-anchor="middle" class="sub"><tspan style:fill={readColor}>{fmtK(ctx)}</tspan>/{fmtK(target)}</text>
 </svg>
 
 <style>
@@ -121,6 +121,7 @@
   }
   .sub {
     font-size: calc(8.5px * var(--size-num));
+    fill: var(--muted);
     font-family: var(--font-num);
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;

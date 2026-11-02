@@ -112,7 +112,7 @@
     fill: var(--red);
   }
   .sub {
-    font-size: calc(14px * var(--size-num));
+    font-size: calc(19px * var(--size-num));
     fill: var(--fg);
     font-family: var(--font-num);
     font-size-adjust: var(--font-num-adj);

@@ -117,10 +117,13 @@ async fn calibrate_limits(app: tauri::AppHandle) -> Result<limits::Limits, Strin
 }
 
 /// The full context/spend curve for one session, rebuilt from its transcript,
-/// so the graph can show history from before Greedout was opened.
+/// so the graph can show history from before Greedout was opened. A long
+/// transcript takes a while to read, so it runs off the main thread.
 #[tauri::command]
-fn get_history(id: String) -> Vec<scan::Sample> {
-    scan::session_history(&id)
+async fn get_history(id: String) -> Result<Vec<scan::Sample>, String> {
+    tauri::async_runtime::spawn_blocking(move || scan::session_history(&id))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// The latest compaction's summary text + boundary metadata for one session, shown

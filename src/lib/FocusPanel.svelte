@@ -159,7 +159,7 @@
     <div class="speedo" title={ctxTip()}><Speedo pct={session.pct} ctx={session.ctx} target={session.target} {fmtK} /></div>
     <div class="spend">
       <div class="figure" title={hov ? moneyTip() : spendTip(session.costUsd)}>
-        {#if dialHov}<span class="lbl below">{dialHov.label} {t("main.limitUsage")} / {t("main.limitWindow")}</span>
+        {#if dialHov}<span class="lbl below">{dialHov.label} <span style:color={dialColor}>{t("main.limitUsage")}</span> / <span style:color={windowColor}>{t("main.limitWindow")}</span></span>
         {:else if hov}<span class="lbl">{hov.label}<span class="at">{hov.time}</span></span>{/if}
         {#if dialHov}
           <span class="val pair"

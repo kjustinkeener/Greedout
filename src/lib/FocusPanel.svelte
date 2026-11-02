@@ -200,7 +200,11 @@
         </button>
       {/if}
       {#if dialHov && dialHov.usage == null}
-        <span class="note">{t("main.limitNote")}</span>
+        <ol class="note">
+          <li>{t("main.limitStep1")}</li>
+          <li>{t("main.limitStep2")}</li>
+          <li>{t("main.limitStep3")}</li>
+        </ol>
       {/if}
     </div>
   </div>
@@ -533,9 +537,12 @@
     position: absolute;
     inset: 0;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     justify-content: center;
-    text-align: center;
+    align-items: flex-start;
+    margin: 0;
+    list-style: decimal;
+    padding: 0 0 0 1.6em;
     pointer-events: none;
     color: var(--fg);
     font-size: calc(12px * var(--size-ui));

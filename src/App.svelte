@@ -430,7 +430,8 @@
           if (free > 0 && pitch > 0) want += Math.ceil(free / pitch);
         }
       }
-      if (want !== lastPool) {
+      // An empty list (before the first snapshot) says nothing about space.
+      if (sessions.length > 0 && want !== lastPool) {
         lastPool = want;
         poolChanged = true;
         await invoke("set_pool", { n: want }).catch(() => {});

@@ -29,6 +29,8 @@ export const ptBR: PartialDict = {
   "main.clearUsage": "Limpar dados de uso",
   "main.limitUsage": "uso",
   "main.limitWindow": "janela",
+  "main.limitDone": "Calibrado a partir de /usage",
+  "main.limitHint": "?",
   "main.spend": "gasto",
   "main.context": "contexto",
   "main.startupFloor": "base inicial",

@@ -29,6 +29,8 @@ export const ru: PartialDict = {
   "main.clearUsage": "Очистить данные об использовании",
   "main.limitUsage": "использование",
   "main.limitWindow": "окно",
+  "main.limitDone": "Откалибровано по /usage",
+  "main.limitHint": "?",
   "main.spend": "расходы",
   "main.context": "контекст",
   "main.startupFloor": "стартовая база",

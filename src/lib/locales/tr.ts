@@ -29,6 +29,8 @@ export const tr: PartialDict = {
   "main.clearUsage": "Kullanım verilerini temizle",
   "main.limitUsage": "kullanım",
   "main.limitWindow": "pencere",
+  "main.limitDone": "/usage üzerinden kalibre edildi",
+  "main.limitHint": "?",
   "main.spend": "harcama",
   "main.context": "bağlam",
   "main.startupFloor": "başlangıç tabanı",

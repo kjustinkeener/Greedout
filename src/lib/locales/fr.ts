@@ -29,6 +29,8 @@ export const fr: PartialDict = {
   "main.clearUsage": "Effacer les données d'utilisation",
   "main.limitUsage": "utilisation",
   "main.limitWindow": "fenêtre",
+  "main.limitDone": "Calibré à partir de /usage",
+  "main.limitHint": "?",
   "main.spend": "dépenses",
   "main.context": "contexte",
   "main.startupFloor": "base initiale",

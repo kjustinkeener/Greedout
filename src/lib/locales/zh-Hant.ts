@@ -29,6 +29,8 @@ export const zhHant: PartialDict = {
   "main.clearUsage": "清除用量資料",
   "main.limitUsage": "用量",
   "main.limitWindow": "時間視窗",
+  "main.limitDone": "已根據 /usage 校準",
+  "main.limitHint": "?",
   "main.spend": "花費",
   "main.context": "上下文",
   "main.startupFloor": "啟動基線",

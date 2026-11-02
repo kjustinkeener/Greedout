@@ -29,6 +29,8 @@ export const ja: PartialDict = {
   "main.clearUsage": "使用量データを消去",
   "main.limitUsage": "使用量",
   "main.limitWindow": "期間",
+  "main.limitDone": "/usage から校正済み",
+  "main.limitHint": "?",
   "main.spend": "支出",
   "main.context": "コンテキスト",
   "main.startupFloor": "起動時の下限",

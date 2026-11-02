@@ -29,6 +29,8 @@ export const ko: PartialDict = {
   "main.clearUsage": "사용량 데이터 지우기",
   "main.limitUsage": "사용량",
   "main.limitWindow": "기간",
+  "main.limitDone": "/usage 기준으로 보정됨",
+  "main.limitHint": "?",
   "main.spend": "지출",
   "main.context": "컨텍스트",
   "main.startupFloor": "시작 기준값",

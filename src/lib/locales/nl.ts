@@ -29,6 +29,8 @@ export const nl: PartialDict = {
   "main.clearUsage": "Gebruiksgegevens wissen",
   "main.limitUsage": "gebruik",
   "main.limitWindow": "venster",
+  "main.limitDone": "Gekalibreerd op basis van /usage",
+  "main.limitHint": "?",
   "main.spend": "uitgaven",
   "main.context": "context",
   "main.startupFloor": "basis bij start",

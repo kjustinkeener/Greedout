@@ -53,6 +53,9 @@ struct Pair {
     cost: f64,
     pct: f64,
     at: i64,
+    /// The window's end, epoch ms; 0 on readings saved before this was kept.
+    #[serde(default)]
+    reset: i64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -109,9 +112,20 @@ fn gather(now: i64, calib: &Calib) -> Windows {
     ledger::windows(now, calib.five_reset, calib.week_reset).unwrap_or_default()
 }
 
-fn window(cost: f64, budget: f64, end: Option<i64>, len: i64, now: i64) -> LimitWindow {
+/// While the window of the newest `/usage` reading is still open, the dial starts
+/// from that reading and moves by the spend since at the fitted budget, so it shows
+/// the reported share right after a paste. Otherwise spend over the fitted budget.
+fn window(cost: f64, pairs: &[Pair], end: Option<i64>, len: i64, now: i64) -> LimitWindow {
+    let fitted = fit_budget(pairs);
+    let anchor = pairs.last().filter(|p| end.is_some_and(|e| e == p.reset));
+    let pct = match anchor {
+        Some(a) if fitted > 0.0 => Some((a.pct + (cost - a.cost) / fitted).max(0.0)),
+        _ => (fitted > 0.0).then(|| cost / fitted),
+    };
+    // The budget the shown share implies, so cost / budget always reads as the dial.
+    let budget = pct.filter(|p| *p > 0.0).map_or(fitted, |p| cost / p);
     LimitWindow {
-        pct: (budget > 0.0).then(|| cost / budget),
+        pct,
         cost,
         budget,
         elapsed: end.map(|e| ((now - (e - len)) as f64 / len as f64).clamp(0.0, 1.0)),
@@ -129,8 +143,8 @@ fn estimate(now: i64) -> Limits {
 
 fn estimate_from(w: &Windows, calib: &Calib, now: i64) -> Limits {
     Limits {
-        five_hour: window(w.five.cost, fit_budget(&calib.five), w.five.end, H5_MS, now),
-        weekly: window(w.seven.cost, fit_budget(&calib.week), w.seven.end, D7_MS, now),
+        five_hour: window(w.five.cost, &calib.five, w.five.end, H5_MS, now),
+        weekly: window(w.seven.cost, &calib.week, w.seven.end, D7_MS, now),
     }
 }
 
@@ -194,13 +208,13 @@ fn calibrate(text: &str, now: i64) -> Result<Calib, String> {
     if let Some(r) = &report.five {
         calib.five_reset = r.reset;
         if r.pct > 0.0 {
-            calib.five.push(Pair { cost: spent(r.reset, H5_MS), pct: r.pct, at });
+            calib.five.push(Pair { cost: spent(r.reset, H5_MS), pct: r.pct, at, reset: r.reset });
         }
     }
     if let Some(r) = &report.week {
         calib.week_reset = r.reset;
         if r.pct > 0.0 {
-            calib.week.push(Pair { cost: spent(r.reset, D7_MS), pct: r.pct, at });
+            calib.week.push(Pair { cost: spent(r.reset, D7_MS), pct: r.pct, at, reset: r.reset });
         }
     }
     for pairs in [&mut calib.five, &mut calib.week] {
@@ -287,10 +301,28 @@ mod tests {
     #[test]
     fn budget_fit_weights_high_percentages() {
         assert_eq!(fit_budget(&[]), 0.0);
-        let p = |cost, pct| Pair { cost, pct, at: 0 };
+        let p = |cost, pct| Pair { cost, pct, at: 0, reset: 0 };
         assert!((fit_budget(&[p(12.5, 0.25)]) - 50.0).abs() < 1e-9);
         // A noisy low reading barely moves a clean high one.
         let b = fit_budget(&[p(50.0, 1.0), p(15.0, 0.25)]);
         assert!((b - 50.0).abs() < 2.0, "{b}");
+    }
+
+    #[test]
+    fn dial_starts_at_the_newest_reading_while_its_window_is_open() {
+        let p = |cost, pct, reset| Pair { cost, pct, at: 0, reset };
+        // Older readings imply a $50 budget; the newest, $60.
+        let pairs = [p(10.0, 0.2, 1), p(30.0, 0.5, 2)];
+        let budget = fit_budget(&pairs);
+        // Same window: exactly the reported share at the reported spend.
+        let w = window(30.0, &pairs, Some(2), H5_MS, 0);
+        assert!((w.pct.unwrap() - 0.5).abs() < 1e-9);
+        // Then it moves by the fitted budget.
+        let w = window(35.0, &pairs, Some(2), H5_MS, 0);
+        assert!((w.pct.unwrap() - (0.5 + 5.0 / budget)).abs() < 1e-9);
+        assert!((w.cost / w.budget - w.pct.unwrap()).abs() < 1e-9);
+        // A different window falls back to spend over the fitted budget.
+        let w = window(35.0, &pairs, Some(3), H5_MS, 0);
+        assert!((w.pct.unwrap() - 35.0 / budget).abs() < 1e-9);
     }
 }

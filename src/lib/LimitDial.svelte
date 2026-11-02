@@ -9,13 +9,19 @@
     pct,
     elapsed,
     hint,
+    usageWord,
+    windowWord,
   }: {
     label: string;
     pct: number | null;
     elapsed: number | null;
     /** Shown in place of the percentage until the dial is calibrated. */
     hint: string;
+    /** Captions for the hover read-out: "47% usage", "40% window". */
+    usageWord: string;
+    windowWord: string;
   } = $props();
+  let hovered = $state(false);
 
   const CX = 60,
     CY = 60,
@@ -53,7 +59,14 @@
   let over = $derived(pct != null && pct >= 1);
 </script>
 
-<svg viewBox="0 0 120 100" class="dial" role="img" aria-label={label}>
+<svg
+  viewBox="0 0 120 100"
+  class="dial"
+  role="img"
+  aria-label={label}
+  onmouseenter={() => (hovered = true)}
+  onmouseleave={() => (hovered = false)}
+>
   <path d={arc(R_TIME, 0, 1)} fill="none" stroke="var(--track)" stroke-width={W} stroke-linecap="round" />
   <path d={arc(R_USE, 0, 1)} fill="none" stroke="var(--track)" stroke-width={W} stroke-linecap="round" />
   {#if elapsed != null && time > 0}
@@ -62,7 +75,14 @@
   {#if use > 0}
     <path d={arc(R_USE, 0, use)} fill="none" stroke={useColor} stroke-width={W} stroke-linecap="round" />
   {/if}
-  <text x={CX} y="66" text-anchor="middle" class="pct" class:over class:hint={pct == null}>{pctText}</text>
+  {#if hovered && pct != null}
+    <text x={CX} y="54" text-anchor="middle" class="read">{Math.round(pct * 100)}% {usageWord}</text>
+    <text x={CX} y="68" text-anchor="middle" class="read">
+      {elapsed == null ? "-" : Math.round(time * 100) + "%"} {windowWord}
+    </text>
+  {:else}
+    <text x={CX} y="66" text-anchor="middle" class="pct" class:over class:hint={pct == null}>{pctText}</text>
+  {/if}
   <text x={CX} y="94" text-anchor="middle" class="sub">{label}</text>
 </svg>
 
@@ -74,6 +94,14 @@
   }
   .pct {
     font-size: calc(18px * var(--size-num));
+    font-weight: var(--w-bold);
+    fill: var(--fg);
+    font-family: var(--font-num);
+    font-size-adjust: var(--font-num-adj);
+    font-variant-numeric: tabular-nums;
+  }
+  .read {
+    font-size: calc(9px * var(--size-num));
     font-weight: var(--w-bold);
     fill: var(--fg);
     font-family: var(--font-num);

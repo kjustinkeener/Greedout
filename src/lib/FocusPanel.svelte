@@ -149,10 +149,10 @@
       {#if limits}
         <button type="button" class="dials" bind:this={dialsEl} onclick={calibrate}>
           <div class="dial" title={limitTip("5h", limits.fiveHour)}>
-            <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} />
+            <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} usageWord={t("main.limitUsage")} windowWord={t("main.limitWindow")} />
           </div>
           <div class="dial" title={limitTip("week", limits.weekly)}>
-            <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} />
+            <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} usageWord={t("main.limitUsage")} windowWord={t("main.limitWindow")} />
           </div>
         </button>
       {/if}

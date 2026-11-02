@@ -86,6 +86,8 @@ export const en = {
   "tip.limitClick": "Click to calibrate from a copied /usage report.",
   "main.limitDone": "Calibrated from /usage",
   "main.limitHint": "/usage",
+  "main.limitUsage": "usage",
+  "main.limitWindow": "window",
   "tip.history": "context and spend over time",
 
   // Status bar

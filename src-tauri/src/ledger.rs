@@ -32,6 +32,7 @@ use crate::grouping;
 use crate::scan;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use memchr::memmem;
@@ -1340,17 +1341,10 @@ fn retotal_days(tx: &Connection) -> rusqlite::Result<()> {
     if dirty == 0 {
         return Ok(());
     }
-    if dirty > 300 {
+    if dirty > 16 {
         // A first scan touches nearly every day: one pass over the turns beats
         // looking each day up.
-        return tx.execute_batch(
-            "DELETE FROM daily;
-             INSERT INTO daily
-                 SELECT s.directory, strftime('%Y-%m-%d', t.ts / 1000, 'unixepoch', 'localtime'), SUM(t.cost), COUNT(*)
-                 FROM turns t JOIN sessions s ON s.id = t.session
-                 WHERE t.counted = 1 AND t.cost > 0
-                 GROUP BY 1, 2;",
-        );
+        return retotal_all_days(tx);
     }
     tx.execute_batch(
         "DELETE FROM daily WHERE (directory, day) IN (SELECT dir, day FROM dirty);
@@ -1363,6 +1357,52 @@ fn retotal_days(tx: &Connection) -> rusqlite::Result<()> {
                  AND t.ts <  CAST(strftime('%s', d.day, '+1 day', 'utc') AS INTEGER) * 1000
              GROUP BY d.dir, d.day;",
     )
+}
+
+/// Rebuild `daily` in one pass. SQLite converts to local time once per calendar day
+/// (the same `utc` bounds the incremental path uses) instead of once per turn; each
+/// turn is then placed by binary search.
+fn retotal_all_days(tx: &Connection) -> rusqlite::Result<()> {
+    tx.execute("DELETE FROM daily", [])?;
+    let (min, max): (Option<i64>, Option<i64>) = tx.query_row(
+        "SELECT MIN(ts), MAX(ts) FROM turns WHERE counted = 1 AND cost > 0",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    let (Some(min), Some(max)) = (min, max) else { return Ok(()) };
+    let label = |ts: i64| -> rusqlite::Result<String> {
+        tx.query_row("SELECT strftime('%Y-%m-%d', ?1 / 1000, 'unixepoch', 'localtime')", [ts], |r| r.get(0))
+    };
+    let last = label(max)?;
+    let mut days: Vec<(i64, String)> = Vec::new();
+    let mut day = label(min)?;
+    loop {
+        let start: i64 = tx.query_row("SELECT CAST(strftime('%s', ?1, 'utc') AS INTEGER) * 1000", [&day], |r| r.get(0))?;
+        let next: String = tx.query_row("SELECT date(?1, '+1 day')", [&day], |r| r.get(0))?;
+        days.push((start, day));
+        if days.last().map_or(true, |(_, d)| *d >= last) {
+            break;
+        }
+        day = next;
+    }
+    let mut totals: HashMap<(i64, usize), (f64, i64)> = HashMap::new();
+    let mut st = tx.prepare(
+        "SELECT s.directory, t.ts, t.cost FROM turns t JOIN sessions s ON s.id = t.session
+         WHERE t.counted = 1 AND t.cost > 0",
+    )?;
+    let mut rows = st.query([])?;
+    while let Some(r) = rows.next()? {
+        let (dir, ts, cost): (i64, i64, f64) = (r.get(0)?, r.get(1)?, r.get(2)?);
+        let i = days.partition_point(|(start, _)| *start <= ts).saturating_sub(1);
+        let e = totals.entry((dir, i)).or_insert((0.0, 0));
+        e.0 += cost;
+        e.1 += 1;
+    }
+    let mut ins = tx.prepare("INSERT INTO daily VALUES (?1, ?2, ?3, ?4)")?;
+    for ((dir, i), (cost, n)) in totals {
+        ins.execute(params![dir, days[i].1, cost, n])?;
+    }
+    Ok(())
 }
 
 /// Bring the ledger up to date with every conversation on disk.

@@ -179,7 +179,6 @@
         {:else if hov}<span class="lbl below">{hov.label}<span class="at">{hov.time}</span></span>{/if}
         {#if dialHov && dialHov.usage == null}
           <span class="val pair hide">0</span>
-          <span class="note">{t("main.limitNote")}</span>
         {:else if dialHov}
           <span class="val pair"
             ><span style:color={dialColor}>{pctText(dialHov.usage)}</span> / <span style:color={windowColor}>{pctText(dialHov.window)}</span></span
@@ -191,7 +190,7 @@
         {/if}
       </div>
       {#if limits}
-        <button type="button" class="dials" bind:this={dialsEl} onclick={calibrate}>
+        <button type="button" class="dials" class:ghost={dialHov && dialHov.usage == null} bind:this={dialsEl} onclick={calibrate}>
           <div class="dial" class:dim={dialHov && dialHov.label !== "5h"} oncontextmenu={(e) => openMenu(e)} role="presentation">
             <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} onHover={hoverDial("5h")} />
           </div>
@@ -199,6 +198,9 @@
             <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} onHover={hoverDial("7d")} />
           </div>
         </button>
+      {/if}
+      {#if dialHov && dialHov.usage == null}
+        <span class="note">{t("main.limitNote")}</span>
       {/if}
     </div>
   </div>
@@ -432,6 +434,7 @@
   }
   .spend {
     flex: 1 1 auto;
+    position: relative;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -524,16 +527,22 @@
     visibility: hidden;
   }
   /* Calibration hint over the dials, in the space of the figure it replaces. */
+  /* Calibration hint over the whole column; the dials fade out beneath it (but keep
+     catching the pointer, so the hover holds). */
   .spend .note {
     position: absolute;
-    left: 50%;
-    top: 0;
-    width: 150px;
-    transform: translate(-50%, -5px);
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
+    pointer-events: none;
     color: var(--fg);
-    font-size: calc(10px * var(--size-ui));
-    line-height: 1.25;
+    font-size: calc(12px * var(--size-ui));
+    line-height: 1.3;
+  }
+  .dials.ghost {
+    opacity: 0;
   }
   .spend .val.lift {
     transform: translateY(-5px) scale(0.68);

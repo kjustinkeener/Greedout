@@ -441,7 +441,7 @@
   }
   .spend .lbl.below {
     bottom: auto;
-    top: 100%;
+    top: calc(100% - 12px);
   }
   /* Clock time of the hovered point, kept on the label line. */
   .spend .at {
@@ -455,7 +455,7 @@
   /* Two shares side by side ("47% / 40%"), scaled rather than resized so the
      figure keeps its height and the dials below do not move. */
   .spend .val.pair {
-    transform: scale(0.68);
+    transform: translateY(-5px) scale(0.68);
     color: var(--muted);
     white-space: nowrap;
   }

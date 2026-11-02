@@ -40,10 +40,14 @@
   const clamp = (n: number | null) => (n == null ? 0 : Math.max(0, Math.min(1, n)));
   let use = $derived(clamp(pct));
   let time = $derived(clamp(elapsed));
-  // The usage bar takes the gauge colour at its own end, so it warms as it fills.
+  // The usage bar is coloured by pace: usage over window elapsed, with the hottest
+  // colour reached at 125% of pace. Without a window start it falls back to usage.
+  const HOT_PACE = 1.25;
   let useColor = $derived.by(() => {
     void $themeTick;
-    return pct == null ? "var(--muted)" : gaugeColor(use);
+    if (pct == null) return "var(--muted)";
+    const pace = elapsed != null && elapsed > 0 ? pct / elapsed : null;
+    return gaugeColor(clamp(pace == null ? pct : pace / HOT_PACE));
   });
   let pctText = $derived(pct == null ? hint : Math.round(pct * 100) + "%");
   let over = $derived(pct != null && pct >= 1);

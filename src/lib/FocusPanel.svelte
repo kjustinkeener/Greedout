@@ -536,11 +536,11 @@
   .spend .note {
     position: absolute;
     z-index: 5;
-    left: 0;
+    left: -80px;
     right: 0;
-    top: -6px;
+    top: -28px;
     margin: 0;
-    padding: 6px 8px 6px 1.9em;
+    padding: 4px 8px 4px 1.9em;
     list-style: decimal;
     background: var(--bg);
     border: 1px solid var(--track);
@@ -549,7 +549,7 @@
     pointer-events: none;
     color: var(--fg);
     font-size: calc(11px * var(--size-ui));
-    line-height: 1.35;
+    line-height: 1.3;
     white-space: nowrap;
   }
   .spend .val.lift {

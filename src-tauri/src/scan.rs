@@ -1224,6 +1224,13 @@ fn focused_session_id() -> Option<(String, u64)> {
     // once, from the most preferred folder, even if the other copy is newer.
     let mut seen_names: HashSet<std::ffi::OsString> = HashSet::new();
     let mut best: Option<(u64, String)> = None;
+    type Sidecar = ((u128, u64), Option<(u64, String)>);
+    static SIDECARS: OnceLock<Mutex<HashMap<PathBuf, Sidecar>>> = OnceLock::new();
+    let mut cache = SIDECARS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let mut live: HashSet<PathBuf> = HashSet::new();
     for base in claude_sessions_dirs() {
         // The glob crate matches unreliably across multiple `\`-separated wildcard
         // segments on Windows; forward slashes match fine and Windows accepts them.
@@ -1239,15 +1246,38 @@ fn focused_session_id() -> Option<(String, u64)> {
             if !seen_names.insert(name.to_os_string()) {
                 continue;
             }
-            let Ok(text) = std::fs::read_to_string(&path) else { continue };
-            let Ok(v) = serde_json::from_str::<Value>(&text) else { continue };
-            let focused_at = v.get("lastFocusedAt").and_then(Value::as_u64).unwrap_or(0);
-            let Some(cli) = v.get("cliSessionId").and_then(Value::as_str) else { continue };
+            // Re-parse a sidecar only when its mtime or length changed; a focus switch
+            // rewrites the file, so the cached answer is exact.
+            let Ok(meta) = std::fs::metadata(&path) else { continue };
+            let stamp = (
+                meta.modified()
+                    .ok()
+                    .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0),
+                meta.len(),
+            );
+            let parsed = match cache.get(&path) {
+                Some((s, p)) if *s == stamp => p.clone(),
+                _ => {
+                    let Ok(text) = std::fs::read_to_string(&path) else { continue };
+                    let p = serde_json::from_str::<Value>(&text).ok().and_then(|v| {
+                        let focused_at = v.get("lastFocusedAt").and_then(Value::as_u64).unwrap_or(0);
+                        let cli = v.get("cliSessionId").and_then(Value::as_str)?;
+                        Some((focused_at, cli.to_string()))
+                    });
+                    cache.insert(path.clone(), (stamp, p.clone()));
+                    p
+                }
+            };
+            live.insert(path);
+            let Some((focused_at, cli)) = parsed else { continue };
             if best.as_ref().map(|(t, _)| focused_at > *t).unwrap_or(true) {
-                best = Some((focused_at, cli.to_string()));
+                best = Some((focused_at, cli));
             }
         }
     }
+    cache.retain(|p, _| live.contains(p));
     best.map(|(t, id)| (id, t))
 }
 

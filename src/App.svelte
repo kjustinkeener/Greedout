@@ -413,9 +413,23 @@
         visible++;
         await tick();
       }
-      // Tell the backend how many rows to build: what fits plus a margin. When every
-      // row fit there may be room for more, so ask for extra to let the list grow.
-      const want = visible >= sessions.length ? sessions.length + 5 : visible + 3;
+      // Tell the backend how many sessions to build. The scan starts with one (the
+      // main dials). When the rows trimmed to fit, keep one past what shows. When
+      // every row fit, measure the empty space under the last one and ask for as
+      // many rows as it holds (plus the peeking one); with no row on screen yet to
+      // measure, ask for one as a probe.
+      let want = visible + 1;
+      if (visible >= sessions.length) {
+        want = sessions.length + 1;
+        const last = mainEl?.lastElementChild?.getBoundingClientRect();
+        const rows = mainEl ? Array.from(mainEl.querySelectorAll(".row")) : [];
+        if (mainEl && last && rows.length > 0) {
+          const free = mainEl.getBoundingClientRect().bottom - last.bottom;
+          const r0 = rows[0].getBoundingClientRect();
+          const pitch = rows.length > 1 ? rows[1].getBoundingClientRect().top - r0.top : r0.height;
+          if (free > 0 && pitch > 0) want += Math.ceil(free / pitch);
+        }
+      }
       if (want !== lastPool) {
         lastPool = want;
         poolChanged = true;

@@ -386,6 +386,7 @@
   }
   .spend {
     flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;

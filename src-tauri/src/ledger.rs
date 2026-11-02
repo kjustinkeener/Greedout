@@ -433,9 +433,17 @@ fn agent_result(v: &Value) -> Option<(String, String)> {
 fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
     let mut out = Parsed::default();
     let mut pos = base;
-    let whole = Instant::now();
-    let (utf8, mut asst, mut other) = (0u64, 0u64, 0u64);
     let mut lines = 0u64;
+    // Time since the last lap goes to one of `PARSE_STEPS`.
+    let mut steps = [0u64; PARSE_STEPS.len()];
+    let mut clock = Instant::now();
+    macro_rules! lap {
+        ($i:expr) => {{
+            let now = Instant::now();
+            steps[$i] += (now - clock).as_nanos() as u64;
+            clock = now;
+        }};
+    }
     // `memchr` finds line ends far faster than a per-byte closure, which dev builds
     // compile unoptimized.
     let mut rest = buf;
@@ -456,6 +464,7 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
         let head = &raw[..raw.len().min(256)];
         let user = has(&n.user, head);
         let assistant = !user && has(&n.assistant_head, head);
+        lap!(0);
         if !user && has(&n.rate_limit, raw) {
             rate_limit_resets(&line(), &mut out.resets);
         }
@@ -472,16 +481,23 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
                 out.title = title;
             }
         }
+        lap!(1);
         if !user && !assistant && has(&n.compact_boundary, raw) {
             out.evs.push(Ev::Compact);
+            lap!(2);
             continue;
         }
-        if !user && (assistant || (has(&n.usage, raw) && has(&n.assistant, raw))) {
+        let usage_line = !user && (assistant || (has(&n.usage, raw) && has(&n.assistant, raw)));
+        lap!(2);
+        if usage_line {
             if extends_turn(raw, pos, &mut out.evs) {
+                lap!(3);
                 continue;
             }
-            let t = Instant::now();
-            if let Ok(a) = serde_json::from_slice::<AssistantLine>(raw) {
+            lap!(3);
+            let typed = serde_json::from_slice::<AssistantLine>(raw);
+            lap!(4);
+            if let Ok(a) = typed {
                 let msg = a.message;
                 let usage = msg.as_ref().and_then(|m| m.usage.as_ref()).or(a.usage.as_ref());
                 if let (Some("assistant"), Some(u)) = (a.kind.as_deref(), usage) {
@@ -495,11 +511,13 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
                             u.cache_creation_input_tokens,
                             u.cache_read_input_tokens,
                         );
+                        lap!(5);
                         // Only messages that launch a subagent need the whole record.
                         let spawns = (has(&n.task_call, raw) || has(&n.agent_call, raw))
                             .then(|| serde_json::from_slice::<Value>(raw).ok())
                             .flatten()
                             .and_then(|v| spawn_ids(&v));
+                        lap!(6);
                         out.evs.push(Ev::Turn {
                             id: msg.and_then(|m| m.id),
                             ts,
@@ -511,36 +529,31 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
                             bubble: None,
                         });
                     }
-                    asst += t.elapsed().as_nanos() as u64;
+                    lap!(5);
                     continue;
                 }
             }
-            asst += t.elapsed().as_nanos() as u64;
         }
         if has(&n.tool_use_result, raw) && has(&n.agent_id, raw) {
-            let t = Instant::now();
             if let Some(link) = serde_json::from_str::<Value>(&line()).ok().as_ref().and_then(agent_result) {
                 out.agents.push(link);
             }
-            other += t.elapsed().as_nanos() as u64;
+            lap!(7);
             continue;
         }
         let prompt = if sidechain { user && is_sidechain_prompt(raw) } else { user && is_user_prompt(raw) };
         if prompt {
-            let t = Instant::now();
             let ts = serde_json::from_str::<Value>(&line())
                 .ok()
                 .and_then(|v| v.get("timestamp").and_then(Value::as_str).and_then(scan::iso_to_millis))
                 .unwrap_or(0);
             out.evs.push(Ev::Prompt { off: Some(start), ts });
-            other += t.elapsed().as_nanos() as u64;
         }
+        lap!(8);
     }
-    let total = whole.elapsed().as_nanos() as u64;
-    PARSE_UTF8_NS.fetch_add(utf8, Ordering::Relaxed);
-    PARSE_ASSISTANT_NS.fetch_add(asst, Ordering::Relaxed);
-    PARSE_OTHER_NS.fetch_add(other, Ordering::Relaxed);
-    PARSE_SCAN_NS.fetch_add(total.saturating_sub(utf8 + asst + other), Ordering::Relaxed);
+    for (total, step) in PARSE_STEPS_NS.iter().zip(steps) {
+        total.fetch_add(step, Ordering::Relaxed);
+    }
     PARSE_LINES.fetch_add(lines, Ordering::Relaxed);
     out
 }
@@ -755,8 +768,11 @@ fn read_parse(path: &Path, work: &Work, parse: ParseFn) -> Option<(Parsed, usize
     let t0 = Instant::now();
     let mut f = std::fs::File::open(path).ok()?;
     f.seek(SeekFrom::Start(work.from)).ok()?;
+    let t_open = Instant::now();
     let mut buf = Vec::new();
     f.read_to_end(&mut buf).ok()?;
+    READ_OPEN_NS.fetch_add((t_open - t0).as_nanos() as u64, Ordering::Relaxed);
+    READ_BYTES_NS.fetch_add(t_open.elapsed().as_nanos() as u64, Ordering::Relaxed);
     // Stop at the last full line: a transcript still being written ends mid-line.
     let end = memchr::memrchr(b'\n', &buf).map_or(0, |i| i + 1);
     let t1 = Instant::now();
@@ -1071,14 +1087,28 @@ static FILE_READ_NS: AtomicU64 = AtomicU64::new(0);
 static FILE_PARSE_NS: AtomicU64 = AtomicU64::new(0);
 static FILE_STORE_NS: AtomicU64 = AtomicU64::new(0);
 
-// Inside `parse_claude`: utf-8 decoding, the substring checks that pick a line's
-// kind (scan), the full JSON parse of assistant lines, and the JSON parses of the
-// few other kinds we keep.
-static PARSE_UTF8_NS: AtomicU64 = AtomicU64::new(0);
-static PARSE_SCAN_NS: AtomicU64 = AtomicU64::new(0);
-static PARSE_ASSISTANT_NS: AtomicU64 = AtomicU64::new(0);
-static PARSE_OTHER_NS: AtomicU64 = AtomicU64::new(0);
+// Inside `parse_claude`, thread time by step: cutting out a line and judging its kind
+// from its head; the rate-limit, working-directory and title checks; the kind
+// searches that pick out usage lines; a streamed line that continues the previous
+// turn; the typed JSON parse of a usage line; its cost; the whole-record parse of a
+// message that launches subagents; the tool result that names a subagent; and user
+// prompts.
+const PARSE_STEPS: [&str; 9] = [
+    "cut and head",
+    "rate, cwd, title",
+    "kind searches",
+    "continued turn",
+    "usage json",
+    "cost",
+    "spawn json",
+    "subagent link",
+    "prompt",
+];
+static PARSE_STEPS_NS: [AtomicU64; PARSE_STEPS.len()] = [const { AtomicU64::new(0) }; PARSE_STEPS.len()];
 static PARSE_LINES: AtomicU64 = AtomicU64::new(0);
+// Inside `read_parse`: opening the file, then reading it.
+static READ_OPEN_NS: AtomicU64 = AtomicU64::new(0);
+static READ_BYTES_NS: AtomicU64 = AtomicU64::new(0);
 
 fn take_ms(c: &AtomicU64) -> f64 {
     c.swap(0, Ordering::Relaxed) as f64 / 1e6
@@ -1342,7 +1372,7 @@ fn sync(conn: &Connection) -> rusqlite::Result<()> {
         &config::load_config(),
         &format!(
             "ledger sync: {files} files changed in {:?} [{}] (claude files, wall: walk {:.0}ms, plan {:.0}ms, read and parse {:.0}ms, store {:.0}ms; thread time: read {:.0}ms, parse {:.0}ms) \
-             (parse of {} lines: utf8 {:.0}ms, line-kind scans {:.0}ms, assistant json {:.0}ms, other json {:.0}ms)",
+             (open {:.0}ms, read bytes {:.0}ms) (parse of {} lines: {})",
             started.elapsed(),
             ph.line(),
             take_ms(&WALK_NS),
@@ -1351,11 +1381,15 @@ fn sync(conn: &Connection) -> rusqlite::Result<()> {
             take_ms(&FILE_STORE_NS),
             take_ms(&FILE_READ_NS),
             take_ms(&FILE_PARSE_NS),
+            take_ms(&READ_OPEN_NS),
+            take_ms(&READ_BYTES_NS),
             PARSE_LINES.swap(0, Ordering::Relaxed),
-            take_ms(&PARSE_UTF8_NS),
-            take_ms(&PARSE_SCAN_NS),
-            take_ms(&PARSE_ASSISTANT_NS),
-            take_ms(&PARSE_OTHER_NS),
+            PARSE_STEPS
+                .iter()
+                .zip(&PARSE_STEPS_NS)
+                .map(|(name, ns)| format!("{name} {:.0}ms", take_ms(ns)))
+                .collect::<Vec<_>>()
+                .join(", "),
         ),
     );
     if files > 100 {

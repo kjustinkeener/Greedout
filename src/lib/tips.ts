@@ -20,6 +20,7 @@ export const spendTip = (usd: number): string =>
   t("tip.spend", { amount: `$${usd.toFixed(2)}`, money: moneyTip() });
 
 export const agoTip = (): string => t("tip.ago");
+export const ctxTip = (): string => t("tip.ctx");
 export const pctTip = (): string => t("tip.pct");
 export const modelTip = (): string => t("tip.model");
 export const sizeTip = (): string => t("tip.size");

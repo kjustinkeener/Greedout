@@ -308,16 +308,6 @@ fn pick_focus(app: u8, claude_ts: Option<u64>, codex_ts: Option<u64>, cursor_ts:
 pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     let now = now_secs();
     let t_start = std::time::Instant::now();
-    // Forward slashes are REQUIRED: the glob crate treats `\` as an escape, so a
-    // backslash `projects\*\*.jsonl` silently matches nothing on Windows (only the
-    // focus-forced session would ever show). Same fix as session_history().
-    let pattern = claude_dir()
-        .join("projects")
-        .join("*")
-        .join("*.jsonl")
-        .to_string_lossy()
-        .replace('\\', "/");
-
     // The session currently open in the Claude app, if we can tell. It's forced
     // to the top so switching to a session shows its gauge immediately, without
     // waiting for Claude to write to the transcript.
@@ -400,15 +390,24 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     // compete in one pool so the `n` most-recent across ALL harnesses are what show.
     let t_focus = t_start.elapsed();
     let mut candidates: Vec<(PathBuf, u64, Harness)> = Vec::new();
-    if let Ok(paths) = glob::glob(&pattern) {
-        for entry in paths.flatten() {
-            let Ok(meta) = std::fs::metadata(&entry) else { continue };
-            let Ok(mtime) = meta.modified() else { continue };
-            let mtime = mtime
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            candidates.push((entry, mtime, Harness::Claude));
+    // Walk `projects/<dir>/*.jsonl` with read_dir: on Windows a DirEntry's metadata
+    // comes from the directory listing itself, so there is no per-file stat (the glob
+    // plus metadata walk over thousands of transcripts cost ~20 ms every poll).
+    if let Ok(projects) = std::fs::read_dir(claude_dir().join("projects")) {
+        for project in projects.flatten() {
+            let Ok(files) = std::fs::read_dir(project.path()) else { continue };
+            for entry in files.flatten() {
+                if entry.path().extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                    continue;
+                }
+                let Ok(meta) = entry.metadata() else { continue };
+                let Ok(mtime) = meta.modified() else { continue };
+                let mtime = mtime
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                candidates.push((entry.path(), mtime, Harness::Claude));
+            }
         }
     }
     let t_glob = t_start.elapsed();

@@ -34,8 +34,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::Value;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+use memchr::memmem;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::time::{Instant, UNIX_EPOCH};
 
 pub(crate) const H5_MS: i64 = 5 * 3600 * 1000;
@@ -265,8 +266,72 @@ fn rate_limit_resets(line: &str, out: &mut Resets) {
 
 /// A subagent's own transcript opens with the prompt it was given, flagged as a
 /// side chain, which `scan::is_user_prompt` rejects for the main transcript.
-fn is_sidechain_prompt(line: &str) -> bool {
-    line.contains("\"type\":\"user\"") && !line.contains("\"tool_result\"") && !line.contains("\"isMeta\":true")
+fn is_sidechain_prompt(line: &[u8]) -> bool {
+    let n = &*NEEDLES;
+    has(&n.user, line) && !has(&n.tool_result, line) && !has(&n.meta, line)
+}
+
+/// Same test as `scan::is_user_prompt`, on bytes.
+fn is_user_prompt(line: &[u8]) -> bool {
+    let n = &*NEEDLES;
+    has(&n.user, line)
+        && !has(&n.tool_result, line)
+        && !has(&n.compact_summary, line)
+        && !has(&n.meta, line)
+        && !has(&n.sidechain, line)
+        && !has(&n.command_name, line)
+        && !has(&n.command_message, line)
+        && !has(&n.local_stdout, line)
+        && !has(&n.local_stderr, line)
+}
+
+/// The phrases that tell a transcript line's kind. Searching lines with `memchr` is
+/// several times faster than `str::contains`, which dev builds compile unoptimized.
+struct Needles {
+    rate_limit: memmem::Finder<'static>,
+    cwd: memmem::Finder<'static>,
+    custom_title: memmem::Finder<'static>,
+    compact_boundary: memmem::Finder<'static>,
+    usage: memmem::Finder<'static>,
+    assistant: memmem::Finder<'static>,
+    tool_use_result: memmem::Finder<'static>,
+    agent_id: memmem::Finder<'static>,
+    user: memmem::Finder<'static>,
+    tool_result: memmem::Finder<'static>,
+    compact_summary: memmem::Finder<'static>,
+    meta: memmem::Finder<'static>,
+    sidechain: memmem::Finder<'static>,
+    command_name: memmem::Finder<'static>,
+    command_message: memmem::Finder<'static>,
+    local_stdout: memmem::Finder<'static>,
+    local_stderr: memmem::Finder<'static>,
+}
+
+static NEEDLES: LazyLock<Needles> = LazyLock::new(|| {
+    let f = |s: &'static str| memmem::Finder::new(s.as_bytes());
+    Needles {
+        rate_limit: f("\"rate_limit_info\""),
+        cwd: f("\"cwd\":\""),
+        custom_title: f("\"custom-title\""),
+        compact_boundary: f("\"subtype\":\"compact_boundary\""),
+        usage: f("\"usage\""),
+        assistant: f("\"assistant\""),
+        tool_use_result: f("\"toolUseResult\""),
+        agent_id: f("\"agentId\""),
+        user: f("\"type\":\"user\""),
+        tool_result: f("\"tool_result\""),
+        compact_summary: f("\"isCompactSummary\""),
+        meta: f("\"isMeta\":true"),
+        sidechain: f("\"isSidechain\":true"),
+        command_name: f("<command-name>"),
+        command_message: f("<command-message>"),
+        local_stdout: f("<local-command-stdout>"),
+        local_stderr: f("<local-command-stderr>"),
+    }
+});
+
+fn has(needle: &memmem::Finder<'_>, hay: &[u8]) -> bool {
+    needle.find(hay).is_some()
 }
 
 /// The ids of the tool calls in an assistant message that launch subagents.
@@ -301,22 +366,29 @@ fn agent_result(v: &Value) -> Option<(String, String)> {
 fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
     let mut out = Parsed::default();
     let mut pos = base;
+    let whole = Instant::now();
+    let (mut utf8, mut asst, mut other) = (0u64, 0u64, 0u64);
+    let mut lines = 0u64;
     for raw in buf.split(|b| *b == b'\n') {
         let start = pos;
         pos += raw.len() as u64 + 1;
         if raw.is_empty() {
             continue;
         }
+        lines += 1;
+        let t = Instant::now();
         let line = String::from_utf8_lossy(raw);
-        if line.contains("\"rate_limit_info\"") {
+        utf8 += t.elapsed().as_nanos() as u64;
+        let n = &*NEEDLES;
+        if has(&n.rate_limit, raw) {
             rate_limit_resets(&line, &mut out.resets);
         }
-        if out.cwd.is_none() && line.contains("\"cwd\":\"") {
+        if out.cwd.is_none() && has(&n.cwd, raw) {
             out.cwd = serde_json::from_str::<Value>(&line)
                 .ok()
                 .and_then(|v| v.get("cwd").and_then(Value::as_str).map(str::to_string));
         }
-        if line.contains("\"custom-title\"") {
+        if has(&n.custom_title, raw) {
             let title = serde_json::from_str::<Value>(&line)
                 .ok()
                 .and_then(|v| v.get("customTitle").and_then(Value::as_str).map(str::to_string));
@@ -324,11 +396,12 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
                 out.title = title;
             }
         }
-        if line.contains("\"subtype\":\"compact_boundary\"") {
+        if has(&n.compact_boundary, raw) {
             out.evs.push(Ev::Compact);
             continue;
         }
-        if line.contains("\"usage\"") && line.contains("\"assistant\"") {
+        if has(&n.usage, raw) && has(&n.assistant, raw) {
+            let t = Instant::now();
             if let Ok(v) = serde_json::from_str::<Value>(&line) {
                 if let Some((id, _ctx, cost, model)) = scan::assistant_usage(&v) {
                     // A turn with no timestamp cannot be placed on a day.
@@ -344,25 +417,37 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
                             bubble: None,
                         });
                     }
+                    asst += t.elapsed().as_nanos() as u64;
                     continue;
                 }
             }
+            asst += t.elapsed().as_nanos() as u64;
         }
-        if line.contains("\"toolUseResult\"") && line.contains("\"agentId\"") {
+        if has(&n.tool_use_result, raw) && has(&n.agent_id, raw) {
+            let t = Instant::now();
             if let Some(link) = serde_json::from_str::<Value>(&line).ok().as_ref().and_then(agent_result) {
                 out.agents.push(link);
             }
+            other += t.elapsed().as_nanos() as u64;
             continue;
         }
-        let prompt = if sidechain { is_sidechain_prompt(&line) } else { scan::is_user_prompt(&line) };
+        let prompt = if sidechain { is_sidechain_prompt(raw) } else { is_user_prompt(raw) };
         if prompt {
+            let t = Instant::now();
             let ts = serde_json::from_str::<Value>(&line)
                 .ok()
                 .and_then(|v| v.get("timestamp").and_then(Value::as_str).and_then(scan::iso_to_millis))
                 .unwrap_or(0);
             out.evs.push(Ev::Prompt { off: Some(start), ts });
+            other += t.elapsed().as_nanos() as u64;
         }
     }
+    let total = whole.elapsed().as_nanos() as u64;
+    PARSE_UTF8_NS.fetch_add(utf8, Ordering::Relaxed);
+    PARSE_ASSISTANT_NS.fetch_add(asst, Ordering::Relaxed);
+    PARSE_OTHER_NS.fetch_add(other, Ordering::Relaxed);
+    PARSE_SCAN_NS.fetch_add(total.saturating_sub(utf8 + asst + other), Ordering::Relaxed);
+    PARSE_LINES.fetch_add(lines, Ordering::Relaxed);
     out
 }
 
@@ -522,14 +607,15 @@ fn sync_file(
     tx: &Connection,
     harness: i64,
     path: &Path,
+    md: &std::fs::Metadata,
     key: &str,
     sid: &str,
     agent: Option<&str>,
     fallback_dir: &dyn Fn() -> String,
     parse: ParseFn,
 ) -> rusqlite::Result<bool> {
-    let Ok(md) = std::fs::metadata(path) else { return Ok(false) };
-    let (mtime, len) = (mtime_ms(&md), md.len() as i64);
+    let t_start = Instant::now();
+    let (mtime, len) = (mtime_ms(md), md.len() as i64);
     let path_s = path.to_string_lossy().to_string();
     let row: Option<Row> = tx
         .prepare_cached("SELECT id, path, mtime, len, COALESCE(offset, 0), model FROM sessions WHERE harness = ?1 AND key = ?2")?
@@ -550,6 +636,7 @@ fn sync_file(
             if r.path.as_deref() != Some(path_s.as_str()) {
                 tx.execute("UPDATE sessions SET path = ?2 WHERE id = ?1", params![r.id, path_s])?;
             }
+            FILE_LOOKUP_NS.fetch_add(t_start.elapsed().as_nanos() as u64, Ordering::Relaxed);
             return Ok(false);
         }
         Some(r) if len >= r.offset => (Some(r.id), r.offset as u64, r.model),
@@ -562,6 +649,7 @@ fn sync_file(
         }
     };
     let t0 = Instant::now();
+    FILE_LOOKUP_NS.fetch_add((t0 - t_start).as_nanos() as u64, Ordering::Relaxed);
     let Ok(mut f) = std::fs::File::open(path) else { return Ok(false) };
     if f.seek(SeekFrom::Start(from)).is_err() {
         return Ok(false);
@@ -616,11 +704,33 @@ fn sync_file(
     Ok(true)
 }
 
+/// Every `.jsonl` file under `dir`, at any depth. A plain directory read is far
+/// quicker than a `**` glob, and this runs on every poll.
+fn collect_jsonl(dir: &Path, out: &mut Vec<(PathBuf, std::fs::Metadata)>) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for e in entries.flatten() {
+        let path = e.path();
+        match e.file_type() {
+            // Saved tool output, about half of all directories, never holds a transcript.
+            Ok(t) if t.is_dir() && e.file_name() != "tool-results" => collect_jsonl(&path, out),
+            Ok(t) if t.is_file() && path.extension().is_some_and(|x| x == "jsonl") => {
+                if let Ok(md) = e.metadata() {
+                    out.push((path, md));
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Every Claude Code transcript under `root`, subagent runs included.
 fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
-    let pattern = root.join("**").join("*.jsonl").to_string_lossy().replace('\\', "/");
     let mut files = 0;
-    let Ok(paths) = glob::glob(&pattern) else { return Ok(0) };
+    let t = Instant::now();
+    let mut paths = Vec::new();
+    collect_jsonl(root, &mut paths);
+    paths.sort_by(|a, b| a.0.cmp(&b.0));
+    WALK_NS.fetch_add(t.elapsed().as_nanos() as u64, Ordering::Relaxed);
     // Debug builds only: GREEDOUT_MAX_FILES=200 reads just that many Claude files, so a
     // first scan finishes in seconds. The rest are picked up once the variable is gone.
     let cap = if cfg!(debug_assertions) {
@@ -628,7 +738,7 @@ fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
     } else {
         usize::MAX
     };
-    for p in paths.flatten().take(cap) {
+    for (p, md) in paths.into_iter().take(cap) {
         let rel = p.strip_prefix(root).unwrap_or(&p);
         let key = rel.to_string_lossy().replace('\\', "/");
         let sid = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
@@ -641,7 +751,7 @@ fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
             scan::decode_project_dir(&folder.unwrap_or_default())
         };
         let parse = |buf: &[u8], base: u64, _model: Option<&str>| parse_claude(buf, base, sidechain);
-        if sync_file(tx, CLAUDE, &p, &key, &sid, agent.as_deref(), &fallback, &parse)? {
+        if sync_file(tx, CLAUDE, &p, &md, &key, &sid, agent.as_deref(), &fallback, &parse)? {
             files += 1;
         }
     }
@@ -653,8 +763,9 @@ fn sync_codex(tx: &Connection, files: &[PathBuf]) -> rusqlite::Result<usize> {
     let mut n = 0;
     for p in files {
         let id = crate::codex::id_from_path(p);
+        let Ok(md) = std::fs::metadata(p) else { continue };
         let parse = |buf: &[u8], base: u64, model: Option<&str>| crate::codex::ledger_parse(buf, base, model, &id);
-        if sync_file(tx, CODEX, p, &id, &id, None, &|| "Codex".to_string(), &parse)? {
+        if sync_file(tx, CODEX, p, &md, &id, &id, None, &|| "Codex".to_string(), &parse)? {
             n += 1;
         }
     }
@@ -733,9 +844,20 @@ fn sync_cursor(tx: &Connection) -> rusqlite::Result<usize> {
 }
 
 // Time inside `sync_file`, split by what it was doing; `sync` logs and resets them.
+static WALK_NS: AtomicU64 = AtomicU64::new(0);
+static FILE_LOOKUP_NS: AtomicU64 = AtomicU64::new(0);
 static FILE_READ_NS: AtomicU64 = AtomicU64::new(0);
 static FILE_PARSE_NS: AtomicU64 = AtomicU64::new(0);
 static FILE_STORE_NS: AtomicU64 = AtomicU64::new(0);
+
+// Inside `parse_claude`: utf-8 decoding, the substring checks that pick a line's
+// kind (scan), the full JSON parse of assistant lines, and the JSON parses of the
+// few other kinds we keep.
+static PARSE_UTF8_NS: AtomicU64 = AtomicU64::new(0);
+static PARSE_SCAN_NS: AtomicU64 = AtomicU64::new(0);
+static PARSE_ASSISTANT_NS: AtomicU64 = AtomicU64::new(0);
+static PARSE_OTHER_NS: AtomicU64 = AtomicU64::new(0);
+static PARSE_LINES: AtomicU64 = AtomicU64::new(0);
 
 fn take_ms(c: &AtomicU64) -> f64 {
     c.swap(0, Ordering::Relaxed) as f64 / 1e6
@@ -998,12 +1120,20 @@ fn sync(conn: &Connection) -> rusqlite::Result<()> {
     config::debug_log(
         &config::load_config(),
         &format!(
-            "ledger sync: {files} files changed in {:?} [{}] (files: read {:.0}ms, parse {:.0}ms, store {:.0}ms)",
+            "ledger sync: {files} files changed in {:?} [{}] (walk and stat {:.0}ms; files: lookup {:.0}ms, read {:.0}ms, parse {:.0}ms, store {:.0}ms) \
+             (parse of {} lines: utf8 {:.0}ms, line-kind scans {:.0}ms, assistant json {:.0}ms, other json {:.0}ms)",
             started.elapsed(),
             ph.line(),
+            take_ms(&WALK_NS),
+            take_ms(&FILE_LOOKUP_NS),
             take_ms(&FILE_READ_NS),
             take_ms(&FILE_PARSE_NS),
             take_ms(&FILE_STORE_NS),
+            PARSE_LINES.swap(0, Ordering::Relaxed),
+            take_ms(&PARSE_UTF8_NS),
+            take_ms(&PARSE_SCAN_NS),
+            take_ms(&PARSE_ASSISTANT_NS),
+            take_ms(&PARSE_OTHER_NS),
         ),
     );
     if files > 100 {

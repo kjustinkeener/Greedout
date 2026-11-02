@@ -656,22 +656,27 @@ struct Row {
     model: Option<String>,
 }
 
-/// Bring one conversation file up to date, reading only what was appended since
-/// last time. Returns whether anything was read.
-fn sync_file(
+/// A conversation file with something new in it: where the next read starts and the
+/// state the database held for it.
+struct Work {
+    existing: Option<i64>,
+    from: u64,
+    model: Option<String>,
+    mtime: i64,
+    len: i64,
+}
+
+/// Decide whether a conversation file needs reading. Returns `None` when the
+/// database is already current.
+fn plan_file(
     tx: &Connection,
     harness: i64,
     path: &Path,
     md: &std::fs::Metadata,
     key: &str,
-    sid: &str,
-    agent: Option<&str>,
-    fallback_dir: &dyn Fn() -> String,
-    parse: ParseFn,
-) -> rusqlite::Result<bool> {
+) -> rusqlite::Result<Option<Work>> {
     let t_start = Instant::now();
     let (mtime, len) = (mtime_ms(md), md.len() as i64);
-    let path_s = path.to_string_lossy().to_string();
     let row: Option<Row> = tx
         .prepare_cached("SELECT id, path, mtime, len, COALESCE(offset, 0), model FROM sessions WHERE harness = ?1 AND key = ?2")?
         .query_row(params![harness, key], |r| {
@@ -685,42 +690,62 @@ fn sync_file(
             })
         })
         .optional()?;
-    let (existing, from, model) = match row {
+    let work = match row {
         Some(r) if r.mtime == Some(mtime) && r.len == Some(len) => {
             // Archiving moves a Codex rollout without touching its bytes.
-            if r.path.as_deref() != Some(path_s.as_str()) {
-                tx.execute("UPDATE sessions SET path = ?2 WHERE id = ?1", params![r.id, path_s])?;
+            let path_s = path.to_string_lossy();
+            if r.path.as_deref() != Some(&*path_s) {
+                tx.execute("UPDATE sessions SET path = ?2 WHERE id = ?1", params![r.id, &*path_s])?;
             }
-            FILE_LOOKUP_NS.fetch_add(t_start.elapsed().as_nanos() as u64, Ordering::Relaxed);
-            return Ok(false);
+            None
         }
-        Some(r) if len >= r.offset => (Some(r.id), r.offset as u64, r.model),
+        Some(r) if len >= r.offset => Some(Work { existing: Some(r.id), from: r.offset as u64, model: r.model, mtime, len }),
         other => {
             // Rewritten shorter: start over.
             if let Some(r) = other {
                 delete_session(tx, r.id)?;
             }
-            (None, 0, None)
+            Some(Work { existing: None, from: 0, model: None, mtime, len })
         }
     };
+    FILE_LOOKUP_NS.fetch_add(t_start.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    Ok(work)
+}
+
+/// Read what was appended to a conversation file and parse it. Touches no database,
+/// so several files can be done at once. Returns the parse and the bytes consumed.
+fn read_parse(path: &Path, work: &Work, parse: ParseFn) -> Option<(Parsed, usize)> {
     let t0 = Instant::now();
-    FILE_LOOKUP_NS.fetch_add((t0 - t_start).as_nanos() as u64, Ordering::Relaxed);
-    let Ok(mut f) = std::fs::File::open(path) else { return Ok(false) };
-    if f.seek(SeekFrom::Start(from)).is_err() {
-        return Ok(false);
-    }
+    let mut f = std::fs::File::open(path).ok()?;
+    f.seek(SeekFrom::Start(work.from)).ok()?;
     let mut buf = Vec::new();
-    if f.read_to_end(&mut buf).is_err() {
-        return Ok(false);
-    }
+    f.read_to_end(&mut buf).ok()?;
     // Stop at the last full line: a transcript still being written ends mid-line.
     let end = buf.iter().rposition(|b| *b == b'\n').map_or(0, |i| i + 1);
     let t1 = Instant::now();
-    let parsed = parse(&buf[..end], from, model.as_deref());
-    let t2 = Instant::now();
+    let parsed = parse(&buf[..end], work.from, work.model.as_deref());
     FILE_READ_NS.fetch_add((t1 - t0).as_nanos() as u64, Ordering::Relaxed);
-    FILE_PARSE_NS.fetch_add((t2 - t1).as_nanos() as u64, Ordering::Relaxed);
-    let session = match existing {
+    FILE_PARSE_NS.fetch_add(t1.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    Some((parsed, end))
+}
+
+/// Write a parsed conversation file into the database.
+fn finish_file(
+    tx: &Connection,
+    harness: i64,
+    path: &Path,
+    work: &Work,
+    key: &str,
+    parsed: &Parsed,
+    end: usize,
+    sid: &str,
+    agent: Option<&str>,
+    fallback_dir: &dyn Fn() -> String,
+) -> rusqlite::Result<()> {
+    let t = Instant::now();
+    let path_s = path.to_string_lossy().to_string();
+    let (from, mtime, len) = (work.from, work.mtime, work.len);
+    let session = match work.existing {
         Some(id) => id,
         None => {
             let dir = ensure_directory(tx, harness, &parsed.cwd.clone().unwrap_or_else(fallback_dir))?;
@@ -755,7 +780,26 @@ fn sync_file(
         )?;
     }
     tx.execute("INSERT OR IGNORE INTO changed (id) VALUES (?1)", [session])?;
-    FILE_STORE_NS.fetch_add(t2.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    FILE_STORE_NS.fetch_add(t.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    Ok(())
+}
+
+/// Bring one conversation file up to date, reading only what was appended since
+/// last time. Returns whether anything was read.
+fn sync_file(
+    tx: &Connection,
+    harness: i64,
+    path: &Path,
+    md: &std::fs::Metadata,
+    key: &str,
+    sid: &str,
+    agent: Option<&str>,
+    fallback_dir: &dyn Fn() -> String,
+    parse: ParseFn,
+) -> rusqlite::Result<bool> {
+    let Some(work) = plan_file(tx, harness, path, md, key)? else { return Ok(false) };
+    let Some((parsed, end)) = read_parse(path, &work, parse) else { return Ok(false) };
+    finish_file(tx, harness, path, &work, key, &parsed, end, sid, agent, fallback_dir)?;
     Ok(true)
 }
 
@@ -844,20 +888,60 @@ fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
     } else {
         usize::MAX
     };
+    // Plan on this thread (it reads the database), parse a batch of files on several
+    // threads (it does not), store on this thread, in path order.
+    struct Job {
+        path: PathBuf,
+        key: String,
+        sid: String,
+        agent: Option<String>,
+        sidechain: bool,
+        folder: String,
+        work: Work,
+    }
+    let mut jobs = Vec::new();
     for (p, md) in paths.into_iter().take(cap) {
         let rel = p.strip_prefix(root).unwrap_or(&p);
         let key = rel.to_string_lossy().replace('\\', "/");
+        let Some(work) = plan_file(tx, CLAUDE, &p, &md, &key)? else { continue };
         let sid = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
         let agent = sid.strip_prefix("agent-").map(str::to_string);
         let sidechain = rel.components().any(|c| c.as_os_str() == "subagents");
         // Without a recorded working directory, the transcript folder's name says
         // where the session ran.
-        let fallback = || {
-            let folder = rel.components().next().map(|c| c.as_os_str().to_string_lossy().to_string());
-            scan::decode_project_dir(&folder.unwrap_or_default())
-        };
-        let parse = |buf: &[u8], base: u64, _model: Option<&str>| parse_claude(buf, base, sidechain);
-        if sync_file(tx, CLAUDE, &p, &md, &key, &sid, agent.as_deref(), &fallback, &parse)? {
+        let folder = rel.components().next().map(|c| c.as_os_str().to_string_lossy().to_string()).unwrap_or_default();
+        jobs.push(Job { path: p, key, sid, agent, sidechain, folder, work });
+    }
+    let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(8);
+    for batch in jobs.chunks(64) {
+        let next = AtomicUsize::new(0);
+        let mut done: Vec<Option<(Parsed, usize)>> = std::thread::scope(|s| {
+            let workers: Vec<_> = (0..threads)
+                .map(|_| {
+                    s.spawn(|| {
+                        let mut local = Vec::new();
+                        loop {
+                            let i = next.fetch_add(1, Ordering::Relaxed);
+                            let Some(job) = batch.get(i) else { break };
+                            let parse = |buf: &[u8], base: u64, _m: Option<&str>| parse_claude(buf, base, job.sidechain);
+                            local.push((i, read_parse(&job.path, &job.work, &parse)));
+                        }
+                        local
+                    })
+                })
+                .collect();
+            let mut slots: Vec<Option<(Parsed, usize)>> = (0..batch.len()).map(|_| None).collect();
+            for w in workers {
+                for (i, r) in w.join().unwrap_or_default() {
+                    slots[i] = r;
+                }
+            }
+            slots
+        });
+        for (job, slot) in batch.iter().zip(done.iter_mut()) {
+            let Some((parsed, end)) = slot.take() else { continue };
+            let fallback = || scan::decode_project_dir(&job.folder);
+            finish_file(tx, CLAUDE, &job.path, &job.work, &job.key, &parsed, end, &job.sid, job.agent.as_deref(), &fallback)?;
             files += 1;
         }
     }

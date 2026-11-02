@@ -160,13 +160,13 @@
     <div class="spend">
       <div class="figure" title={hov ? moneyTip() : spendTip(session.costUsd)}>
         {#if dialHov}<span class="lbl below"><span class="who">{dialHov.label}</span> <span style:color={dialColor}>{t("main.limitUsage")}</span> / <span style:color={windowColor}>{t("main.limitWindow")}</span></span>
-        {:else if hov}<span class="lbl">{hov.label}<span class="at">{hov.time}</span></span>{/if}
+        {:else if hov}<span class="lbl below">{hov.label}<span class="at">{hov.time}</span></span>{/if}
         {#if dialHov}
           <span class="val pair"
             ><span style:color={dialColor}>{pctText(dialHov.usage)}</span> / <span style:color={windowColor}>{pctText(dialHov.window)}</span></span
           >
         {:else}
-          <span class="val" style:color={hov ? hovColor : spendColor}
+          <span class="val" class:lift={hov} style:color={hov ? hovColor : spendColor}
             >{hov ? hov.value : fmtUsd(session.costUsd)}</span
           >
         {/if}
@@ -461,6 +461,9 @@
   }
   /* Two shares side by side ("47% / 40%"), scaled rather than resized so the
      figure keeps its height and the dials below do not move. */
+  .spend .val.lift {
+    transform: translateY(-5px);
+  }
   .spend .val.pair {
     transform: translateY(-5px) scale(0.68);
     color: var(--muted);

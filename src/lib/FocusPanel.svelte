@@ -155,7 +155,7 @@
       <div class="figure" title={hov ? moneyTip() : spendTip(session.costUsd)}>
         {#if dialHov}<span class="lbl">{dialHov.label} {t("main.limitUsage")} / {t("main.limitWindow")}</span>
         {:else if hov}<span class="lbl">{hov.label}<span class="at">{hov.time}</span></span>{/if}
-        <span class="val" style:color={dialHov ? dialColor : hov ? hovColor : spendColor}
+        <span class="val" class:pair={dialHov} style:color={dialHov ? dialColor : hov ? hovColor : spendColor}
           >{dialHov ? dialValue : hov ? hov.value : fmtUsd(session.costUsd)}</span
         >
       </div>
@@ -434,6 +434,10 @@
     font-size: calc(1em * var(--size-num) / var(--size-ui));
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;
+  }
+  /* Two shares side by side ("47% / 40%") in the space of one dollar figure. */
+  .spend .val.pair {
+    font-size: calc(15px * var(--size-num));
   }
   .spend .val {
     color: var(--yellow);

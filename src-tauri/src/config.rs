@@ -15,7 +15,8 @@ static DEBUG_ON: AtomicBool = AtomicBool::new(false);
 /// instrumentation in costs nothing when it is off, which is only true if the
 /// check itself is nearly free and happens *before* the message is built.
 pub fn debug_enabled() -> bool {
-    DEBUG_ON.load(Ordering::Relaxed)
+    // Dev builds always log, whatever the setting says; releases follow the setting.
+    cfg!(debug_assertions) || DEBUG_ON.load(Ordering::Relaxed)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -313,7 +314,7 @@ pub fn cache_db_path() -> PathBuf {
 /// Append a diagnostic line to `greedout.log` when debug logging is on. Shared by
 /// lib.rs and scan.rs so any module can trace without re-implementing the gate.
 pub fn debug_log(cfg: &Config, msg: &str) {
-    if !cfg.debug_logging {
+    if !cfg.debug_logging && !debug_enabled() {
         return;
     }
     debug_log_raw(msg);

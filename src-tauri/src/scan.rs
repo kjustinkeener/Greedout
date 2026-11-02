@@ -472,7 +472,7 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     });
     candidates.truncate(MAX_POOL);
 
-    if cfg.debug_logging {
+    if crate::config::debug_enabled() {
         let top: Vec<String> = candidates
             .iter()
             .take(3)
@@ -510,7 +510,7 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
                 }
                 Harness::Claude => build_session(&path, mtime, now, cfg, labels, focused.as_deref()),
             };
-            if cfg.debug_logging {
+            if crate::config::debug_enabled() {
                 slow.push((t0.elapsed(), format!("{} {}MB", &s.id[..s.id.len().min(8)], s.size_bytes / 1_048_576)));
             }
             s
@@ -518,7 +518,7 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
         .collect();
     let t_built = t_start.elapsed();
     apply_grouping(&mut sessions);
-    if cfg.debug_logging {
+    if crate::config::debug_enabled() {
         slow.sort_by(|a, b| b.0.cmp(&a.0));
         let top: Vec<String> = slow.iter().take(5).map(|(d, s)| format!("{s} {d:?}")).collect();
         crate::config::debug_log(

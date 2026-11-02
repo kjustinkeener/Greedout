@@ -224,6 +224,8 @@ pub fn db_file_mtime_ms() -> Option<i64> {
 /// and search: the model tag (assistant bubbles only), the turn type (1 = user),
 /// the visible text, and a best-effort timestamp in epoch ms.
 struct Bubble {
+    /// The `cursorDiskKV` key (`bubbleId:<composer>:<bubble>`), which names the bubble.
+    key: String,
     model: Option<String>,
     btype: i64,
     text: String,
@@ -267,7 +269,8 @@ fn fetch_bubbles(conn: &Connection, id: &str) -> rusqlite::Result<Vec<Bubble>> {
         "SELECT json_extract(value,'$.modelInfo.modelName'),
                 json_extract(value,'$.type'),
                 json_extract(value,'$.text'),
-                json_extract(value,'$.createdAt')
+                json_extract(value,'$.createdAt'),
+                key
          FROM cursorDiskKV WHERE key LIKE ?1 ORDER BY rowid ASC",
     )?;
     let rows = stmt.query_map([pattern], |r| {
@@ -275,7 +278,8 @@ fn fetch_bubbles(conn: &Connection, id: &str) -> rusqlite::Result<Vec<Bubble>> {
         let btype: i64 = r.get::<_, Option<i64>>(1)?.unwrap_or(0);
         let text: String = r.get::<_, Option<String>>(2)?.unwrap_or_default();
         let created: SqlValue = r.get(3)?;
-        Ok(Bubble { model, btype, text, ts: created_to_ms(&created) })
+        let key: String = r.get(4)?;
+        Ok(Bubble { key, model, btype, text, ts: created_to_ms(&created) })
     })?;
     rows.collect()
 }
@@ -353,6 +357,48 @@ fn composer_info(id: &str) -> Option<ComposerInfo> {
 
         Ok(ComposerInfo { ctx, ctx_limit, model, cost_usd, created_ms, title, turns })
     })
+}
+
+/// One chat message as the ledger stores it: whether the user wrote it, when, and
+/// what it cost to read or write.
+pub(crate) struct LedgerBubble {
+    pub key: String,
+    pub user: bool,
+    pub ts: i64,
+    pub cost: f64,
+}
+
+/// One composer as the ledger stores it, from a single pass over its bubbles.
+pub(crate) struct LedgerComposer {
+    pub title: Option<String>,
+    pub cwd: Option<String>,
+    pub model: Option<String>,
+    pub bubbles: Vec<LedgerBubble>,
+}
+
+/// The composer's non-empty messages in order, priced the way `composer_info`
+/// prices them. A bubble with no time of its own takes the composer's creation
+/// time; one with neither is left out.
+pub(crate) fn ledger_composer(id: &str) -> Option<LedgerComposer> {
+    let (title, created_ms, bubbles) = with_db(|conn| {
+        let (_ctx, _limit, created_ms, title) = fetch_meter(conn, id).unwrap_or((None, None, None, None));
+        Ok((title, created_ms, fetch_bubbles(conn, id)?))
+    })?;
+    let model = bubbles.iter().rev().find_map(|b| b.model.as_deref().filter(|m| !m.is_empty()).map(str::to_string));
+    let mi = model_info(model.as_deref().unwrap_or(""));
+    let bubbles = bubbles
+        .iter()
+        .filter_map(|b| {
+            let chars = b.text.chars().count() as u64;
+            let ts = b.ts.or(created_ms)?;
+            if chars == 0 {
+                return None;
+            }
+            let rate = if b.btype == 1 { mi.price_in } else { mi.price_out };
+            Some(LedgerBubble { key: b.key.clone(), user: b.btype == 1, ts, cost: est_tokens(chars) as f64 * rate / 1_000_000.0 })
+        })
+        .collect();
+    Some(LedgerComposer { title, cwd: workspace_map().get(id).cloned(), model, bubbles })
 }
 
 // --- composer -> workspace folder mapping (project attribution) ---

@@ -132,44 +132,37 @@ fn get_compact_summary(id: String) -> Option<scan::CompactSummary> {
     scan::compact_summary(&id)
 }
 
-/// Per-day, per-project spend totals for the Daily Spend overview (months + days).
-/// A tiny aggregate read straight from the persistent per-turn cache (shared with
-/// the Context Explorer); returns empty until the first enrich scan has populated it.
+/// Per-day, per-project spend totals for the Daily Spend overview (months + days),
+/// read from the ledger's stored daily rollup after it catches up with the
+/// conversations. The first run reads every conversation, so it stays off the main
+/// thread.
 #[tauri::command]
-fn get_spend_summary() -> Vec<scan::SpendSummary> {
-    let t0 = std::time::Instant::now();
-    let rows = browse::spend_summary();
-    config::debug_log(
-        &config::load_config(),
-        &format!("spend_summary: {} rows in {}ms", rows.len(), t0.elapsed().as_millis()),
-    );
-    rows
+async fn get_spend_summary() -> Result<Vec<scan::SpendSummary>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let t0 = std::time::Instant::now();
+        let rows = ledger::spend_summary();
+        config::debug_log(
+            &config::load_config(),
+            &format!("spend_summary: {} rows in {}ms", rows.len(), t0.elapsed().as_millis()),
+        );
+        rows
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
-/// The deduped billed turns for one local day (the `[lo, hi)` epoch-ms range the
-/// window computes), for the swim lanes. Loaded lazily when a day is opened so the
-/// window never ships the whole ~100k-turn history at once.
+/// The billed turns for one local day (the `[lo, hi)` epoch-ms range the window
+/// computes), for the swim lanes. Loaded lazily when a day is opened so the window
+/// never ships the whole history at once.
 #[tauri::command]
 fn get_spend_day(lo: i64, hi: i64) -> Vec<scan::SpendEvent> {
     let t0 = std::time::Instant::now();
-    let rows = browse::spend_day(lo, hi);
+    let rows = ledger::spend_day(lo, hi);
     config::debug_log(
         &config::load_config(),
         &format!("spend_day: {} rows in {}ms", rows.len(), t0.elapsed().as_millis()),
     );
     rows
-}
-
-/// Ensure the shared cache exists and (re)scan so Daily Spend has per-turn data.
-/// Always deep -- the turns table is only written by the enrich pass. Reuses the
-/// browse scan machinery (progress via "browse-progress", cancel via browse_cancel)
-/// and is a no-op if a scan is already running. Independent of the browse opt-in:
-/// opening Daily Spend builds the cache without flipping the user's setting.
-#[tauri::command]
-fn spend_scan(app: tauri::AppHandle) -> Result<(), String> {
-    browse::enable()?;
-    browse::run_scan(app, true);
-    Ok(())
 }
 
 /// Estimate the base-context breakdown (system prompt, tools, MCP, memory) for
@@ -517,7 +510,6 @@ pub fn run() {
             get_compact_summary,
             get_spend_summary,
             get_spend_day,
-            spend_scan,
             analyze_baseline,
             chat_breakdown,
             chat_block,

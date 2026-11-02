@@ -442,6 +442,65 @@ fn payload_str(line: &str, key: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+/// Read the complete lines in `buf`, which starts at byte `base` of a rollout, as
+/// ledger events: each `token_usage_record` is one billed turn (priced from its own
+/// response, with the newest model seen so far), each user message opens an
+/// exchange, and a `compacted` record starts a new segment. `carried` is the model
+/// from earlier reads of the same rollout.
+pub(crate) fn ledger_parse(buf: &[u8], base: u64, carried: Option<&str>, id: &str) -> crate::ledger::Parsed {
+    use crate::ledger::{Ev, Parsed};
+    let mut out = Parsed::default();
+    let mut model = carried.map(str::to_string);
+    let mut pos = base;
+    for raw in buf.split(|b| *b == b'\n') {
+        let start = pos;
+        pos += raw.len() as u64 + 1;
+        if raw.is_empty() {
+            continue;
+        }
+        let line = String::from_utf8_lossy(raw);
+        if line.contains("\"model\"") {
+            if let Some(m) = payload_str(&line, "model") {
+                model = Some(m);
+            }
+        }
+        if out.cwd.is_none() && line.contains("\"cwd\"") {
+            out.cwd = payload_str(&line, "cwd");
+        }
+        if line.contains("\"token_usage_record\"") {
+            if let Ok(v) = serde_json::from_str::<Value>(&line) {
+                if v.get("type").and_then(Value::as_str) == Some("token_usage_record") {
+                    let usage = v.get("payload").and_then(|p| p.get("usage"));
+                    let ts = v.get("timestamp").and_then(Value::as_str).and_then(iso_to_millis);
+                    if let (Some(usage), Some(ts)) = (usage, ts) {
+                        out.evs.push(Ev::Turn {
+                            id: None,
+                            ts,
+                            cost: price(&counts_of(usage), model.as_deref()),
+                            model: model.clone(),
+                            start: Some(start),
+                            end: Some(pos),
+                            spawns: None,
+                            bubble: None,
+                        });
+                    }
+                    continue;
+                }
+            }
+        }
+        if line.contains("\"compacted\"") && is_record_type(&line, "compacted") {
+            out.evs.push(Ev::Compact);
+            continue;
+        }
+        if is_codex_user_prompt(&line) {
+            out.evs.push(Ev::Prompt { off: Some(start), ts: line_ts_ms(&line).unwrap_or(0) });
+        }
+    }
+    out.model = model;
+    out.title = session_title(id);
+    out
+}
+
 /// The Codex thread the user currently has open, including an IDLE one they just
 /// clicked into without sending a turn. Codex writes no focus sidecar, and its
 /// `state_5.sqlite` `recency_at_ms` (tried first, reverted) advances only on

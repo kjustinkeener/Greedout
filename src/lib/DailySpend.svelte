@@ -4,8 +4,9 @@
   // per session, spans merged across activity gaps shorter than an hour.
   //
   // The months + days overviews run off a tiny per-day/per-project AGGREGATE
-  // (get_spend_summary): the backend has already deduped resume/compaction copies
-  // and summed by local day, so every bar total here is safe to take directly. The
+  // (get_spend_summary): the ledger keeps it totalled by local day, with
+  // resume/compaction copies already counted once, so every bar total here is safe
+  // to take directly. The
   // swim lanes need the individual turns, so one day's events are fetched lazily
   // (get_spend_day) only when a day is opened, and cached per day.
   import { onMount, onDestroy } from "svelte";
@@ -15,8 +16,6 @@
   import type { SpendEvent, SpendSummary } from "../types";
   import Brand from "./Brand.svelte";
   import Icon from "./Icon.svelte";
-  import ScanProgress from "./ScanProgress.svelte";
-  import { scanState, startScan, cancelScan, onScanDone } from "./scanControl";
   import { openExplorer } from "./explorerWindow";
   import { t, watchLocale, activeLocale } from "./i18n.svelte";
 
@@ -29,10 +28,9 @@
   // Per-day cache of fetched turns, keyed by "YYYY-MM-DD".
   const dayCache = new Map<string, SpendEvent[]>();
   let loading = $state(true);
-  // Scan state (the shared cache build, reused from the Context Explorer scan)
-  // lives in the shared scanControl store; `running` gates the empty-state
-  // message and the rescan button here.
-  const scanning = $derived($scanState.running);
+  // True while the ledger catches up with the conversations (the first run reads
+  // all of them); gates the rescan button.
+  let syncing = $state(false);
   let level = $state<"months" | "days" | "day">("months");
   let curMonth = $state(""); // "YYYY-MM"
   let curDay = $state(""); // "YYYY-MM-DD"
@@ -48,12 +46,16 @@
   const unlistenLocale = watchLocale();
   onDestroy(() => void unlistenLocale.then((u) => u()));
 
+  // The backend reads whatever the conversations gained since the last call before
+  // it answers.
   async function fetchSummary() {
+    syncing = true;
     try {
       summary = await invoke<SpendSummary[]>("get_spend_summary");
     } catch {
       summary = [];
     }
+    syncing = false;
   }
   // Fetch (or reuse a cached) one day's turns for the swim lanes. A later
   // openDay/stepDay wins: a response whose key is no longer the open day is ignored.
@@ -75,27 +77,16 @@
     }
   }
   onMount(async () => {
-    // Read the small summary aggregate FIRST, off the warm cache, before the scan
-    // opens its write transaction: the scan's write lock would make a concurrent
-    // read fail to empty (a blank "0 rows" flash). The summary is fast even on a
-    // large history, so the window shows real data in well under a second, then the
-    // scan folds in anything new (the onScanDone handler below refetches).
     await fetchSummary();
     loading = false;
-    startScan();
   });
 
-  // Scan bars/log render off the shared scanControl store (via <ScanProgress>);
-  // this only handles the DATA side-effects when a scan finishes.
-  const unScanDone = onScanDone(() => {
-    void fetchSummary(); // pull the freshly-written aggregate
-    // If a day is open, its cached turns are now stale -- drop and reload it.
-    if (level === "day" && curDay) {
-      dayCache.delete(curDay);
-      void loadDay(curDay);
-    }
-  });
-  onDestroy(unScanDone);
+  async function rescan() {
+    await fetchSummary();
+    // Cached days may be stale now; drop them and reload the open one.
+    dayCache.clear();
+    if (level === "day" && curDay) void loadDay(curDay);
+  }
 
   // --- Local-time keys. Bucketing is by the user's clock, not UTC: "daily spend"
   // means the day the user was working, and a turn at 23:30 belongs to that day. ---
@@ -464,9 +455,9 @@
     <span class="total" title={headerTitle} data-tauri-drag-region>{usd(headerTotal)}</span>
     <button
       class="rescan"
-      onclick={() => startScan()}
-      disabled={scanning}
-      title={scanning ? "Scanning…" : "Rescan"}
+      onclick={rescan}
+      disabled={syncing}
+      title={syncing ? "Scanning…" : "Rescan"}
       aria-label="Rescan"
     >
       <Icon name="refresh" size={13} />
@@ -498,16 +489,10 @@
     {/if}
   </nav>
 
-  <ScanProgress oncancel={cancelScan} />
-
   {#if loading}
     <div class="msg">{t("common.loading")}</div>
   {:else if !summary.length}
-    <!-- The scan bars (above) show progress during the first build; only show the
-         resting empty message once the scan is done with no spend. -->
-    {#if !scanning}
-      <div class="msg">No spend recorded yet.</div>
-    {/if}
+    <div class="msg">No spend recorded yet.</div>
   {:else if level === "months"}
     <div class="sub">
       <span class="readout">{hover || "Click a month to break it down by day"}</span>

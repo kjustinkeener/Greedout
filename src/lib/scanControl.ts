@@ -101,9 +101,7 @@ void listen<BrowseProgress>("browse-progress", (e) => {
 });
 
 // Kick off a fresh scan. Resets the store and sets running SYNCHRONOUSLY so the
-// bars appear before the first event lands. Both windows use browse_scan (DS used
-// to call spend_scan; both funnel into the same guarded run_scan(deep=true), so
-// they are equivalent -- unifying here keeps one command).
+// bars appear before the first event lands.
 export function startScan(deep = true) {
   scanState.set({ ...initial(), running: true });
   invoke("browse_scan", { deep }).catch(() => {

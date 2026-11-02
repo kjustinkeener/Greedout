@@ -12,7 +12,7 @@
 //! transcript lines added since the last run.
 
 use crate::config;
-use crate::ledger;
+use crate::ledger::{self, Windows, D7_MS, H5_MS};
 use crate::scan;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -20,8 +20,6 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-const H5_MS: i64 = 5 * 3600 * 1000;
-const D7_MS: i64 = 7 * 24 * 3600 * 1000;
 /// Saved calibration pairs per window, and how long one stays useful.
 const KEEP_PAIRS: usize = 10;
 const PAIR_TTL_MS: i64 = 30 * 24 * 3600 * 1000;
@@ -105,10 +103,10 @@ fn now_ms() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
 }
 
-/// The counted turns of the last 8 days (the weekly window plus slack) and the
-/// newest recorded resets, from the ledger after it catches up with the transcripts.
-fn gather(now: i64) -> Gathered {
-    ledger::recent(now - D7_MS - 24 * 3600 * 1000).unwrap_or_default()
+/// Spend of the open windows, from the ledger after it catches up with the
+/// conversations. `calib` supplies the resets a `/usage` report pinned.
+fn gather(now: i64, calib: &Calib) -> Windows {
+    ledger::windows(now, calib.five_reset, calib.week_reset).unwrap_or_default()
 }
 
 fn window(cost: f64, budget: f64, end: Option<i64>, len: i64, now: i64) -> LimitWindow {
@@ -121,52 +119,18 @@ fn window(cost: f64, budget: f64, end: Option<i64>, len: i64, now: i64) -> Limit
     }
 }
 
-type Gathered = (Vec<(i64, f64)>, Option<i64>, Option<i64>);
-
-/// Estimate both windows from local transcripts and the saved calibration.
+/// Estimate both windows from local conversations and the saved calibration. The
+/// ledger decides where each window ends (a pinned reset, else the activity-based
+/// 5-hour window, else a trailing week) and keeps its running spend.
 fn estimate(now: i64) -> Limits {
-    estimate_from(&gather(now), &load_calib(), now)
+    let calib = load_calib();
+    estimate_from(&gather(now, &calib), &calib, now)
 }
 
-fn estimate_from(gathered: &Gathered, calib: &Calib, now: i64) -> Limits {
-    let (events, r5, r7) = (&gathered.0, gathered.1, gathered.2);
-
-    // 5-hour window: it opens with the first message after the previous one closed
-    // and lasts five hours. A reset in the future, from a `/usage` report or a
-    // recorded limit event, pins the end exactly.
-    let mut start: Option<i64> = None;
-    for (t, _) in events {
-        if start.map_or(true, |s| *t >= s + H5_MS) {
-            start = Some(*t);
-        }
-    }
-    let mut end5 = start.map(|s| s + H5_MS).filter(|e| *e > now);
-    if let Some(r) = [r5, Some(calib.five_reset)].into_iter().flatten().filter(|r| *r > now).max() {
-        end5 = Some(r);
-    }
-    let cost5: f64 = end5
-        .map(|e| events.iter().filter(|(t, _)| *t >= e - H5_MS && *t < e).map(|(_, c)| c).sum())
-        .unwrap_or(0.0);
-
-    // Weekly window: the reset is a fixed weekly anchor, rolled forward in whole
-    // weeks. Without one the spend is a plain trailing 7 days and progress is unknown.
-    let anchor7 = if calib.week_reset > 0 { Some(calib.week_reset) } else { r7 };
-    let end7 = anchor7.map(|r| {
-        let mut e = r;
-        while e <= now {
-            e += D7_MS;
-        }
-        while e - D7_MS > now {
-            e -= D7_MS;
-        }
-        e
-    });
-    let lo = end7.map(|e| e - D7_MS).unwrap_or(now - D7_MS);
-    let cost7: f64 = events.iter().filter(|(t, _)| *t >= lo).map(|(_, c)| c).sum();
-
+fn estimate_from(w: &Windows, calib: &Calib, now: i64) -> Limits {
     Limits {
-        five_hour: window(cost5, fit_budget(&calib.five), end5, H5_MS, now),
-        weekly: window(cost7, fit_budget(&calib.week), end7, D7_MS, now),
+        five_hour: window(w.five.cost, fit_budget(&calib.five), w.five.end, H5_MS, now),
+        weekly: window(w.seven.cost, fit_budget(&calib.week), w.seven.end, D7_MS, now),
     }
 }
 
@@ -218,16 +182,14 @@ fn parse_report(text: &str) -> Option<Report> {
 }
 
 /// Fold a pasted `/usage` report into the saved calibration.
-fn calibrate(text: &str, gathered: &Gathered, now: i64) -> Result<Calib, String> {
+fn calibrate(text: &str, now: i64) -> Result<Calib, String> {
     let report = parse_report(text).ok_or("not a /usage report")?;
     let at = report.at.unwrap_or(now);
     if now - at > D7_MS {
         return Err("that /usage report is too old".into());
     }
-    let events = &gathered.0;
-    let spent = |end: i64, len: i64| -> f64 {
-        events.iter().filter(|(t, _)| *t >= end - len && *t < end && *t <= at).map(|(_, c)| c).sum()
-    };
+    // Spend inside the report's window, up to the moment the report was made.
+    let spent = |end: i64, len: i64| -> f64 { ledger::spent(end - len, end.min(at + 1)) };
     let mut calib = load_calib();
     if let Some(r) = &report.five {
         calib.five_reset = r.reset;
@@ -270,10 +232,11 @@ pub fn calibrate_from_clipboard(app: &tauri::AppHandle) -> Result<Limits, String
         .map_err(|_| "could not read the clipboard".to_string())?;
     let now = now_ms();
     let started = std::time::Instant::now();
-    let gathered = gather(now);
+    // Catch the ledger up first, so the report is compared with current spend.
+    let _ = gather(now, &load_calib());
     let scanned = started.elapsed();
-    let calib = calibrate(&text, &gathered, now)?;
-    let out = estimate_from(&gathered, &calib, now);
+    calibrate(&text, now)?;
+    let out = estimate(now);
     config::debug_log(&config::load_config(), &format!("limits calibrate: scan {scanned:?}, total {:?}", started.elapsed()));
     publish(app, &out);
     Ok(out)

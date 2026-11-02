@@ -44,13 +44,12 @@
   let use = $derived(clamp(pct));
   let time = $derived(clamp(elapsed));
   // The usage bar is coloured by pace: usage over window elapsed, with the hottest
-  // colour reached at 125% of pace. Without a window start it falls back to usage.
-  const HOT_PACE = 1.25;
+  // colour reached at 100% of pace. Without a window start it falls back to usage.
   let useColor = $derived.by(() => {
     void $themeTick;
     if (pct == null) return "var(--muted)";
     const pace = elapsed != null && elapsed > 0 ? pct / elapsed : null;
-    return gaugeColor(clamp(pace == null ? pct : pace / HOT_PACE));
+    return gaugeColor(clamp(pace == null ? pct : pace));
   });
   // The window bar uses the main gauge's colour sweep: short segments coloured by
   // their position along the dial, drawn only as far as the window has elapsed.

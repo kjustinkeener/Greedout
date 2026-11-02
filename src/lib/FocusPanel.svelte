@@ -492,9 +492,8 @@
   .menu button:hover {
     background: var(--track);
   }
-  /* TEMPORARY (screenshots): the other dial is not dimmed. Original opacity: 0.45. */
   .dials .dial.dim {
-    opacity: 1;
+    opacity: 0.45;
   }
   .dials .dial {
     transition: opacity 0.12s;

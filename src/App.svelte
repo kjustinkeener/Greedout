@@ -395,6 +395,7 @@
   // the container height changes.
   let fitting = false;
   let lastPool = 0;
+  let poolChanged = false;
   async function fit() {
     if (!mainEl || fitting) return;
     fitting = true;
@@ -417,10 +418,17 @@
       const want = visible >= sessions.length ? sessions.length + 5 : visible + 3;
       if (want !== lastPool) {
         lastPool = want;
-        invoke("set_pool", { n: want }).catch(() => {});
+        poolChanged = true;
+        await invoke("set_pool", { n: want }).catch(() => {});
       }
     } finally {
       fitting = false;
+    }
+    // Fetch right away at the new size instead of waiting for the next poll; the
+    // snapshot re-runs fit(), which settles once the size stops changing.
+    if (poolChanged) {
+      poolChanged = false;
+      record(await invoke<Session[]>("get_sessions"));
     }
   }
 
@@ -498,6 +506,9 @@
     } catch {
       // Window resize unavailable; the UI still scales.
     }
+    // Row heights changed with the zoom: re-measure how many rows fit.
+    await tick();
+    fit();
     // Debounce-persist the zoom so it's restored next launch (window size is
     // persisted separately, in winstate.rs).
     clearTimeout(saveScaleTimer);

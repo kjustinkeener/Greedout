@@ -462,7 +462,7 @@
   /* Two shares side by side ("47% / 40%"), scaled rather than resized so the
      figure keeps its height and the dials below do not move. */
   .spend .val.lift {
-    transform: translateY(-5px);
+    transform: translateY(-5px) scale(0.68);
   }
   .spend .val.pair {
     transform: translateY(-5px) scale(0.68);

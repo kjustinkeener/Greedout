@@ -86,7 +86,7 @@
   {#if use > 0}
     <path d={arc(R_USE, 0, use)} fill="none" stroke={useColor} stroke-width={W} stroke-linecap="round" />
   {/if}
-  <text x={CX} y="66" text-anchor="middle" class="pct" class:over class:hint={pct == null}>{pctText}</text>
+  <text x={CX} y={pct == null ? 74 : 66} text-anchor="middle" class="pct" class:over class:hint={pct == null}>{pctText}</text>
   <text x={CX} y="94" text-anchor="middle" class="sub">{label}</text>
 </svg>
 
@@ -105,7 +105,7 @@
     font-variant-numeric: tabular-nums;
   }
   .pct.hint {
-    font-size: calc(13px * var(--size-num));
+    font-size: calc(39px * var(--size-num));
     fill: var(--muted);
   }
   .pct.over {

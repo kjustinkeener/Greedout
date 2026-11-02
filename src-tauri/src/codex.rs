@@ -443,12 +443,12 @@ fn payload_str(line: &str, key: &str) -> Option<String> {
 }
 
 /// Read the complete lines in `buf`, which starts at byte `base` of a rollout, as
-/// ledger events: each `token_usage_record` is one billed turn (priced from its own
+/// cache events: each `token_usage_record` is one billed turn (priced from its own
 /// response, with the newest model seen so far), each user message opens an
 /// exchange, and a `compacted` record starts a new segment. `carried` is the model
 /// from earlier reads of the same rollout.
-pub(crate) fn ledger_parse(buf: &[u8], base: u64, carried: Option<&str>, id: &str) -> crate::ledger::Parsed {
-    use crate::ledger::{Ev, Parsed};
+pub(crate) fn cache_parse(buf: &[u8], base: u64, carried: Option<&str>, id: &str) -> crate::cache::Parsed {
+    use crate::cache::{Ev, Parsed};
     let mut out = Parsed::default();
     let mut model = carried.map(str::to_string);
     let mut pos = base;
@@ -953,18 +953,18 @@ mod tests {
         assert_eq!(id_from_path(short), "tiny");
     }
 
-    // --- ledger_parse context size ---
+    // --- cache_parse context size ---
 
     fn parse_ctx(lines: &[&str]) -> (Option<u64>, bool) {
         let raw = lines.join("
 ") + "
 ";
-        let out = ledger_parse(raw.as_bytes(), 0, None, "id");
+        let out = cache_parse(raw.as_bytes(), 0, None, "id");
         (out.ctx, out.ctx_reset)
     }
 
     #[test]
-    fn ledger_parse_ctx_is_the_newest_input_and_unknown_after_a_trailing_compaction() {
+    fn cache_parse_ctx_is_the_newest_input_and_unknown_after_a_trailing_compaction() {
         let u1 = r#"{"timestamp":"2026-09-10T01:20:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":1000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
         let u2 = r#"{"timestamp":"2026-09-10T01:21:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":2000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
         let compacted = r#"{"type":"compacted","payload":{"message":""}}"#;
@@ -973,7 +973,7 @@ mod tests {
     }
 
     #[test]
-    fn ledger_parse_ctx_self_heals_when_a_turn_follows_compaction() {
+    fn cache_parse_ctx_self_heals_when_a_turn_follows_compaction() {
         let u1 = r#"{"timestamp":"2026-09-10T01:20:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":9000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
         let compacted = r#"{"type":"compacted","payload":{"message":""}}"#;
         let u2 = r#"{"timestamp":"2026-09-10T01:22:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":1500,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;

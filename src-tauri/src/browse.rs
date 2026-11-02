@@ -1,9 +1,9 @@
 //! The Context Explorer's data: browse every conversation by harness, project and
-//! session, and search their chat text. Everything is read from the ledger
-//! (`ledger.rs`); this module owns no database of its own.
+//! session, and search their chat text. Everything is read from the cache
+//! (`cache.rs`); this module owns no database of its own.
 //!
-//! Search text lives in the ledger's `chat_fts` table as chunks keyed to byte ranges
-//! of each transcript. A background thread, kicked after every ledger sync, reads the
+//! Search text lives in the cache's `chat_fts` table as chunks keyed to byte ranges
+//! of each transcript. A background thread, kicked after every cache sync, reads the
 //! bytes a transcript gained since its last chunk and indexes just those, so the
 //! index trails the transcripts by seconds and opening the Explorer never waits.
 //! Sessions the index has not caught up with yet are searched straight from disk.
@@ -12,7 +12,7 @@ use crate::codex;
 use crate::config::{codex_dir, cursor_dir};
 use crate::cursor;
 use crate::grouping;
-use crate::ledger;
+use crate::cache;
 use crate::scan;
 use rusqlite::params;
 use serde::Serialize;
@@ -36,7 +36,7 @@ macro_rules! blog {
     };
 }
 
-/// Set while a ledger sync is being followed, so a second `browse_scan` is a no-op.
+/// Set while a cache sync is being followed, so a second `browse_scan` is a no-op.
 fn running() -> &'static AtomicBool {
     static R: OnceLock<AtomicBool> = OnceLock::new();
     R.get_or_init(|| AtomicBool::new(false))
@@ -111,7 +111,7 @@ struct ScanProgress {
     total: u64,
 }
 
-// --- Ledger queries ---
+// --- Cache queries ---
 
 /// A session counts as this big in the size-sized treemap: its transcript, or for a
 /// Cursor chat (which has no file) four bytes per context token.
@@ -121,7 +121,7 @@ const SIZE: &str = "COALESCE(s.len, s.ctx * 4, 0)";
 const TOP: &str = "s.agent_id IS NULL AND s.parent_turn IS NULL";
 
 pub fn status() -> BrowseStatus {
-    let indexed = ledger::with_db(|c| {
+    let indexed = cache::with_db(|c| {
         c.query_row(&format!("SELECT COUNT(*) FROM sessions s WHERE {TOP}"), [], |r| r.get::<_, u64>(0))
     })
     .unwrap_or(0);
@@ -138,7 +138,7 @@ pub struct IndexProgress {
 
 /// Sessions whose text is fully indexed, out of all file-backed main sessions.
 pub fn index_progress() -> IndexProgress {
-    let (done, total) = ledger::with_db(|c| {
+    let (done, total) = cache::with_db(|c| {
         c.query_row(
             "SELECT COALESCE(SUM(fts_off >= COALESCE(offset, 0)), 0), COUNT(*) FROM sessions
              WHERE path IS NOT NULL AND agent_id IS NULL",
@@ -150,7 +150,7 @@ pub fn index_progress() -> IndexProgress {
     IndexProgress { done, total }
 }
 
-/// Follow a ledger sync on a background thread, emitting "browse-progress" with how
+/// Follow a cache sync on a background thread, emitting "browse-progress" with how
 /// many conversation files it has stored, then "done". A no-op while one is followed.
 pub fn run_scan(app: tauri::AppHandle) {
     if running().swap(true, Ordering::SeqCst) {
@@ -159,9 +159,9 @@ pub fn run_scan(app: tauri::AppHandle) {
     cancel_flag().store(false, Ordering::SeqCst);
     std::thread::spawn(move || {
         let t0 = std::time::Instant::now();
-        let sync = std::thread::spawn(ledger::refresh);
+        let sync = std::thread::spawn(cache::refresh);
         while !sync.is_finished() && !cancel_flag().load(Ordering::Relaxed) {
-            let (done, total) = ledger::sync_progress();
+            let (done, total) = cache::sync_progress();
             let _ = app.emit("browse-progress", ScanProgress { phase: "sync", done, total });
             std::thread::sleep(Duration::from_millis(100));
         }
@@ -180,7 +180,7 @@ pub fn cancel() {
 }
 
 pub fn harnesses() -> Vec<HarnessAgg> {
-    ledger::with_db(|conn| {
+    cache::with_db(|conn| {
         let mut stmt = conn.prepare(&format!(
             "SELECT h.name, COUNT(DISTINCT d.project), COUNT(*), COALESCE(SUM({SIZE}), 0),
                     COALESCE(SUM(s.ctx), 0), COALESCE(SUM(s.cost), 0)
@@ -205,7 +205,7 @@ pub fn harnesses() -> Vec<HarnessAgg> {
 }
 
 pub fn projects(harness: &str) -> Vec<ProjectAgg> {
-    ledger::with_db(|conn| {
+    cache::with_db(|conn| {
         let mut stmt = conn.prepare(&format!(
             "SELECT p.label, p.root, COUNT(*), COALESCE(SUM({SIZE}), 0),
                     COALESCE(SUM(s.ctx), 0), COALESCE(SUM(s.cost), 0)
@@ -258,9 +258,9 @@ fn session_row(r: &rusqlite::Row) -> rusqlite::Result<SessionMeta> {
 }
 
 /// Sessions in a project, newest first. A transcript that was deleted from disk stays
-/// in the ledger as history but cannot be opened, so it is left out here.
+/// in the cache as history but cannot be opened, so it is left out here.
 pub fn sessions(harness: &str, project: &str) -> Vec<SessionMeta> {
-    let rows = ledger::with_db(|conn| {
+    let rows = cache::with_db(|conn| {
         let mut stmt = conn.prepare(&format!(
             "{SESSION_SELECT} WHERE h.name = ?1 AND p.label = ?2 AND {TOP} ORDER BY s.mtime DESC"
         ))?;
@@ -274,7 +274,7 @@ pub fn sessions(harness: &str, project: &str) -> Vec<SessionMeta> {
 
 /// One session by its id.
 pub fn session(id: &str) -> Option<SessionMeta> {
-    ledger::with_db(|conn| {
+    cache::with_db(|conn| {
         conn.prepare(&format!("{SESSION_SELECT} WHERE s.sid = ?1 AND s.agent_id IS NULL LIMIT 1"))?
             .query_map([id], session_row)?
             .next()
@@ -298,14 +298,14 @@ fn file_stat(path: &Path) -> Option<(i64, u64)> {
     Some((mtime, meta.len()))
 }
 
-// --- Chat index (fills `chat_fts` in the ledger) ---
+// --- Chat index (fills `chat_fts` in the cache) ---
 
 /// Longest stretch of a transcript read into one chunk.
 const CHUNK: u64 = 4 << 20;
 
 static INDEXING: AtomicBool = AtomicBool::new(false);
 
-/// Start the indexer if it is not running. Called after every ledger sync.
+/// Start the indexer if it is not running. Called after every cache sync.
 pub fn kick_index() {
     if INDEXING.swap(true, Ordering::SeqCst) {
         return;
@@ -327,7 +327,7 @@ struct Pending {
 
 /// Index the newest sessions with unindexed bytes. Returns how many it worked on.
 fn index_round() -> usize {
-    let todo: Vec<Pending> = ledger::with_db(|conn| {
+    let todo: Vec<Pending> = cache::with_db(|conn| {
         let mut stmt = conn.prepare(
             "SELECT id, harness, path, offset, fts_off FROM sessions
              WHERE path IS NOT NULL AND agent_id IS NULL AND fts_off < COALESCE(offset, 0)
@@ -352,7 +352,7 @@ fn index_round() -> usize {
 /// Mark a session fully indexed without text, so a file that cannot be read is not
 /// retried forever.
 fn give_up(id: i64, offset: u64) {
-    ledger::with_db(|c| c.execute("UPDATE sessions SET fts_off = ?2 WHERE id = ?1", params![id, offset as i64]));
+    cache::with_db(|c| c.execute("UPDATE sessions SET fts_off = ?2 WHERE id = ?1", params![id, offset as i64]));
 }
 
 /// Fill `buf` with `want` bytes of `file` starting at `pos`.
@@ -362,14 +362,14 @@ fn read_at(file: &mut std::fs::File, pos: u64, want: u64, buf: &mut Vec<u8>) -> 
 }
 
 /// Read a session's transcript from where the index stopped, chunk by chunk, and add
-/// each chunk's chat text. File reads and parsing happen outside the ledger lock.
+/// each chunk's chat text. File reads and parsing happen outside the cache lock.
 fn index_session(p: &Pending) {
     let Ok(mut file) = std::fs::File::open(&p.path) else { return give_up(p.id, p.offset) };
     let path = Path::new(&p.path);
     let mut pos = p.indexed;
     let mut buf = Vec::new();
     while pos < p.offset {
-        // A line longer than a chunk is read whole, up to what the ledger holds.
+        // A line longer than a chunk is read whole, up to what the cache holds.
         let mut want = (p.offset - pos).min(CHUNK);
         if !read_at(&mut file, pos, want, &mut buf) {
             return give_up(p.id, p.offset);
@@ -385,7 +385,7 @@ fn index_session(p: &Pending) {
         let doc = if p.harness == 2 { codex::read_chat_doc(path, &raw) } else { read_chat_doc(path, &raw) };
         let intro = doc.first_user.as_deref().map(short_title);
         let next = pos + end as u64;
-        let stored = ledger::with_db(|conn| {
+        let stored = cache::with_db(|conn| {
             let tx = conn.unchecked_transaction()?;
             // The session may have been rewritten since it was picked: then its chunks
             // were dropped and this one no longer belongs.
@@ -697,7 +697,7 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
         let hits = AtomicU64::new(0);
         let mut indexed: HashSet<String> = HashSet::new();
         if fts_match_expr(&terms).is_some() {
-            indexed = ledger::with_db(|conn| {
+            indexed = cache::with_db(|conn| {
                 let mut stmt = conn.prepare(
                     "SELECT path FROM sessions
                      WHERE path IS NOT NULL AND agent_id IS NULL AND fts_off >= COALESCE(offset, 0)",
@@ -714,7 +714,7 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
 
         // Slow path: read every transcript the index does not cover. Cursor chats have
         // no file; they are always read from their database.
-        let mut all_paths: Vec<PathBuf> = ledger::with_db(|conn| {
+        let mut all_paths: Vec<PathBuf> = cache::with_db(|conn| {
             let mut stmt =
                 conn.prepare("SELECT path FROM sessions WHERE path IS NOT NULL AND agent_id IS NULL")?;
             let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
@@ -793,13 +793,13 @@ fn fts_match_expr(terms: &[String]) -> Option<String> {
 /// Stream hits for the fully indexed sessions straight from `chat_fts`. A session is
 /// a candidate when each indexable term matches in some chunk of it; its chunks are
 /// then joined and run through the same scorer and snippet as the disk path, so the
-/// two never rank differently. The ledger is locked only while reading, never while
+/// two never rank differently. The cache is locked only while reading, never while
 /// scoring, so the limit dials keep polling. Returns the number emitted.
 fn run_fts_hits(app: &tauri::AppHandle, full: &str, terms: &[String], my_gen: u64) -> u64 {
     let mut candidates: Option<HashSet<i64>> = None;
     for term in terms.iter().filter(|t| t.chars().count() >= 3) {
         let Some(expr) = fts_match_expr(std::slice::from_ref(term)) else { continue };
-        let found: Option<HashSet<i64>> = ledger::with_db(|conn| {
+        let found: Option<HashSet<i64>> = cache::with_db(|conn| {
             conn.prepare(
                 "SELECT DISTINCT c.session FROM chat_fts f
                  JOIN chat_chunks c ON c.id = f.rowid JOIN sessions s ON s.id = c.session
@@ -821,7 +821,7 @@ fn run_fts_hits(app: &tauri::AppHandle, full: &str, terms: &[String], my_gen: u6
         if search_cancel().load(Ordering::Relaxed) || search_gen().load(Ordering::SeqCst) != my_gen {
             break;
         }
-        let row = ledger::with_db(|conn| {
+        let row = cache::with_db(|conn| {
             let body = conn
                 .prepare("SELECT f.text FROM chat_chunks c JOIN chat_fts f ON f.rowid = c.id WHERE c.session = ?1 ORDER BY c.id")?
                 .query_map([id], |r| r.get::<_, String>(0))?

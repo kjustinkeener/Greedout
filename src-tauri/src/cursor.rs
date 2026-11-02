@@ -350,28 +350,28 @@ fn composer_info(id: &str) -> Option<ComposerInfo> {
     })
 }
 
-/// One chat message as the ledger stores it: whether the user wrote it, when, and
+/// One chat message as the cache stores it: whether the user wrote it, when, and
 /// what it cost to read or write.
-pub(crate) struct LedgerBubble {
+pub(crate) struct CacheBubble {
     pub key: String,
     pub user: bool,
     pub ts: i64,
     pub cost: f64,
 }
 
-/// One composer as the ledger stores it, from a single pass over its bubbles.
-pub(crate) struct LedgerComposer {
+/// One composer as the cache stores it, from a single pass over its bubbles.
+pub(crate) struct CacheComposer {
     pub title: Option<String>,
     pub cwd: Option<String>,
     pub model: Option<String>,
     pub ctx: Option<u64>,
-    pub bubbles: Vec<LedgerBubble>,
+    pub bubbles: Vec<CacheBubble>,
 }
 
 /// The composer's non-empty messages in order, priced the way `composer_info`
 /// prices them. A bubble with no time of its own takes the composer's creation
 /// time; one with neither is left out.
-pub(crate) fn ledger_composer(id: &str) -> Option<LedgerComposer> {
+pub(crate) fn cache_composer(id: &str) -> Option<CacheComposer> {
     let (ctx, title, created_ms, bubbles) = with_db(|conn| {
         let (ctx, _limit, created_ms, title) = fetch_meter(conn, id).unwrap_or((None, None, None, None));
         Ok((ctx, title, created_ms, fetch_bubbles(conn, id)?))
@@ -387,10 +387,10 @@ pub(crate) fn ledger_composer(id: &str) -> Option<LedgerComposer> {
                 return None;
             }
             let rate = if b.btype == 1 { mi.price_in } else { mi.price_out };
-            Some(LedgerBubble { key: b.key.clone(), user: b.btype == 1, ts, cost: est_tokens(chars) as f64 * rate / 1_000_000.0 })
+            Some(CacheBubble { key: b.key.clone(), user: b.btype == 1, ts, cost: est_tokens(chars) as f64 * rate / 1_000_000.0 })
         })
         .collect();
-    Some(LedgerComposer { title, cwd: workspace_map().get(id).cloned(), model, ctx, bubbles })
+    Some(CacheComposer { title, cwd: workspace_map().get(id).cloned(), model, ctx, bubbles })
 }
 
 // --- composer -> workspace folder mapping (project attribution) ---
@@ -807,8 +807,8 @@ mod tests {
         for (path, _mtime) in cands {
             let id = id_from_path(&path);
             if let Some(info) = composer_info(&id) {
-                // Meter is a real snapshot; the ledger must store it unmodified.
-                assert_eq!(ledger_composer(&id).and_then(|c| c.ctx), info.ctx);
+                // Meter is a real snapshot; the cache must store it unmodified.
+                assert_eq!(cache_composer(&id).and_then(|c| c.ctx), info.ctx);
                 // If a model resolved, it prices to a known label (Grok on this box).
                 if let Some(m) = &info.model {
                     assert!(!model_info(m).label.is_empty());

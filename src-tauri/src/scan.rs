@@ -733,11 +733,11 @@ fn cumulative_cost(id: &str, path: &Path) -> f64 {
         Ok(c) => c,
         Err(_) => return 0.0,
     };
-    // On first sight resume from what the ledger has already read of this transcript
+    // On first sight resume from what the cache has already read of this transcript
     // (its offset, spend and message ids) rather than tallying the whole file again;
     // the two agree turn for turn.
     if !cache.contains_key(id) {
-        let seed = crate::ledger::session_seed(id).filter(|(off, ..)| {
+        let seed = crate::cache::session_seed(id).filter(|(off, ..)| {
             std::fs::metadata(path).map(|m| *off <= m.len()).unwrap_or(false)
         });
         let state = match seed {

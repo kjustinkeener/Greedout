@@ -8,11 +8,11 @@
 //! budget is fitted across the saved pairs. Until one exists the dials show
 //! elapsed time only.
 //!
-//! Per-turn costs come from the conversation ledger, which re-reads only the
+//! Per-turn costs come from the conversation cache, which re-reads only the
 //! transcript lines added since the last run.
 
 use crate::config;
-use crate::ledger::{self, Windows, D7_MS, H5_MS};
+use crate::cache::{self, Windows, D7_MS, H5_MS};
 use crate::scan;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -106,10 +106,10 @@ fn now_ms() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
 }
 
-/// Spend of the open windows, from the ledger after it catches up with the
+/// Spend of the open windows, from the cache after it catches up with the
 /// conversations. `calib` supplies the resets a `/usage` report pinned.
 fn gather(now: i64, calib: &Calib) -> Windows {
-    ledger::windows(now, calib.five_reset, calib.week_reset).unwrap_or_default()
+    cache::windows(now, calib.five_reset, calib.week_reset).unwrap_or_default()
 }
 
 /// While the window of the newest `/usage` reading is still open, the dial starts
@@ -134,7 +134,7 @@ fn window(cost: f64, pairs: &[Pair], end: Option<i64>, len: i64, now: i64) -> Li
 }
 
 /// Estimate both windows from local conversations and the saved calibration. The
-/// ledger decides where each window ends (a pinned reset, else the activity-based
+/// cache decides where each window ends (a pinned reset, else the activity-based
 /// 5-hour window, else a trailing week) and keeps its running spend.
 fn estimate(now: i64) -> Limits {
     let calib = load_calib();
@@ -203,7 +203,7 @@ fn calibrate(text: &str, now: i64) -> Result<Calib, String> {
         return Err("that /usage report is too old".into());
     }
     // Spend inside the report's window, up to the moment the report was made.
-    let spent = |end: i64, len: i64| -> f64 { ledger::spent(end - len, end.min(at + 1)) };
+    let spent = |end: i64, len: i64| -> f64 { cache::spent(end - len, end.min(at + 1)) };
     let mut calib = load_calib();
     if let Some(r) = &report.five {
         calib.five_reset = r.reset;
@@ -246,7 +246,7 @@ pub fn calibrate_from_clipboard(app: &tauri::AppHandle) -> Result<Limits, String
         .map_err(|_| "could not read the clipboard".to_string())?;
     let now = now_ms();
     let started = std::time::Instant::now();
-    // Catch the ledger up first, so the report is compared with current spend.
+    // Catch the cache up first, so the report is compared with current spend.
     let _ = gather(now, &load_calib());
     let scanned = started.elapsed();
     calibrate(&text, now)?;

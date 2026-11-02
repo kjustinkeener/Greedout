@@ -1,12 +1,12 @@
 mod baseline;
 mod browse;
+mod cache;
 mod codex;
 mod config;
 mod cursor;
 mod grouping;
 mod i18n;
 mod install;
-mod ledger;
 mod limits;
 mod update;
 mod scan;
@@ -150,14 +150,14 @@ fn get_compact_summary(id: String) -> Option<scan::CompactSummary> {
 }
 
 /// Per-day, per-project spend totals for the Daily Spend overview (months + days),
-/// read from the ledger's stored daily rollup after it catches up with the
+/// read from the cache's stored daily rollup after it catches up with the
 /// conversations. The first run reads every conversation, so it stays off the main
 /// thread.
 #[tauri::command]
 async fn get_spend_summary() -> Result<Vec<scan::SpendSummary>, String> {
     tauri::async_runtime::spawn_blocking(|| {
         let t0 = std::time::Instant::now();
-        let rows = ledger::spend_summary();
+        let rows = cache::spend_summary();
         config::debug_log(
             &config::load_config(),
             &format!("spend_summary: {} rows in {}ms", rows.len(), t0.elapsed().as_millis()),
@@ -174,7 +174,7 @@ async fn get_spend_summary() -> Result<Vec<scan::SpendSummary>, String> {
 #[tauri::command]
 fn get_spend_day(lo: i64, hi: i64) -> Vec<scan::SpendEvent> {
     let t0 = std::time::Instant::now();
-    let rows = ledger::spend_day(lo, hi);
+    let rows = cache::spend_day(lo, hi);
     config::debug_log(
         &config::load_config(),
         &format!("spend_day: {} rows in {}ms", rows.len(), t0.elapsed().as_millis()),
@@ -284,17 +284,17 @@ fn browse_index_progress() -> browse::IndexProgress {
     browse::index_progress()
 }
 
-/// Bring the ledger up to date and report progress on "browse-progress".
+/// Bring the cache up to date and report progress on "browse-progress".
 #[tauri::command]
 fn browse_scan(app: tauri::AppHandle) {
     browse::run_scan(app);
 }
 
-/// Delete everything the ledger holds (spend history and the search index) so it
+/// Delete everything the cache holds (spend history and the search index) so it
 /// rebuilds from the transcripts on the next sync.
 #[tauri::command]
 fn clear_cache() -> Result<(), String> {
-    ledger::clear()
+    cache::clear()
 }
 
 /// Stop following a sync; it carries on in the background.

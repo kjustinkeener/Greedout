@@ -1,4 +1,4 @@
-//! The conversation ledger: every Claude Code, Codex and Cursor conversation, read
+//! The conversation cache: every Claude Code, Codex and Cursor conversation, read
 //! once and kept in `cache.sqlite` as a hierarchy of tables, each level nested in
 //! the one above and each storing its own totals.
 //!
@@ -199,7 +199,7 @@ pub(crate) fn with_db<T>(f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> 
         match open() {
             Ok(c) => *guard = Some(c),
             Err(e) => {
-                config::debug_log(&config::load_config(), &format!("ledger: could not open: {e}"));
+                config::debug_log(&config::load_config(), &format!("cache: could not open: {e}"));
                 return None;
             }
         }
@@ -207,7 +207,7 @@ pub(crate) fn with_db<T>(f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> 
     match f(guard.as_ref()?) {
         Ok(v) => Some(v),
         Err(e) => {
-            config::debug_log(&config::load_config(), &format!("ledger: {e}"));
+            config::debug_log(&config::load_config(), &format!("cache: {e}"));
             None
         }
     }
@@ -1267,7 +1267,7 @@ fn sync_codex(tx: &Connection, files: &[PathBuf]) -> rusqlite::Result<usize> {
     for p in files {
         let id = crate::codex::id_from_path(p);
         let Ok(md) = std::fs::metadata(p) else { continue };
-        let parse = |buf: &[u8], base: u64, model: Option<&str>| crate::codex::ledger_parse(buf, base, model, &id);
+        let parse = |buf: &[u8], base: u64, model: Option<&str>| crate::codex::cache_parse(buf, base, model, &id);
         if sync_file(tx, CODEX, p, &md, &id, &id, None, &|| "Codex".to_string(), &parse)? {
             n += 1;
         }
@@ -1297,7 +1297,7 @@ fn sync_cursor(tx: &Connection) -> rusqlite::Result<usize> {
         if matches!(row, Some((_, Some(s))) if s == stamp) {
             continue;
         }
-        let Some(chat) = crate::cursor::ledger_composer(&id) else { continue };
+        let Some(chat) = crate::cursor::cache_composer(&id) else { continue };
         let session = match row {
             Some((sid, _)) => {
                 clear_children(tx, sid)?;
@@ -1367,7 +1367,7 @@ pub fn clear() -> Result<(), String> {
     .ok_or_else(|| "Could not clear the cache (it may be in use).".to_string())
 }
 
-/// Bring the ledger up to date with the conversations on disk.
+/// Bring the cache up to date with the conversations on disk.
 pub fn refresh() {
     with_db(sync);
 }
@@ -1430,7 +1430,7 @@ impl Phases {
     }
 }
 
-/// Bring the ledger up to date with every conversation. Returns how many changed.
+/// Bring the cache up to date with every conversation. Returns how many changed.
 fn sync_sources(
     conn: &Connection,
     claude_root: &Path,
@@ -1693,7 +1693,7 @@ fn retotal_all_days(tx: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-/// Bring the ledger up to date with every conversation on disk.
+/// Bring the cache up to date with every conversation on disk.
 fn sync(conn: &Connection) -> rusqlite::Result<()> {
     let started = Instant::now();
     FILES_TOTAL.store(0, Ordering::Relaxed);
@@ -1705,7 +1705,7 @@ fn sync(conn: &Connection) -> rusqlite::Result<()> {
     config::debug_log(
         &config::load_config(),
         &format!(
-            "ledger sync: {files} files changed in {:?} [{}] (claude files, wall: walk {:.0}ms, plan {:.0}ms, read and parse {:.0}ms, store {:.0}ms; thread time: read {:.0}ms, parse {:.0}ms) \
+            "cache sync: {files} files changed in {:?} [{}] (claude files, wall: walk {:.0}ms, plan {:.0}ms, read and parse {:.0}ms, store {:.0}ms; thread time: read {:.0}ms, parse {:.0}ms) \
              (open {:.0}ms, read bytes {:.0}ms) (parse of {} lines: {})",
             started.elapsed(),
             ph.line(),
@@ -1900,10 +1900,10 @@ pub fn windows(now: i64, reset5: i64, anchor7: i64) -> Option<Windows> {
     })
 }
 
-/// What the ledger has already read of one Claude transcript: the byte offset it
+/// What the cache has already read of one Claude transcript: the byte offset it
 /// stopped at (a line end), the spend of its turns, and their message ids. Lets a
 /// session's running cost resume from there instead of re-reading the whole file.
-/// Every copy of a message counts here, whichever session the ledger credits it to.
+/// Every copy of a message counts here, whichever session the cache credits it to.
 pub fn session_seed(sid: &str) -> Option<(u64, f64, Vec<String>)> {
     with_db(|conn| {
         let row: Option<(i64, i64, i64)> = conn
@@ -1989,7 +1989,7 @@ mod tests {
     use std::io::Write;
 
     fn scratch(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("greedout-ledger-{name}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("greedout-cache-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
         d

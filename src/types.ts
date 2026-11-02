@@ -186,7 +186,7 @@ export interface BrowseStatus {
   scanning: boolean;
 }
 
-// Payload of the "browse-progress" event during a ledger sync.
+// Payload of the "browse-progress" event during a cache sync.
 export interface BrowseProgress {
   phase: "sync" | "done" | "canceled";
   done: number;

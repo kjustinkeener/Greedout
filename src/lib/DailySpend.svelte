@@ -4,7 +4,7 @@
   // per session, spans merged across activity gaps shorter than an hour.
   //
   // The months + days overviews run off a tiny per-day/per-project AGGREGATE
-  // (get_spend_summary): the ledger keeps it totalled by local day, with
+  // (get_spend_summary): the cache keeps it totalled by local day, with
   // resume/compaction copies already counted once, so every bar total here is safe
   // to take directly. The
   // swim lanes need the individual turns, so one day's events are fetched lazily
@@ -28,7 +28,7 @@
   // Per-day cache of fetched turns, keyed by "YYYY-MM-DD".
   const dayCache = new Map<string, SpendEvent[]>();
   let loading = $state(true);
-  // True while the ledger catches up with the conversations (the first run reads
+  // True while the cache catches up with the conversations (the first run reads
   // all of them); gates the rescan button.
   let syncing = $state(false);
   let level = $state<"months" | "days" | "day">("months");

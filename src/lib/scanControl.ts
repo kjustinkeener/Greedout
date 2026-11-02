@@ -1,7 +1,7 @@
-// Shared control for the ledger sync the Context Explorer waits on: ONE
+// Shared control for the cache sync the Context Explorer waits on: ONE
 // implementation of the sync trigger, its lifecycle, and its live progress state.
 //
-// The backend sync is already the single shared thing (the ledger); what would be
+// The backend sync is already the single shared thing (the cache); what would be
 // duplicated is the FRONTEND side, so this module owns the `listen("browse-progress")`,
 // the progress bookkeeping, and the start/cancel invokes once. Hard limit: windows
 // are SEPARATE webviews (separate JS contexts), so this module loads once PER window

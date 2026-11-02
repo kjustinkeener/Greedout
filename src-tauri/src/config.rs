@@ -243,7 +243,7 @@ pub fn cursor_db_path() -> PathBuf {
 }
 
 /// `%LOCALAPPDATA%\Greedout`: Greedout's own data dir (config, labels, log, and
-/// the ledger). The app reads `~/.claude` but writes only here, so
+/// the cache). The app reads `~/.claude` but writes only here, so
 /// nothing of ours lands inside Claude Code's config home. Falls back to the old
 /// location only if the platform has no local-data dir (not expected on Windows).
 pub fn app_dir() -> PathBuf {

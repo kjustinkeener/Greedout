@@ -1456,7 +1456,7 @@
           }}
         />
         {#if idx.done < idx.total}
-          <span class="sidx" title="Chat text indexed: {idx.done} of {idx.total} conversations. Search covers the rest from disk, more slowly.">
+          <span class="sidx" title="Chat text indexed: {idx.done} of {idx.total} conversations.">
             <span class="sidxbar"><span class="sidxfill" style:width="{(idx.done / idx.total) * 100}%"></span></span>
             {Math.floor((idx.done / idx.total) * 100)}%
           </span>

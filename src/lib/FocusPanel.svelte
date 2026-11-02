@@ -439,6 +439,7 @@
      figure keeps its height and the dials below do not move. */
   .spend .val.pair {
     transform: scale(0.68);
+    white-space: nowrap;
   }
   .spend .val {
     color: var(--yellow);

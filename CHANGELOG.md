@@ -6,13 +6,22 @@ documented in the GitHub Releases notes and the `v*` git tags.
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-11-01
+
+### Added
+- A progress meter beside the Explorer search box shows how much chat text the
+  search index has covered.
+- The dial calibration and usage-clearing strings are translated into the 13 other
+  languages.
+
 ### Changed
+- The database file is now `cache.sqlite`. It rebuilds once on the next launch.
 - The Context Explorer reads from the same cache as the limit dials and Daily
   Spend, so it opens instantly and its own scan is gone. Chat search is indexed in
   the background as transcripts grow, and sessions the index has not reached yet are
   still searched from disk.
-- The Explorer's separate database and its opt-in step are removed. After
-  updating, the cache rebuilds once on the next launch.
+- The Explorer's separate database, its opt-in step and its rescan button are
+  removed.
 
 ## [0.4.7] - 2026-11-01
 

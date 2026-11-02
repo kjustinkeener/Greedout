@@ -435,9 +435,10 @@
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;
   }
-  /* Two shares side by side ("47% / 40%") in the space of one dollar figure. */
+  /* Two shares side by side ("47% / 40%"), scaled rather than resized so the
+     figure keeps its height and the dials below do not move. */
   .spend .val.pair {
-    font-size: calc(15px * var(--size-num));
+    transform: scale(0.68);
   }
   .spend .val {
     color: var(--yellow);

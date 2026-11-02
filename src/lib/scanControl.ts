@@ -1,25 +1,22 @@
-// Shared control for the shared-cache scan: ONE implementation of the scan
-// trigger, its lifecycle, and its live progress state, so the Daily Spend and
-// Context Explorer windows stop diverging.
+// Shared control for the ledger sync the Context Explorer waits on: ONE
+// implementation of the sync trigger, its lifecycle, and its live progress state.
 //
-// The backend scan itself is already the single shared thing (a guarded
-// `run_scan`); what was duplicated was the FRONTEND side -- each window wired its
-// own `listen("browse-progress")`, its own phase bookkeeping, and its own
-// start/cancel invokes. This module owns all of that once. Note the hard limit:
-// DS and CE are SEPARATE webviews (separate JS contexts), so this module loads
-// once PER window and cannot literally share runtime state across them. "Shared
-// control" therefore means one code module + one listener per window (not
-// duplicated inline); both windows still receive the same backend event stream,
-// so a window that didn't start a scan still renders it and still gets onDone.
+// The backend sync is already the single shared thing (the ledger); what would be
+// duplicated is the FRONTEND side, so this module owns the `listen("browse-progress")`,
+// the progress bookkeeping, and the start/cancel invokes once. Hard limit: windows
+// are SEPARATE webviews (separate JS contexts), so this module loads once PER window
+// and cannot literally share runtime state across them. Every window still receives
+// the same backend event stream, so a window that didn't start a sync still renders
+// it and still gets onDone.
 import { writable } from "svelte/store";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { BrowseProgress } from "../types";
 
-// One scan phase's live state. t0/end are wall-clock (performance.now()) measured
-// on this side: t0 = first event for the phase, end = when a later phase (or the
-// scan's end) started. Both 0 until they happen; elapsed is (end || now) - t0, so
-// the active phase counts up live and finished ones freeze.
+// The sync's live state. t0/end are wall-clock (performance.now()) measured on this
+// side: t0 = first event, end = when the sync finished. Both 0 until they happen;
+// elapsed is (end || now) - t0, so the running sync counts up live and a finished
+// one freezes.
 export interface PhaseState {
   done: number;
   total: number;
@@ -28,22 +25,14 @@ export interface PhaseState {
 }
 export interface ScanState {
   running: boolean;
-  index: PhaseState;
-  enrich: PhaseState;
-  write: PhaseState;
+  sync: PhaseState;
 }
 
 const zeroPhase = (): PhaseState => ({ done: 0, total: 0, t0: 0, end: 0 });
-const initial = (): ScanState => ({
-  running: false,
-  index: zeroPhase(),
-  enrich: zeroPhase(),
-  write: zeroPhase(),
-});
+const initial = (): ScanState => ({ running: false, sync: zeroPhase() });
 
-// The single source of truth for scan progress in this window. ScanProgress
-// renders from it; host windows can subscribe for side effects (e.g. throttled
-// tile refresh during enrichment).
+// The single source of truth for sync progress in this window. ScanProgress renders
+// from it; host windows can subscribe for side effects.
 export const scanState = writable<ScanState>(initial());
 
 // Done/canceled callbacks: host windows register their data-refresh here instead
@@ -54,45 +43,21 @@ export function onScanDone(cb: (canceled: boolean) => void): () => void {
   return () => void doneCbs.delete(cb);
 }
 
-// Freeze a started-but-unfinished earlier phase when the next one (or the end)
-// fires, so its elapsed stops ticking.
-function finish(st: PhaseState, t: number): PhaseState {
-  return st.t0 && !st.end ? { ...st, end: t } : st;
-}
-
 // One listener per window, registered at module load. It lives for the window's
 // lifetime, so there is no unlisten to manage.
 void listen<BrowseProgress>("browse-progress", (e) => {
   const p = e.payload;
   const t = performance.now();
   scanState.update((s) => {
-    let { running, index, enrich, write } = s;
-    // A scan is underway but this window didn't start it (it mounted mid-scan, or
-    // the other window / a background enrich triggered it): reset and turn running
-    // on so a fresh set of bars shows. This runs at most once per run (running
-    // stays true until done/canceled), so it never wipes a scan already in flight.
-    if (!running && p.phase !== "done" && p.phase !== "canceled") {
-      index = zeroPhase();
-      enrich = zeroPhase();
-      write = zeroPhase();
-      running = true;
+    // A sync is underway but this window didn't start it (it mounted mid-sync, or
+    // another window started it): turn running on so the bar shows. This runs at
+    // most once per run (running stays true until done/canceled).
+    if (p.phase === "sync") {
+      const sync = { done: p.done, total: p.total, t0: s.sync.t0 || t, end: 0 };
+      return { running: true, sync };
     }
-    if (p.phase === "index") {
-      index = { done: p.done, total: p.total, t0: index.t0 || t, end: 0 };
-    } else if (p.phase === "enrich") {
-      index = finish(index, t);
-      enrich = { done: p.done, total: p.total, t0: enrich.t0 || t, end: 0 };
-    } else if (p.phase === "write") {
-      index = finish(index, t);
-      enrich = finish(enrich, t);
-      write = { done: p.done, total: p.total, t0: write.t0 || t, end: 0 };
-    } else if (p.phase === "done" || p.phase === "canceled") {
-      index = finish(index, t);
-      enrich = finish(enrich, t);
-      write = finish(write, t);
-      running = false;
-    }
-    return { running, index, enrich, write };
+    const sync = s.sync.t0 && !s.sync.end ? { ...s.sync, end: t } : s.sync;
+    return { running: false, sync };
   });
   if (p.phase === "done" || p.phase === "canceled") {
     const canceled = p.phase === "canceled";
@@ -100,11 +65,11 @@ void listen<BrowseProgress>("browse-progress", (e) => {
   }
 });
 
-// Kick off a fresh scan. Resets the store and sets running SYNCHRONOUSLY so the
-// bars appear before the first event lands.
-export function startScan(deep = true) {
+// Kick off a sync. Resets the store and sets running SYNCHRONOUSLY so the bar
+// appears before the first event lands.
+export function startScan() {
   scanState.set({ ...initial(), running: true });
-  invoke("browse_scan", { deep }).catch(() => {
+  invoke("browse_scan").catch(() => {
     scanState.update((s) => ({ ...s, running: false }));
   });
 }

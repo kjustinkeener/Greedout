@@ -49,11 +49,11 @@ const CURSOR: i64 = 3;
 
 /// Bump when the tables, the parsing or the price table in `scan::model_info`
 /// change: a database from another version is dropped and rebuilt on next launch.
-const VERSION: i64 = 3;
+const VERSION: i64 = 4;
 
-const TABLES: [&str; 10] = [
-    "meta", "windows", "daily", "spawn_links", "turns", "exchanges", "sessions", "directories", "projects",
-    "harnesses",
+const TABLES: [&str; 12] = [
+    "meta", "windows", "daily", "spawn_links", "chat_fts", "chat_chunks", "turns", "exchanges", "sessions",
+    "directories", "projects", "harnesses",
 ];
 
 const SCHEMA: &str = "
@@ -91,9 +91,21 @@ CREATE TABLE sessions (
     -- Number of /compact boundaries read so far.
     segment INTEGER NOT NULL DEFAULT 0,
     first_ms INTEGER, last_ms INTEGER,
+    -- Context size after the newest turn (NULL when unknown, e.g. right after a Codex
+    -- compaction) and whether a /context report was ever recorded.
+    ctx INTEGER, ctx_cmd INTEGER NOT NULL DEFAULT 0,
+    -- How far the chat index has read, in the same bytes as `offset`; and the first
+    -- user prompt, shown as the title of a session that was never named.
+    fts_off INTEGER NOT NULL DEFAULT 0, intro TEXT,
     cost REAL NOT NULL DEFAULT 0, total REAL NOT NULL DEFAULT 0, n_turns INTEGER NOT NULL DEFAULT 0,
     UNIQUE (harness, key)
 );
+-- Chat text for search: one row per stretch of a file, so a transcript that grows adds
+-- chunks instead of rewriting its text. `chat_fts` rows share their rowid with the
+-- chunk; the trigram tokenizer gives case-insensitive substring matching.
+CREATE TABLE chat_chunks (id INTEGER PRIMARY KEY, session INTEGER NOT NULL);
+CREATE INDEX idx_chat_chunks_session ON chat_chunks(session);
+CREATE VIRTUAL TABLE chat_fts USING fts5(text, tokenize='trigram');
 CREATE INDEX idx_sessions_directory ON sessions(directory);
 CREATE INDEX idx_sessions_parent ON sessions(parent_turn);
 CREATE INDEX idx_sessions_agent ON sessions(agent_id);
@@ -181,7 +193,7 @@ fn init(conn: &Connection) -> rusqlite::Result<()> {
     )
 }
 
-fn with_db<T>(f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Option<T> {
+pub(crate) fn with_db<T>(f: impl FnOnce(&Connection) -> rusqlite::Result<T>) -> Option<T> {
     let mut guard = DB.lock().unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
         match open() {
@@ -232,6 +244,12 @@ pub(crate) struct Parsed {
     pub cwd: Option<String>,
     pub title: Option<String>,
     pub model: Option<String>,
+    /// Context size after the newest turn read, and whether a compaction since then
+    /// left it unknown.
+    pub ctx: Option<u64>,
+    pub ctx_reset: bool,
+    /// A `/context` report was among the lines.
+    pub ctx_cmd: bool,
     /// `(subagent id, tool call id)` pairs read off tool results.
     agents: Vec<(String, String)>,
     /// Usage lines seen before this parse's first event that did not start a turn of
@@ -278,6 +296,11 @@ impl Parsed {
         self.cwd = self.cwd.take().or(next.cwd);
         self.title = next.title.or(self.title.take());
         self.model = next.model.or(self.model.take());
+        if next.ctx.is_some() || next.ctx_reset {
+            self.ctx = next.ctx;
+            self.ctx_reset = next.ctx_reset;
+        }
+        self.ctx_cmd |= next.ctx_cmd;
         self.agents.extend(next.agents);
     }
 }
@@ -363,6 +386,7 @@ struct Needles {
     assistant_head: memmem::Finder<'static>,
     task_call: memmem::Finder<'static>,
     agent_call: memmem::Finder<'static>,
+    context_usage: memmem::Finder<'static>,
 }
 
 /// The fields of an assistant line that we keep, so the rest (message text, tool
@@ -424,6 +448,7 @@ static NEEDLES: LazyLock<Needles> = LazyLock::new(|| {
         assistant_head: f("\"message\":{\"model\""),
         task_call: f("\"name\":\"Task\""),
         agent_call: f("\"name\":\"Agent\""),
+        context_usage: f("\"contextUsage\""),
     }
 });
 
@@ -533,6 +558,9 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
                 .ok()
                 .and_then(|v| v.get("cwd").and_then(Value::as_str).map(str::to_string));
         }
+        if !out.ctx_cmd && has(&n.context_usage, raw) {
+            out.ctx_cmd = true;
+        }
         if raw.starts_with(b"{\"type\":\"custom-title\"") {
             let title = serde_json::from_str::<Value>(&line())
                 .ok()
@@ -544,6 +572,9 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
         lap!(1);
         if !user && !assistant && has(&n.compact_boundary, raw) {
             out.evs.push(Ev::Compact);
+            if let Some(post) = serde_json::from_slice::<Value>(raw).ok().as_ref().and_then(scan::post_tokens_from) {
+                out.ctx = Some(post);
+            }
             lap!(2);
             continue;
         }
@@ -587,6 +618,7 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
                                 h.starts_turn = true;
                             }
                         }
+                        out.ctx = Some(u.input_tokens + u.cache_creation_input_tokens + u.cache_read_input_tokens);
                         out.evs.push(Ev::Turn {
                             id: msg.and_then(|m| m.id),
                             ts,
@@ -730,7 +762,12 @@ fn clear_children(tx: &Connection, sid: i64) -> rusqlite::Result<()> {
     tx.execute("UPDATE spawn_links SET resolved = 0 WHERE session = ?1", [sid])?;
     tx.execute("DELETE FROM turns WHERE session = ?1", [sid])?;
     tx.execute("DELETE FROM exchanges WHERE session = ?1", [sid])?;
-    tx.execute("UPDATE sessions SET segment = 0, first_ms = NULL, last_ms = NULL WHERE id = ?1", [sid])?;
+    tx.execute("DELETE FROM chat_fts WHERE rowid IN (SELECT id FROM chat_chunks WHERE session = ?1)", [sid])?;
+    tx.execute("DELETE FROM chat_chunks WHERE session = ?1", [sid])?;
+    tx.execute(
+        "UPDATE sessions SET segment = 0, first_ms = NULL, last_ms = NULL, fts_off = 0, intro = NULL WHERE id = ?1",
+        [sid],
+    )?;
     tx.execute("UPDATE windows SET stale = 1", [])?;
     Ok(())
 }
@@ -952,8 +989,22 @@ fn finish_file(
     let segment = store(tx, session, &parsed.evs)?;
     tx.execute(
         "UPDATE sessions SET path = ?2, mtime = ?3, len = ?4, offset = ?5, segment = ?6,
-             model = COALESCE(?7, model), title = COALESCE(?8, title) WHERE id = ?1",
-        params![session, path_s, mtime, len, (from + end as u64) as i64, segment, parsed.model, parsed.title],
+             model = COALESCE(?7, model), title = COALESCE(?8, title),
+             ctx = CASE WHEN ?9 IS NOT NULL THEN ?9 WHEN ?10 THEN NULL ELSE ctx END,
+             ctx_cmd = MAX(ctx_cmd, ?11) WHERE id = ?1",
+        params![
+            session,
+            path_s,
+            mtime,
+            len,
+            (from + end as u64) as i64,
+            segment,
+            parsed.model,
+            parsed.title,
+            parsed.ctx.map(|c| c as i64),
+            parsed.ctx_reset,
+            parsed.ctx_cmd
+        ],
     )?;
     widen_span(tx, session, &parsed.evs)?;
     for (name, at) in [("reset5", parsed.resets.five), ("reset7", parsed.resets.seven)] {
@@ -972,6 +1023,7 @@ fn finish_file(
         )?;
     }
     tx.execute("INSERT OR IGNORE INTO changed (id) VALUES (?1)", [session])?;
+    FILES_DONE.fetch_add(1, Ordering::Relaxed);
     FILE_STORE_NS.fetch_add(t.elapsed().as_nanos() as u64, Ordering::Relaxed);
     Ok(())
 }
@@ -1094,6 +1146,7 @@ fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
         jobs.push(Job { path: p, key, sid, agent, sidechain, folder, work });
     }
     PLAN_NS.fetch_add(t_plan.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    FILES_TOTAL.fetch_add(jobs.len() as u64, Ordering::Relaxed);
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(8);
     // Big files are cut into line-aligned pieces so no single file bounds the scan.
     let t_cut = Instant::now();
@@ -1279,8 +1332,8 @@ fn sync_cursor(tx: &Connection) -> rusqlite::Result<usize> {
             .collect();
         store(tx, session, &evs)?;
         tx.execute(
-            "UPDATE sessions SET stamp = ?2, mtime = ?3, title = ?4, model = ?5 WHERE id = ?1",
-            params![session, stamp, stamp * 1000, chat.title, chat.model],
+            "UPDATE sessions SET stamp = ?2, mtime = ?3, title = ?4, model = ?5, ctx = ?6 WHERE id = ?1",
+            params![session, stamp, stamp * 1000, chat.title, chat.model, chat.ctx.map(|c| c as i64)],
         )?;
         widen_span(tx, session, &evs)?;
         tx.execute("INSERT OR IGNORE INTO changed (id) VALUES (?1)", [session])?;
@@ -1291,6 +1344,32 @@ fn sync_cursor(tx: &Connection) -> rusqlite::Result<usize> {
         [db_ms],
     )?;
     Ok(n)
+}
+
+/// Files of the running sync that needed reading, and how many are stored so far.
+static FILES_TOTAL: AtomicU64 = AtomicU64::new(0);
+static FILES_DONE: AtomicU64 = AtomicU64::new(0);
+
+/// `(stored, to read)` for the sync in progress.
+pub fn sync_progress() -> (u64, u64) {
+    let total = FILES_TOTAL.load(Ordering::Relaxed);
+    (FILES_DONE.load(Ordering::Relaxed).min(total), total)
+}
+
+/// Drop every table and lay them down again empty; the next sync refills them.
+pub fn clear() -> Result<(), String> {
+    with_db(|conn| {
+        for t in TABLES {
+            conn.execute_batch(&format!("DROP TABLE IF EXISTS {t};"))?;
+        }
+        conn.execute_batch(SCHEMA)
+    })
+    .ok_or_else(|| "Could not clear the cache (it may be in use).".to_string())
+}
+
+/// Bring the ledger up to date with the conversations on disk.
+pub fn refresh() {
+    with_db(sync);
 }
 
 // Time inside `sync_file`, split by what it was doing; `sync` logs and resets them.
@@ -1617,6 +1696,8 @@ fn retotal_all_days(tx: &Connection) -> rusqlite::Result<()> {
 /// Bring the ledger up to date with every conversation on disk.
 fn sync(conn: &Connection) -> rusqlite::Result<()> {
     let started = Instant::now();
+    FILES_TOTAL.store(0, Ordering::Relaxed);
+    FILES_DONE.store(0, Ordering::Relaxed);
     let mut ph = Phases::new();
     let codex: Vec<PathBuf> = crate::codex::candidates().into_iter().map(|(p, _)| p).collect();
     ph.mark("list codex");
@@ -1649,6 +1730,7 @@ fn sync(conn: &Connection) -> rusqlite::Result<()> {
         // A first scan leaves a log as big as the database; fold it back in.
         let _ = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()));
     }
+    crate::browse::kick_index();
     Ok(())
 }
 
@@ -1929,8 +2011,7 @@ mod tests {
     }
 
     fn one_turn_cost() -> f64 {
-        let v: Value = serde_json::from_str(turn("x", "2026-10-01T00:00:00.000Z").trim()).unwrap();
-        scan::assistant_usage(&v).unwrap().2
+        scan::token_cost("claude-opus-4-1", 1000, 1000, 0, 0)
     }
 
     fn db() -> Connection {
@@ -1960,7 +2041,24 @@ mod tests {
                 }
             })
             .collect();
-        format!("{evs:?} {:?} {:?} {:?} {:?} {:?} {:?}", p.resets.five, p.resets.seven, p.cwd, p.title, p.model, p.agents)
+        format!(
+            "{evs:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}",
+            p.resets.five, p.resets.seven, p.cwd, p.title, p.model, p.agents, p.ctx, p.ctx_reset, p.ctx_cmd
+        )
+    }
+
+    #[test]
+    fn context_size_follows_the_newest_turn_and_a_compaction() {
+        let mut text = turn("msg_0", "2026-10-01T00:00:00.000Z");
+        assert_eq!(parse_claude(text.as_bytes(), 0, false).ctx, Some(1000));
+        text.push_str("{\"type\":\"system\",\"subtype\":\"compact_boundary\",\"compactMetadata\":{\"postTokens\":400}}
+");
+        let parsed = parse_claude(text.as_bytes(), 0, false);
+        assert_eq!(parsed.ctx, Some(400));
+        assert!(!parsed.ctx_cmd);
+        text.push_str("{\"type\":\"system\",\"contextUsage\":{}}
+");
+        assert!(parse_claude(text.as_bytes(), 0, false).ctx_cmd);
     }
 
     #[test]

@@ -24,7 +24,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (cmd: string) => {
     switch (cmd) {
       case "browse_status":
-        return { enabled: true, dbExists: true, indexed: 3, enriched: 3, lastFullScan: null, scanning: false };
+        return { indexed: 3, scanning: false };
       case "browse_harnesses":
         return [];
       case "browse_projects":

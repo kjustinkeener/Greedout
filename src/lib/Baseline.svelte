@@ -87,8 +87,6 @@
   let harnessAgg = $state<HarnessAgg | null>(null);
   let sessionRows = $state<SessionMeta[]>([]);
   let loadingBrowse = $state(false);
-  let showEnable = $state(false); // the opt-in gate panel
-  let deepScan = $state(false); // "deluxe" full-scan checkbox
   let scanning = $state(false);
 
   // --- Full-text search (chat text only) ---
@@ -332,7 +330,7 @@
           // data ALWAYS auto-rebuilds (no enable gate): the shared cache is built
           // unconditionally by Daily Spend anyway, so gating here just showed an
           // empty graph. The browse-progress "done" handler repaints when it lands.
-          const haveIndex = s.dbExists && s.indexed > 0;
+          const haveIndex = s.indexed > 0;
           if (initView === "session") {
             // Land straight on the target session's breakdown.
             if (initProject) curProject = initProject;
@@ -351,10 +349,10 @@
             // empty: Pass 1 re-stats every file so Claude/Codex sizes can't go stale,
             // and Pass 2 re-enriches only the rows whose mtime changed. Cached rows
             // paint first; the browse-progress "done" handler repaints when it lands.
-            startScan(true);
+            startScan();
           } else {
             openRoot();
-            startScan(true);
+            startScan();
           }
         }
       })
@@ -367,24 +365,14 @@
 
   // Full rescan: resets the shared scanControl store and fires browse_scan. The
   // store's running flag flows back into `scanning` via the subscription below.
-  function startScan(deep: boolean) {
+  function startScan() {
     scanning = true;
-    startCacheScan(deep);
-  }
-  function enableAndScan() {
-    scanning = true;
-    invoke("browse_enable", { deep: deepScan })
-      .then(() => loadBrowseStatus())
-      .catch((e) => {
-        dbg("browse_enable failed", e);
-        scanning = false;
-      });
+    startCacheScan();
   }
 
   // Top level: every harness as a tile (only Claude Code today).
   function openRoot() {
     zoom = "root";
-    showEnable = false;
     hidden = new Set();
     loadingBrowse = true;
     invoke<HarnessAgg[]>("browse_harnesses")
@@ -395,7 +383,6 @@
   function openHarness(harness: string = curHarness) {
     curHarness = harness;
     zoom = "harness";
-    showEnable = false;
     hidden = new Set();
     loadingBrowse = true;
     invoke<ProjectAgg[]>("browse_projects", { harness })
@@ -406,8 +393,7 @@
       .then((h) => (harnessAgg = h.find((x) => x.harness === harness) ?? h[0] ?? null))
       .catch(() => {});
   }
-  // Read this project's session tiles from the index (read-only, instant). Sizes
-  // are always present; tokens/cost fill in as the background enrich lands.
+  // Read this project's session tiles from the ledger (read-only, instant).
   function refreshSessions(project: string) {
     return invoke<SessionMeta[]>("browse_sessions", { harness: curHarness, project })
       .then((r) => {
@@ -416,44 +402,15 @@
       })
       .catch((e) => dbg("browse_sessions failed", e));
   }
-  // Throttled tile refresh during enrichment (see the progress effect).
-  let lastRefresh = 0;
-  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-  function scheduleRefresh(project: string) {
-    const now = Date.now();
-    if (now - lastRefresh > 300) {
-      lastRefresh = now;
-      refreshSessions(project);
-    } else {
-      clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => {
-        lastRefresh = Date.now();
-        refreshSessions(project);
-      }, 300);
-    }
-  }
   function openProject(project: string) {
     zoom = "project";
     selProject = project;
-    showEnable = false;
     hidden = new Set();
     loadingBrowse = true;
     refreshSessions(project).finally(() => (loadingBrowse = false));
-    // Kick off (or refresh) enrichment in the background: instant drill-in, and
-    // the user can close this window while it keeps running.
-    dbg("enrich project (bg)", project);
-    scanning = true;
-    invoke("browse_enrich_project", { harness: curHarness, project }).catch((e) => {
-      dbg("browse_enrich_project failed", e);
-      scanning = false;
-    });
   }
-  // Zoom out from the session view. Gates on the opt-in the first time.
+  // Zoom out from the session view.
   function zoomOut(level: "harness" | "project") {
-    if (!browse?.enabled) {
-      showEnable = true;
-      return;
-    }
     if (level === "project" && curProject) openProject(curProject);
     else openRoot();
   }
@@ -476,31 +433,19 @@
     else report = null; // different id: the effect fires and re-analyzes
   }
 
-  // Follow scan progress via the shared scanControl store (the bars/log render in
-  // <ScanProgress> off the same store). Mirror running into our local `scanning`
-  // and throttle tile refreshes while enrichment lands; onScanDone does the final
-  // authoritative refresh of whatever level is showing.
+  // Follow sync progress via the shared scanControl store (the bar renders in
+  // <ScanProgress> off the same store). Mirror running into our local `scanning`;
+  // onScanDone does the authoritative refresh of whatever level is showing.
   $effect(() => {
     const unSub = scanState.subscribe((s) => {
       if (!s.running) return;
       scanning = true;
-      // Live-update the project tiles as rows are enriched. Coalesce: each
-      // enriched row emits a progress event, and a naive refresh here re-reads
-      // every row from SQLite AND re-lays-out the whole treemap per row (dozens
-      // of times a second). Throttle to ~300ms; onScanDone does the final
-      // authoritative refresh. `enrich.t0 && !enrich.end` = the enrich phase is
-      // the one currently running.
-      if (zoom === "project" && selProject && s.enrich.t0 && !s.enrich.end) {
-        scheduleRefresh(selProject);
-      }
     });
     const unDone = onScanDone(() => {
       scanning = false;
       loadBrowseStatus();
-      // Refresh the current level READ-ONLY. Never re-open a project here: that
-      // would re-trigger enrichment and loop.
-      if (showEnable) openRoot();
-      else if (zoom === "project" && selProject) refreshSessions(selProject);
+      // Refresh the current level read-only; re-opening a project would reset the view.
+      if (zoom === "project" && selProject) refreshSessions(selProject);
       else if (zoom === "harness") openHarness();
       else if (zoom === "root") openRoot();
     });
@@ -714,11 +659,7 @@
         clearSearch();
         if (p.view === "project" && p.project) {
           curProject = p.project;
-          if (browse?.enabled || (browse?.dbExists && (browse?.indexed ?? 0) > 0)) {
-            openProject(p.project);
-          } else {
-            showEnable = true;
-          }
+          openProject(p.project);
           return;
         }
         // Default: a session view.
@@ -730,7 +671,6 @@
         path = [];
         report = null;
         loadError = null;
-        showEnable = false;
         zoom = "session";
         // Resolve the harness from the id so zoom-out stays on this session's harness.
         if (p.id) {
@@ -906,7 +846,6 @@
     if (zoom === "project") {
       const s = sessionRows.find((x) => x.id === n.detail);
       if (!s) return "";
-      if (!s.enriched) return "size only, open to load tokens";
       const parts = [`${fmt(s.ctx ?? 0)} tok`, `${s.turnCount} turns`];
       if (s.model) parts.push(s.model);
       if (s.hasContextUsage) parts.push("/context ✓");
@@ -1650,26 +1589,6 @@
           {/each}
         {/if}
       </div>
-    {:else if showEnable}
-      <div class="empty">
-        <div class="etitle">Browse context across every session</div>
-        <p class="ebody">
-          Zoom out from this one session to all your projects. Greedout builds a local index of
-          every Claude Code transcript (in <code>%LOCALAPPDATA%\Greedout\cache.sqlite</code>) so it can
-          size projects and sessions. The first pass just reads file sizes and is quick; token and
-          cost details load as you drill in.
-        </p>
-        <label class="deepopt">
-          <input type="checkbox" bind:checked={deepScan} />
-          Full deep scan now: read every transcript up front (slower, but tokens &amp; cost ready everywhere)
-        </label>
-        {#if scanning}
-          {@render scanBar()}
-        {:else}
-          <button class="echk" onclick={enableAndScan}>Enable &amp; scan</button>
-          <button class="crumb back" onclick={() => (showEnable = false)}>Cancel</button>
-        {/if}
-      </div>
     {:else if zoom !== "session"}
       <div class="bar">
         <nav class="crumbs">
@@ -1711,7 +1630,7 @@
               title="Size tiles by measured spend">{fmtUsd(displayUsd)}</button
             >
           </span>
-          <button class="crumb back rescan" onclick={() => startScan(true)} disabled={scanning}
+          <button class="crumb back rescan" onclick={() => startScan()} disabled={scanning}
           >
             {#if !scanning}<Icon name="refresh" size={11} />{/if}{scanning
               ? "scanning…"
@@ -2771,15 +2690,6 @@
   .rescan:disabled {
     opacity: 0.5;
     cursor: default;
-  }
-  .deepopt {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    max-width: min(88%, 900px);
-    font-size: calc(12px * var(--size-ui));
-    color: var(--muted);
-    cursor: pointer;
   }
   .scanwrap {
     padding: 4px 10px 0;

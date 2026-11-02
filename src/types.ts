@@ -144,7 +144,7 @@ export interface HarnessAgg {
   projectCount: number;
   sessionCount: number;
   totalBytes: number;
-  totalTokens: number; // summed over enriched sessions only
+  totalTokens: number;
   totalCost: number;
 }
 
@@ -157,7 +157,6 @@ export interface ProjectAgg {
   totalBytes: number;
   totalTokens: number;
   totalCost: number;
-  enrichedCount: number;
 }
 
 // One browsed session's cached metadata.
@@ -174,25 +173,19 @@ export interface SessionMeta {
   model: string;
   turnCount: number;
   hasContextUsage: boolean;
-  enriched: boolean; // Pass-2 has read its contents
 }
 
-// State of the browse index, for the gate + progress UI.
+// How much the Explorer has to show, and whether a sync is being followed.
 export interface BrowseStatus {
-  enabled: boolean;
-  dbExists: boolean;
   indexed: number;
-  enriched: number;
-  lastFullScan: number | null;
   scanning: boolean;
 }
 
-// Payload of the "browse-progress" event during a scan.
+// Payload of the "browse-progress" event during a ledger sync.
 export interface BrowseProgress {
-  phase: "index" | "enrich" | "write" | "done" | "canceled";
+  phase: "sync" | "done" | "canceled";
   done: number;
   total: number;
-  current: string;
 }
 
 export interface SearchProgress {
@@ -232,7 +225,6 @@ export interface Config {
   ui_scale: number; // UI zoom factor 0.5..3.0
   dim_hours: number; // age (h) at which a row reaches full dim; full <=1h, linear between
   theme: string; // color palette id; "auto" follows the OS (see THEMES in theme.ts)
-  browse_enabled: boolean; // cross-session browse index built + shown (opt-in)
   show_statusbar: boolean; // bottom status bar: per-core CPU + memory usage
   show_prompt: boolean; // show each session's latest prompt under its title
   clickable_titles: boolean; // main-window session/project titles open the Explorer

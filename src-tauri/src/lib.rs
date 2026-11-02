@@ -270,59 +270,28 @@ fn load_window_state(label: String) -> Option<winstate::WinState> {
     winstate::get(&label)
 }
 
-// --- Cross-session browse (opt-in; see browse.rs) ---
+// --- Context Explorer (see browse.rs) ---
 
-/// Whether browsing is enabled, whether the cache DB exists, and how far the
-/// index/enrich has gotten. Drives the browse UI's gate and progress display.
+/// How many conversations the Explorer has, and whether a sync is being followed.
 #[tauri::command]
 fn browse_status() -> browse::BrowseStatus {
-    browse::status(config::load_config().browse_enabled)
+    browse::status()
 }
 
-/// Opt in: flip the setting, create the cache DB, and start the first scan.
-/// `deep` also enriches every session now (the "deluxe" full scan) vs a fast
-/// index-only pass that enriches lazily on drill-in.
+/// Bring the ledger up to date and report progress on "browse-progress".
 #[tauri::command]
-fn browse_enable(app: tauri::AppHandle, deep: bool) -> Result<(), String> {
-    let mut cfg = config::load_config();
-    cfg.browse_enabled = true;
-    config::save_config(&cfg).map_err(|e| e.to_string())?;
-    browse::enable()?;
-    browse::run_scan(app, deep);
-    Ok(())
+fn browse_scan(app: tauri::AppHandle) {
+    browse::run_scan(app);
 }
 
-/// Rescan (index always; enrich everything when `deep`). Emits "browse-progress".
-#[tauri::command]
-fn browse_scan(app: tauri::AppHandle, deep: bool) {
-    browse::run_scan(app, deep);
-}
-
-/// Delete the cross-session cache (`cache.sqlite` + its WAL/SHM sidecars) so the
-/// index and per-turn spend history rebuild from scratch on the next scan. The
-/// live gauge list is unaffected (it reads transcripts directly, not the cache).
-/// Best-effort per file; only a still-present main DB after the attempt is an error.
+/// Delete everything the ledger holds (spend history and the search index) so it
+/// rebuilds from the transcripts on the next sync.
 #[tauri::command]
 fn clear_cache() -> Result<(), String> {
-    let db = config::cache_db_path();
-    for suffix in ["", "-wal", "-shm"] {
-        let p = if suffix.is_empty() {
-            db.clone()
-        } else {
-            db.with_extension(format!("sqlite{suffix}"))
-        };
-        let _ = std::fs::remove_file(&p);
-    }
-    if db.exists() {
-        return Err("Could not clear the cache (it may be in use).".into());
-    }
-    // The file is gone; reset the schema flag so the next open recreates the tables
-    // instead of opening an empty, table-less DB that fails every scan and query.
-    browse::on_cache_cleared();
-    Ok(())
+    ledger::clear()
 }
 
-/// Cancel an in-flight scan; the partial index stays usable.
+/// Stop following a sync; it carries on in the background.
 #[tauri::command]
 fn browse_cancel() {
     browse::cancel();
@@ -341,13 +310,6 @@ fn browse_projects(harness: String) -> Vec<browse::ProjectAgg> {
 #[tauri::command]
 fn browse_sessions(harness: String, project: String) -> Vec<browse::SessionMeta> {
     browse::sessions(&harness, &project)
-}
-
-/// Enrich a project's stale sessions in the background (tokens/cost/model). Returns
-/// immediately; progress arrives on "browse-progress". Read tiles via browse_sessions.
-#[tauri::command]
-fn browse_enrich_project(app: tauri::AppHandle, harness: String, project: String) {
-    browse::run_enrich_project(app, harness, project);
 }
 
 #[tauri::command]
@@ -543,7 +505,6 @@ pub fn run() {
             themes::get_user_themes,
             themes::set_user_themes,
             browse_status,
-            browse_enable,
             browse_scan,
             clear_cache,
             browse_cancel,
@@ -551,7 +512,6 @@ pub fn run() {
             session_harness,
             browse_projects,
             browse_sessions,
-            browse_enrich_project,
             browse_session,
             browse_search,
             browse_search_cancel,

@@ -4,6 +4,16 @@ All notable changes to Greedout are recorded here. This project follows
 [Semantic Versioning](https://semver.org). Releases at or before v0.2.3 are
 documented in the GitHub Releases notes and the `v*` git tags.
 
+## [Unreleased]
+
+### Changed
+- The Context Explorer reads from the same ledger as the limit dials and Daily
+  Spend, so it opens instantly and its own scan is gone. Chat search is indexed in
+  the background as transcripts grow, and sessions the index has not reached yet are
+  still searched from disk.
+- The separate Explorer cache database and its opt-in step are removed. After
+  updating, the ledger rebuilds once on the next launch.
+
 ## [0.4.7] - 2026-11-01
 
 ### Added

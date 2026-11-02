@@ -65,12 +65,6 @@ pub struct Config {
     /// Color palette: "dark", "light", or "auto" (follow OS). Frontend-applied.
     #[serde(default = "default_theme")]
     pub theme: String,
-    /// Cross-session browsing (the zoom-out treemap over every project). Off by
-    /// default: turning it on is what creates the `cache.sqlite` index, so the
-    /// user opts in to a potentially large first scan rather than getting one
-    /// silently. See browse.rs.
-    #[serde(default)]
-    pub browse_enabled: bool,
     /// Show the bottom status bar (per-core CPU + memory usage). On by default.
     #[serde(default = "default_true")]
     pub show_statusbar: bool,
@@ -200,7 +194,6 @@ impl Default for Config {
             locale: default_locale(),
             locale_resolved: default_locale_resolved(),
             theme: "dark".to_string(),
-            browse_enabled: false,
             show_statusbar: true,
             show_prompt: true,
             clickable_titles: true,
@@ -250,10 +243,9 @@ pub fn cursor_db_path() -> PathBuf {
 }
 
 /// `%LOCALAPPDATA%\Greedout`: Greedout's own data dir (config, labels, log, and
-/// the opt-in browse cache). The app reads `~/.claude` but writes only here, so
-/// nothing of ours lands inside Claude Code's config home. Public so browse.rs
-/// can place `cache.sqlite` alongside. Falls back to the old location only if the
-/// platform has no local-data dir (not expected on Windows).
+/// the ledger). The app reads `~/.claude` but writes only here, so
+/// nothing of ours lands inside Claude Code's config home. Falls back to the old
+/// location only if the platform has no local-data dir (not expected on Windows).
 pub fn app_dir() -> PathBuf {
     dirs::data_local_dir()
         .map(|d| d.join("Greedout"))
@@ -277,9 +269,6 @@ pub fn migrate_sidecars() {
         "labels.json",
         "window-state.json",
         "themes.json",
-        "cache.sqlite",
-        "cache.sqlite-wal",
-        "cache.sqlite-shm",
     ] {
         let src = old.join(name);
         let dst = new.join(name);
@@ -303,12 +292,6 @@ pub fn migrate_sidecars() {
 /// otherwise grows it without bound. Best-effort; a missing file is fine.
 pub fn truncate_log() {
     let _ = std::fs::remove_file(app_dir().join("greedout.log"));
-}
-
-/// Path to the opt-in cross-session metadata cache. Only created once browsing is
-/// enabled (see browse.rs); its mere presence means the user opted in.
-pub fn cache_db_path() -> PathBuf {
-    app_dir().join("cache.sqlite")
 }
 
 /// Append a diagnostic line to `greedout.log` when debug logging is on. Shared by

@@ -132,11 +132,9 @@
   // Default values (mirror `Config::default()` in src-tauri/src/config.rs). Used by
   // right-click-to-reset (per field) and the Reset all button. `ui_scale` is the
   // window zoom, not a settings field, so it's preserved rather than reset.
-  // `browse_enabled` is excluded too: it's a data-index toggle, not a cosmetic
-  // setting, so "Reset all" must not silently drop the built cross-session index.
-  // `font_sets` likewise: those are the user's own saved sets, not a setting to
+  // `font_sets` is excluded too: those are the user's own saved sets, not a setting to
   // restore, and resetting the look should not throw them away.
-  const DEFAULTS: Omit<Config, "ui_scale" | "browse_enabled" | "font_sets"> = {
+  const DEFAULTS: Omit<Config, "ui_scale" | "font_sets"> = {
     poll_seconds: 0.5,
     target_tokens: 200_000,
     follow_focus: true,
@@ -262,9 +260,6 @@
       ui_scale: cfg.ui_scale,
       dim_hours: Math.max(1, cfg.dim_hours),
       theme: cfg.theme,
-      // Preserved, not edited here: turning browsing on/off happens in the
-      // Context Breakdown window. Omitting it would reset it to false on save.
-      browse_enabled: cfg.browse_enabled,
       show_statusbar: cfg.show_statusbar,
       show_prompt: cfg.show_prompt,
       clickable_titles: cfg.clickable_titles,

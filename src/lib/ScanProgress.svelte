@@ -1,13 +1,11 @@
 <script lang="ts">
-  // Shared scan-progress panel for the shared-cache build, used by both the Daily
-  // Spend window and the Context Explorer so the two render identically. It is
-  // pure PRESENTATION: all scan state (phases, running) lives in the shared
-  // scanControl store; this component only draws it as three stacked, labeled
-  // phase bars (index -> enrich -> write), each with its count and elapsed. Host
-  // windows drive the DATA side-effects via scanControl.onScanDone.
+  // Sync-progress bar for the Context Explorer. It is pure PRESENTATION: all state
+  // (progress, running) lives in the shared scanControl store; this component only
+  // draws it as one bar with its count and elapsed. Host windows drive the DATA
+  // side-effects via scanControl.onScanDone.
   import { scanState, cancelScan, type PhaseState } from "./scanControl";
 
-  // oncancel: when given, Cancel calls this; otherwise it cancels the scan itself.
+  // oncancel: when given, Cancel calls this; otherwise it stops following the sync.
   let { oncancel }: { oncancel?: () => void } = $props();
 
   // A clock that ticks only while a scan runs, so the active phase's ms updates
@@ -20,15 +18,8 @@
     return () => clearInterval(id);
   });
 
-  // The three phases in emission order, with their user-facing label.
-  const phases = $derived([
-    { label: "Locating sessions", st: $scanState.index },
-    { label: "Parsing transcripts", st: $scanState.enrich },
-    { label: "Saving", st: $scanState.write },
-  ]);
-
   // Remaining width for the mask that obscures the unfilled part of the static
-  // gradient track. 100% = empty; a phase not yet reached (total 0) reads empty.
+  // gradient track. 100% = empty; nothing to read yet (total 0) reads empty.
   function remaining(st: PhaseState): string {
     return st.total ? `${100 - (st.done / st.total) * 100}%` : "100%";
   }
@@ -49,16 +40,14 @@
 
 {#if $scanState.running}
   <div class="scanbar">
-    {#each phases as ph, i (ph.label)}
-      <div class="prow" class:inactive={ph.st.total === 0}>
-        <span class="plabel">{ph.label}</span>
-        <div class="ptrack" style:background-position="{i * 50}% 0">
-          <div class="pmask" style:width={remaining(ph.st)}></div>
-        </div>
-        <span class="pcount">{count(ph.st)}</span>
-        <span class="pms">{elapsed(ph.st)}</span>
+    <div class="prow" class:inactive={$scanState.sync.total === 0}>
+      <span class="plabel">Reading conversations</span>
+      <div class="ptrack">
+        <div class="pmask" style:width={remaining($scanState.sync)}></div>
       </div>
-    {/each}
+      <span class="pcount">{count($scanState.sync)}</span>
+      <span class="pms">{elapsed($scanState.sync)}</span>
+    </div>
     <div class="pfoot">
       <button class="pcancel" onclick={cancel}>Cancel</button>
     </div>
@@ -95,12 +84,8 @@
     height: 6px;
     border-radius: 3px;
     overflow: hidden;
-    /* One continuous theme gauge gradient split across the three bars: the track
-       paints the full g0->g1->g2 sweep at 300% width, and each row shifts its
-       window (background-position 0/50/100%) so bar 1 shows the first third, bar 2
-       the middle, bar 3 the last. Together the three bars read as a single sweep. */
+    /* The theme gauge gradient; the mask over it reveals it as the sync advances. */
     background: linear-gradient(to right, var(--g0), var(--g1), var(--g2));
-    background-size: 300% 100%;
   }
   /* Obscures the unfilled (right) part; shrinking it reveals the static gradient.
      Must be OPAQUE -- var(--panel)/--hover are semi-transparent in some themes and

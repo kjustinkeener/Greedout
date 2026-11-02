@@ -246,8 +246,6 @@ struct ComposerInfo {
     created_ms: Option<i64>,
     /// Composer `name`, if Cursor recorded one.
     title: Option<String>,
-    /// Per-bubble estimated spend rows for Daily Spend: (msg_id, ts_ms, cost).
-    turns: Vec<(Option<String>, i64, f64)>,
 }
 
 /// Read a JSON-extracted `createdAt` cell that may be an integer/real ms epoch or an
@@ -336,7 +334,6 @@ fn composer_info(id: &str) -> Option<ComposerInfo> {
         let mi = model_info(model.as_deref().unwrap_or(""));
 
         let mut cost_usd = 0.0;
-        let mut turns: Vec<(Option<String>, i64, f64)> = Vec::new();
         for b in &bubbles {
             let chars = b.text.chars().count() as u64;
             if chars == 0 {
@@ -347,15 +344,9 @@ fn composer_info(id: &str) -> Option<ComposerInfo> {
             let rate = if b.btype == 1 { mi.price_in } else { mi.price_out };
             let cost = tokens * rate / 1_000_000.0;
             cost_usd += cost;
-            // Per-turn spend row (Daily Spend). No stable dedupe id needed: each
-            // composer's bubbles are inserted only under its own synthetic path.
-            let ts = b.ts.or(created_ms);
-            if let (Some(t), true) = (ts, cost > 0.0) {
-                turns.push((None, t, cost));
-            }
         }
 
-        Ok(ComposerInfo { ctx, ctx_limit, model, cost_usd, created_ms, title, turns })
+        Ok(ComposerInfo { ctx, ctx_limit, model, cost_usd, created_ms, title })
     })
 }
 
@@ -373,6 +364,7 @@ pub(crate) struct LedgerComposer {
     pub title: Option<String>,
     pub cwd: Option<String>,
     pub model: Option<String>,
+    pub ctx: Option<u64>,
     pub bubbles: Vec<LedgerBubble>,
 }
 
@@ -380,9 +372,9 @@ pub(crate) struct LedgerComposer {
 /// prices them. A bubble with no time of its own takes the composer's creation
 /// time; one with neither is left out.
 pub(crate) fn ledger_composer(id: &str) -> Option<LedgerComposer> {
-    let (title, created_ms, bubbles) = with_db(|conn| {
-        let (_ctx, _limit, created_ms, title) = fetch_meter(conn, id).unwrap_or((None, None, None, None));
-        Ok((title, created_ms, fetch_bubbles(conn, id)?))
+    let (ctx, title, created_ms, bubbles) = with_db(|conn| {
+        let (ctx, _limit, created_ms, title) = fetch_meter(conn, id).unwrap_or((None, None, None, None));
+        Ok((ctx, title, created_ms, fetch_bubbles(conn, id)?))
     })?;
     let model = bubbles.iter().rev().find_map(|b| b.model.as_deref().filter(|m| !m.is_empty()).map(str::to_string));
     let mi = model_info(model.as_deref().unwrap_or(""));
@@ -398,7 +390,7 @@ pub(crate) fn ledger_composer(id: &str) -> Option<LedgerComposer> {
             Some(LedgerBubble { key: b.key.clone(), user: b.btype == 1, ts, cost: est_tokens(chars) as f64 * rate / 1_000_000.0 })
         })
         .collect();
-    Some(LedgerComposer { title, cwd: workspace_map().get(id).cloned(), model, bubbles })
+    Some(LedgerComposer { title, cwd: workspace_map().get(id).cloned(), model, ctx, bubbles })
 }
 
 // --- composer -> workspace folder mapping (project attribution) ---
@@ -672,41 +664,6 @@ pub fn history(id: &str) -> Vec<Sample> {
     downsample(vec![Sample { t, ctx, cost: info.cost_usd }], 200)
 }
 
-/// Whole-composer browse-cache row: the Cursor analog of `scan::enrich_meta`,
-/// producing the SAME `EnrichMeta`. Reads the DB by the id encoded in `path` (the
-/// synthetic file itself never exists), so the `raw` variant below ignores its bytes.
-pub fn enrich_meta(path: &Path) -> crate::scan::EnrichMeta {
-    let id = id_from_path(path);
-    let mut out = crate::scan::EnrichMeta::default();
-    let Some(info) = composer_info(&id) else { return out };
-
-    out.ctx = info.ctx;
-    out.cost_usd = info.cost_usd;
-    out.turn_count = info.turns.len() as u64;
-    out.turns = info.turns;
-    out.title = info.title;
-    // Real workspace folder when mapped, so browse Pass-2 refines the project from it;
-    // unmapped composers report None and keep the Pass-1 "Cursor" bucket.
-    out.cwd = workspace_map().get(&id).cloned();
-    out.has_context_usage = false;
-    if let Some(m) = &info.model {
-        let mi = model_info(m);
-        out.model_label = mi.label.to_string();
-        out.model_version = parse_model_version(m);
-        out.target = mi.target;
-        out.limit = info.ctx_limit.unwrap_or(mi.context_max);
-    } else if let Some(lim) = info.ctx_limit {
-        out.limit = lim;
-    }
-    out
-}
-
-/// Parse-only shim for the enrich dispatcher. Cursor data lives in the DB, not in
-/// the (nonexistent) file bytes, so `raw` is ignored and we go straight to the DB.
-pub fn enrich_meta_from(path: &Path, _raw: &str) -> crate::scan::EnrichMeta {
-    enrich_meta(path)
-}
-
 /// Chat text of one composer for the browse search, in the same `ChatDoc` shape as
 /// the Claude/Codex readers. Reads the DB by the id in `path`; `raw` is ignored (the
 /// synthetic file has no bytes). Timestamps are left None -- Cursor's per-bubble
@@ -747,20 +704,6 @@ pub fn read_chat_doc(path: &Path, _raw: &str) -> crate::browse::ChatDoc {
 #[allow(dead_code)]
 pub fn cwd_of(path: &Path) -> Option<String> {
     workspace_map().get(&id_from_path(path)).cloned()
-}
-
-/// The composer's title and a treemap size-analog, in a single DB read. Cursor rows
-/// have no file on disk, so a synthetic path reports 0 bytes and the byte-sized browse
-/// treemap would give the whole harness zero area. We size a composer by its context
-/// magnitude instead -- tokens * 4, the bytes a transcript of that context would take
-/// -- so the Cursor tile is present and comparably scaled. Returns `(title, bytes)`.
-pub(crate) fn title_and_size(id: &str) -> (Option<String>, i64) {
-    with_db(|conn| {
-        let (ctx, _lim, _created, title) =
-            fetch_meter(conn, id).unwrap_or((None, None, None, None));
-        Ok((title, (ctx.unwrap_or(0) as i64) * 4))
-    })
-    .unwrap_or((None, 0))
 }
 
 /// Ordered `(is_user, text, ts_ms)` for a composer's non-empty bubbles, feeding the
@@ -864,9 +807,8 @@ mod tests {
         for (path, _mtime) in cands {
             let id = id_from_path(&path);
             if let Some(info) = composer_info(&id) {
-                // Meter is a real snapshot; enrich must expose it unmodified.
-                let em = enrich_meta(&path);
-                assert_eq!(em.ctx, info.ctx);
+                // Meter is a real snapshot; the ledger must store it unmodified.
+                assert_eq!(ledger_composer(&id).and_then(|c| c.ctx), info.ctx);
                 // If a model resolved, it prices to a known label (Grok on this box).
                 if let Some(m) = &info.model {
                     assert!(!model_info(m).label.is_empty());

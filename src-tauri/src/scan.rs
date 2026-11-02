@@ -28,8 +28,8 @@ enum Harness {
 }
 
 /// Pricing and context limits for one model. Prices are USD per million tokens
-/// (as published), converted to per-token at use. `context_max` is the hard
-/// enforced window; `target` is the recommended "sweet spot" the gauge fills to.
+/// (as published), converted to per-token at use. `context_max` is the
+/// hard enforced window.
 pub(crate) struct ModelInfo {
     pub label: &'static str,
     pub price_in: f64,
@@ -37,7 +37,6 @@ pub(crate) struct ModelInfo {
     pub price_cache_write: f64,
     pub price_cache_read: f64,
     pub context_max: u64,
-    pub target: u64,
 }
 
 /// Look up a model by (case-insensitive substring of) its id. Central table --
@@ -66,17 +65,17 @@ pub(crate) fn model_info(model: &str) -> ModelInfo {
         if m.contains("gpt-6") {
             return ModelInfo { label: "GPT", price_in: 10.0, price_out: 50.0,
                 price_cache_write: 12.5, price_cache_read: 1.0,
-                context_max: 1_050_000, target: 272_000 };
+                context_max: 1_050_000 };
         }
         if m.contains("nano") {
             return ModelInfo { label: "GPT", price_in: 0.05, price_out: 0.40,
                 price_cache_write: 0.05, price_cache_read: 0.005,
-                context_max: 400_000, target: 272_000 };
+                context_max: 400_000 };
         }
         if m.contains("mini") {
             return ModelInfo { label: "GPT", price_in: 0.25, price_out: 2.0,
                 price_cache_write: 0.25, price_cache_read: 0.025,
-                context_max: 400_000, target: 272_000 };
+                context_max: 400_000 };
         }
         // gpt-5.6 (terra/sol/luna) and gpt-5.5 are separately-priced published
         // tiers, NOT one price -- and the version number doesn't track cost (5.5 is
@@ -89,22 +88,22 @@ pub(crate) fn model_info(model: &str) -> ModelInfo {
         if m.contains("-terra") {
             return ModelInfo { label: "GPT", price_in: 2.0, price_out: 12.0,
                 price_cache_write: 2.0, price_cache_read: 0.20,
-                context_max: 400_000, target: 272_000 };
+                context_max: 400_000 };
         }
         if m.contains("-sol") {
             return ModelInfo { label: "GPT", price_in: 4.0, price_out: 20.0,
                 price_cache_write: 4.0, price_cache_read: 0.40,
-                context_max: 400_000, target: 272_000 };
+                context_max: 400_000 };
         }
         if m.contains("-luna") {
             return ModelInfo { label: "GPT", price_in: 0.20, price_out: 1.20,
                 price_cache_write: 0.20, price_cache_read: 0.02,
-                context_max: 400_000, target: 272_000 };
+                context_max: 400_000 };
         }
         if m.contains("gpt-5.5") {
             return ModelInfo { label: "GPT", price_in: 5.0, price_out: 30.0,
                 price_cache_write: 5.0, price_cache_read: 0.50,
-                context_max: 400_000, target: 272_000 };
+                context_max: 400_000 };
         }
         // PLACEHOLDER: any OTHER versioned codex codename (decimal minor after the
         // 5) with no published price we've captured. Proxy to the confirmed
@@ -112,11 +111,11 @@ pub(crate) fn model_info(model: &str) -> ModelInfo {
         if m.contains("gpt-5.") {
             return ModelInfo { label: "GPT", price_in: 1.75, price_out: 14.0,
                 price_cache_write: 1.75, price_cache_read: 0.175,
-                context_max: 400_000, target: 272_000 };
+                context_max: 400_000 };
         }
         return ModelInfo { label: "GPT", price_in: 1.25, price_out: 10.0,
             price_cache_write: 1.25, price_cache_read: 0.125,
-            context_max: 400_000, target: 272_000 };
+            context_max: 400_000 };
     }
     // --- Anthropic Claude ---
     // Sweet spot 200k, hard window 1M (per our own findings).
@@ -128,22 +127,22 @@ pub(crate) fn model_info(model: &str) -> ModelInfo {
     if m.contains("fable") {
         return ModelInfo { label: "Fable", price_in: 10.0, price_out: 50.0,
             price_cache_write: 12.50, price_cache_read: 0.25,
-            context_max: 1_000_000, target: 200_000 };
+            context_max: 1_000_000 };
     }
     if m.contains("opus") {
         return ModelInfo { label: "Opus", price_in: 15.0, price_out: 75.0,
             price_cache_write: 18.75, price_cache_read: 1.50,
-            context_max: 1_000_000, target: 200_000 };
+            context_max: 1_000_000 };
     }
     if m.contains("sonnet") {
         return ModelInfo { label: "Sonnet", price_in: 3.0, price_out: 15.0,
             price_cache_write: 3.75, price_cache_read: 0.30,
-            context_max: 1_000_000, target: 200_000 };
+            context_max: 1_000_000 };
     }
     if m.contains("haiku") {
         return ModelInfo { label: "Haiku", price_in: 1.0, price_out: 5.0,
             price_cache_write: 1.25, price_cache_read: 0.10,
-            context_max: 200_000, target: 200_000 };
+            context_max: 200_000 };
     }
     // --- xAI Grok (Cursor's default; e.g. "grok-4.6") ---
     // grok-4.6 standard-tier API pricing (verified against xAI/aggregators 2026-09-14):
@@ -154,12 +153,12 @@ pub(crate) fn model_info(model: &str) -> ModelInfo {
     if m.contains("grok") {
         return ModelInfo { label: "Grok", price_in: 2.0, price_out: 6.0,
             price_cache_write: 2.0, price_cache_read: 0.50,
-            context_max: 500_000, target: 200_000 };
+            context_max: 500_000 };
     }
     // --- future: other cloud models go here ---
     ModelInfo { label: "?", price_in: 15.0, price_out: 75.0,
         price_cache_write: 18.75, price_cache_read: 1.50,
-        context_max: 1_000_000, target: 200_000 }
+        context_max: 1_000_000 }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -826,32 +825,8 @@ pub(crate) fn token_cost(model: &str, input: u64, output: u64, cache_write: u64,
         / 1_000_000.0
 }
 
-/// Extract everything the enrich pass needs from ONE already-parsed assistant
-/// usage record: `(message id, ctx tokens, USD cost, model id)`. Folds what used
-/// to be three separate `serde_json::from_str` calls (ctx, model, id+cost) into a
-/// single parse. Returns None for non-assistant records or missing usage.
-pub(crate) fn assistant_usage(v: &Value) -> Option<(Option<String>, u64, f64, Option<String>)> {
-    if v.get("type").and_then(Value::as_str) != Some("assistant") {
-        return None;
-    }
-    let msg = v.get("message");
-    let u = msg.and_then(|m| m.get("usage")).or_else(|| v.get("usage"))?;
-    let get = |k: &str| u.get(k).and_then(Value::as_u64).unwrap_or(0);
-    let ctx = get("input_tokens") + get("cache_creation_input_tokens") + get("cache_read_input_tokens");
-    let model = msg.and_then(|m| m.get("model")).and_then(Value::as_str);
-    let cost = token_cost(
-        model.unwrap_or(""),
-        get("input_tokens"),
-        get("output_tokens"),
-        get("cache_creation_input_tokens"),
-        get("cache_read_input_tokens"),
-    );
-    let id = msg.and_then(|m| m.get("id")).and_then(Value::as_str).map(str::to_string);
-    Some((id, ctx, cost, model.map(str::to_string)))
-}
-
 /// `compactMetadata.postTokens` from an already-parsed `compact_boundary` record.
-fn post_tokens_from(v: &Value) -> Option<u64> {
+pub(crate) fn post_tokens_from(v: &Value) -> Option<u64> {
     if v.get("subtype")?.as_str()? != "compact_boundary" {
         return None;
     }
@@ -1387,112 +1362,6 @@ pub struct SpendSummary {
     pub cost: f64,
 }
 
-/// Full per-session metadata for the browse cache (see browse.rs). Unlike the
-/// poll-time `Session`, this is computed from a single WHOLE-file read, so it can
-/// report the deduped cumulative cost, the turn count, and whether the session
-/// ever ran `/context` -- none of which a cheap tail can know. Reserved for the
-/// opt-in cross-session index; not on the hot poll path.
-#[derive(Debug, Clone, Default)]
-pub struct EnrichMeta {
-    pub ctx: Option<u64>,
-    pub model_label: String,
-    pub model_version: String,
-    pub target: u64,
-    pub limit: u64,
-    pub cost_usd: f64,
-    pub turn_count: u64,
-    pub title: Option<String>,
-    pub cwd: Option<String>,
-    /// True if any `/context` (`contextUsage`) record exists anywhere in the file,
-    /// so the UI knows the deepest breakdown tile is available vs a placeholder.
-    pub has_context_usage: bool,
-    /// Every billed assistant turn in the file: (message id, timestamp ms, cost).
-    /// Kept UNdeduped (unlike cost_usd/turn_count above): the Daily Spend view
-    /// dedups by message id globally across files at read time, so per-file rows
-    /// must stay raw. Collected here so the whole tree is parsed once, not twice.
-    pub turns: Vec<(Option<String>, i64, f64)>,
-}
-
-/// Read a whole transcript once and derive its browse-cache row. ctx is
-/// compact-aware (a later `compact_boundary` or post-compact usage wins, same
-/// rule as the backward tail scan). Cost and turn count are deduped by assistant
-/// message id, since resumed/compacted transcripts re-append whole turns.
-pub fn enrich_meta(path: &Path) -> EnrichMeta {
-    let Ok(text) = std::fs::read_to_string(path) else { return EnrichMeta::default() };
-    enrich_meta_from(path, &text)
-}
-
-/// Parse-only half of `enrich_meta`: the caller already holds the file bytes, so
-/// this does zero IO. Split out so the scan can read once and time read vs parse
-/// separately (and feed the same bytes to the chat-doc parser).
-pub fn enrich_meta_from(_path: &Path, text: &str) -> EnrichMeta {
-    let mut out = EnrichMeta::default();
-    let mut seen: HashSet<String> = HashSet::new();
-    let mut last_model: Option<String> = None;
-    for line in text.lines() {
-        // The `/context` flag only needs the substring -- never parse those (they
-        // are the largest lines in the file).
-        if line.contains("\"contextUsage\"") {
-            out.has_context_usage = true;
-        }
-        // Cheap substring prefilter: parse each interesting line EXACTLY ONCE,
-        // then pull every field from that single Value (was 2-3 parses per line).
-        let is_usage = line.contains("\"usage\"") && line.contains("\"assistant\"");
-        let is_compact = line.contains("compact_boundary");
-        let is_title = line.contains("custom-title");
-        let is_cwd = line.contains("\"cwd\"");
-        if !(is_usage || is_compact || is_title || is_cwd) {
-            continue;
-        }
-        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
-        if is_usage {
-            if let Some((id, ctx, cost, model)) = assistant_usage(&v) {
-                out.ctx = Some(ctx);
-                if let Some(m) = model {
-                    last_model = Some(m);
-                }
-                // Per-turn row for Daily Spend: needs the timestamp (assistant_usage
-                // doesn't return it). Skip rows with no timestamp -- they can't be
-                // placed on a day. Rows are raw here; dedup happens at read time.
-                if let Some(t) = v.get("timestamp").and_then(Value::as_str).and_then(iso_to_millis) {
-                    out.turns.push((id.clone(), t, cost));
-                }
-                let fresh = match id {
-                    Some(mid) => seen.insert(mid),
-                    None => true, // no id: count it (better than dropping)
-                };
-                if fresh {
-                    out.cost_usd += cost;
-                    out.turn_count += 1;
-                }
-            }
-        }
-        if is_compact {
-            if let Some(pt) = post_tokens_from(&v) {
-                out.ctx = Some(pt);
-            }
-        }
-        if is_title {
-            if let Some(t) = v.get("customTitle").and_then(Value::as_str) {
-                out.title = Some(t.to_string());
-            }
-        }
-        if is_cwd {
-            if let Some(c) = v.get("cwd").and_then(Value::as_str) {
-                out.cwd = Some(c.to_string());
-            }
-        }
-    }
-    if let Some(m) = last_model {
-        let mi = model_info(&m);
-        out.model_label = mi.label.to_string();
-        out.target = mi.target;
-        out.limit = mi.context_max;
-        out.model_version = parse_model_version(&m);
-    }
-    out
-}
-
 /// Resolve a session id to its transcript file path (searches every project).
 pub fn transcript_path(id: &str) -> Option<PathBuf> {
     let pattern = claude_dir()
@@ -1821,7 +1690,6 @@ mod tests {
         close(f.price_cache_read, 0.25);
         close(f.price_cache_read, f.price_in * 0.025);
         assert_eq!(f.context_max, 1_000_000);
-        assert_eq!(f.target, 200_000);
         // Fable must NOT fall into the "?" Opus fallback (the old bug).
         assert!(f.price_cache_read < model_info("claude-opus-4-8").price_cache_read);
     }
@@ -1861,7 +1729,6 @@ mod tests {
         assert_eq!(g6.label, "GPT");
         close(g6.price_in, 10.0);
         assert_eq!(g6.context_max, 1_050_000);
-        assert_eq!(g6.target, 272_000);
         // Base gpt-5 tier when no specific codename matches.
         let g5 = model_info("gpt-5");
         close(g5.price_in, 1.25);
@@ -2073,44 +1940,6 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         assert_eq!(out.ctx, Some(160000), "grow-until must reach the far usage record");
         assert_eq!(out.subtitle.as_deref(), Some("do the thing"));
-    }
-
-    // --- enrich_meta (whole-file, Claude) ---
-
-    #[test]
-    fn enrich_meta_dedupes_cost_keeps_raw_turns_and_compact_ctx() {
-        let a1 = assistant("mA", "claude-opus-4-8", "2026-09-10T01:00:00.000Z", 1000, 100);
-        let a1_dup = a1.clone();
-        let b = assistant("mB", "claude-opus-4-8", "2026-09-10T01:01:00.000Z", 1000, 100);
-        // A compact_boundary as the final record sets the current ctx to postTokens.
-        let boundary = r#"{"type":"system","subtype":"compact_boundary","compactMetadata":{"postTokens":5000}}"#;
-        let content = format!("{a1}\n{a1_dup}\n{b}\n{boundary}\n");
-        let path = tmp_write(&content);
-        let out = enrich_meta(&path);
-        let _ = std::fs::remove_file(&path);
-
-        // cost/turn_count are DEDUPED by message id: mA once + mB once.
-        close(out.cost_usd, 0.045);
-        assert_eq!(out.turn_count, 2);
-        // turns stay RAW (undeduped) for the Daily Spend global dedupe: 3 rows.
-        assert_eq!(out.turns.len(), 3);
-        // ctx follows the trailing compact_boundary.
-        assert_eq!(out.ctx, Some(5000));
-        assert_eq!(out.model_label, "Opus");
-        assert_eq!(out.target, 200_000);
-        assert_eq!(out.limit, 1_000_000);
-        assert!(!out.has_context_usage);
-    }
-
-    #[test]
-    fn enrich_meta_flags_context_usage() {
-        let a = assistant("mA", "claude-opus-4-8", "2026-09-10T01:00:00.000Z", 1000, 100);
-        let ctx_line = r#"{"type":"user","contextUsage":{"foo":1}}"#;
-        let content = format!("{a}\n{ctx_line}\n");
-        let path = tmp_write(&content);
-        let out = enrich_meta(&path);
-        let _ = std::fs::remove_file(&path);
-        assert!(out.has_context_usage, "a contextUsage record sets the flag");
     }
 
     // --- pure helpers underpinning history/grouping ---

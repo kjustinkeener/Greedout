@@ -473,6 +473,8 @@ pub(crate) fn ledger_parse(buf: &[u8], base: u64, carried: Option<&str>, id: &st
                     let usage = v.get("payload").and_then(|p| p.get("usage"));
                     let ts = v.get("timestamp").and_then(Value::as_str).and_then(iso_to_millis);
                     if let (Some(usage), Some(ts)) = (usage, ts) {
+                        out.ctx = Some(usage.get("input_tokens").and_then(Value::as_u64).unwrap_or(0));
+                        out.ctx_reset = false;
                         out.evs.push(Ev::Turn {
                             id: None,
                             ts,
@@ -490,6 +492,8 @@ pub(crate) fn ledger_parse(buf: &[u8], base: u64, carried: Option<&str>, id: &st
         }
         if line.contains("\"compacted\"") && is_record_type(&line, "compacted") {
             out.evs.push(Ev::Compact);
+            out.ctx = None;
+            out.ctx_reset = true;
             continue;
         }
         if is_codex_user_prompt(&line) {
@@ -643,132 +647,6 @@ pub fn history(id: &str) -> Vec<Sample> {
         out.push(Sample { t, ctx, cost });
     }
     downsample(out, 200)
-}
-
-/// The session's working directory, read as cheaply as possible for the browse
-/// Pass-1 project grouping: a growing backward tail that stops as soon as a `cwd`
-/// is found (or the whole file has been read). Codex encodes no cwd in the rollout
-/// filename, so unlike Claude's Pass-1 (which decodes the project dir name) this
-/// costs a small tail read; the enrich pass later confirms it from a whole-file scan.
-pub fn cwd_of(path: &Path) -> Option<String> {
-    let mut file = std::fs::File::open(path).ok()?;
-    let len = file.metadata().ok()?.len();
-    let mut win = TAIL_BYTES;
-    loop {
-        let start = len.saturating_sub(win);
-        file.seek(SeekFrom::Start(start)).ok()?;
-        let mut buf = Vec::with_capacity((len - start) as usize);
-        file.read_to_end(&mut buf).ok()?;
-        if let Some(cwd) = scan_tail_buf(&buf, start > 0).cwd {
-            return Some(cwd);
-        }
-        if start == 0 {
-            return None;
-        }
-        win = win.saturating_mul(8);
-    }
-}
-
-/// Whole-file browse-cache row for a Codex rollout: the Codex analog of
-/// `scan::enrich_meta`, producing the SAME `EnrichMeta` struct in one pass.
-///
-/// Codex records are unique and append-only (no resume re-append the way Claude
-/// transcripts get), so the per-turn Daily Spend rows carry `None` for msg_id and
-/// need no dedupe key -- each `token_usage_record` is one billed turn. Context is
-/// compaction-aware (a top-level `compacted` record newer than the last usage
-/// resets it to 0, same rule as `scan_tail_buf`), and cumulative spend is priced
-/// off the newest `thread_token_usage` to match the live gauge (see build_session).
-pub fn enrich_meta(path: &Path) -> crate::scan::EnrichMeta {
-    let Ok(text) = std::fs::read_to_string(path) else { return crate::scan::EnrichMeta::default() };
-    enrich_meta_from(path, &text)
-}
-
-/// Parse-only half of `enrich_meta`: the caller already holds the file bytes, so
-/// this does zero IO. Split out so the scan can read once and time read vs parse
-/// separately (and feed the same bytes to the chat-doc parser).
-pub fn enrich_meta_from(path: &Path, text: &str) -> crate::scan::EnrichMeta {
-    let mut out = crate::scan::EnrichMeta::default();
-
-    // Resolve the session's model once (newest wins) so every per-turn row prices
-    // consistently, mirroring history().
-    let model = text.lines().rev().find_map(|l| {
-        l.contains("\"model\"").then(|| payload_str(l, "model")).flatten()
-    });
-
-    // Walk forward so "last write wins" == newest for every single-valued field.
-    let mut ctx: Option<u64> = None;
-    let mut newest_thread: Option<Counts> = None;
-    let mut window: Option<u64> = None;
-    let mut cwd: Option<String> = None;
-    let mut turn_count: u64 = 0;
-
-    for line in text.lines() {
-        let is_usage = line.contains("\"token_usage_record\"");
-        let is_compacted = line.contains("\"compacted\"");
-        let is_window = line.contains("model_context_window");
-        let is_cwd = line.contains("\"cwd\"");
-        if !(is_usage || is_compacted || is_window || is_cwd) {
-            continue;
-        }
-        let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
-        let rtype = v.get("type").and_then(Value::as_str);
-
-        if is_usage && rtype == Some("token_usage_record") {
-            if let Some(p) = v.get("payload") {
-                if let Some(usage) = p.get("usage") {
-                    turn_count += 1;
-                    ctx = Some(usage.get("input_tokens").and_then(Value::as_u64).unwrap_or(0));
-                    // Per-turn spend from THIS response's own usage, not the thread
-                    // cumulative. msg_id None: Codex rows are unique, no dedupe key.
-                    let cost = price(&counts_of(usage), model.as_deref());
-                    if let Some(t) =
-                        v.get("timestamp").and_then(Value::as_str).and_then(iso_to_millis)
-                    {
-                        out.turns.push((None, t, cost));
-                    }
-                    // Cumulative spend tracks the newest thread_token_usage (falls
-                    // back to this response's usage when absent, as usage_from does).
-                    newest_thread = Some(counts_of(p.get("thread_token_usage").unwrap_or(usage)));
-                }
-            }
-        } else if is_compacted && rtype == Some("compacted") {
-            // A compaction leaves ctx UNKNOWN until the next real usage record (see
-            // scan_tail_buf). Forward walk = last write wins, so a following turn
-            // overwrites this None with the real post-compact size; if the session
-            // ends on the compaction, it stays None -> a neutral "--" placeholder,
-            // not a misleading 0.
-            ctx = None;
-        }
-        if is_window {
-            if let Some(w) = window_from(line) {
-                window = Some(w);
-            }
-        }
-        if is_cwd {
-            if let Some(c) = payload_str(line, "cwd") {
-                cwd = Some(c);
-            }
-        }
-    }
-
-    out.ctx = ctx;
-    out.cost_usd = newest_thread.map(|c| price(&c, model.as_deref())).unwrap_or(0.0);
-    out.turn_count = turn_count;
-    out.cwd = cwd;
-    out.title = session_title(&id_from_path(path));
-    // No Codex analog of Claude's `/context` breakdown.
-    out.has_context_usage = false;
-    if let Some(m) = &model {
-        let mi = model_info(m);
-        let (label, version) = model_name(m);
-        out.model_label = label;
-        out.model_version = version;
-        out.target = mi.target;
-        out.limit = window.unwrap_or(mi.context_max);
-    } else {
-        out.limit = window.unwrap_or(0);
-    }
-    out
 }
 
 /// Chat text of a Codex rollout for the browse search, in the same `ChatDoc` shape
@@ -1075,51 +953,31 @@ mod tests {
         assert_eq!(id_from_path(short), "tiny");
     }
 
-    // --- enrich_meta (path-based) ---
+    // --- ledger_parse context size ---
 
-    #[test]
-    fn enrich_meta_last_write_wins_compaction_none_and_spend_survives() {
-        let model_line = r#"{"type":"turn_context","payload":{"model":"gpt-5.6-luna","cwd":"C:\\x\\proj"}}"#;
-        let window_line = r#"{"type":"event_msg","payload":{"type":"task_started","model_context_window":258400}}"#;
-        let u1 = r#"{"timestamp":"2026-09-10T01:20:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":1000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100},"thread_token_usage":{"input_tokens":1000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
-        let u2 = r#"{"timestamp":"2026-09-10T01:21:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":2000,"cached_input_tokens":500,"cache_write_input_tokens":0,"output_tokens":100},"thread_token_usage":{"input_tokens":3000,"cached_input_tokens":500,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
-        let compacted = r#"{"type":"compacted","payload":{"message":""}}"#;
-        let content = format!("{model_line}\n{window_line}\n{u1}\n{u2}\n{compacted}\n");
-        let path = tmp_write(&content);
-        let out = enrich_meta(&path);
-        let _ = std::fs::remove_file(&path);
-
-        // Trailing compaction => ctx unknown, not a misleading 0.
-        assert!(out.ctx.is_none(), "trailing compaction leaves ctx None");
-        // Two priced turns, each with no dedupe key (Codex rows are unique).
-        assert_eq!(out.turns.len(), 2);
-        assert!(out.turns.iter().all(|(id, _, _)| id.is_none()));
-        assert_eq!(out.turn_count, 2);
-        // Cumulative spend is priced off the NEWEST thread_token_usage (u2) and must
-        // survive the trailing compaction (non-zero).
-        let expected = price(
-            &Counts { input: 3000, cached: 500, cache_write: 0, output: 100 },
-            Some("gpt-5.6-luna"),
-        );
-        close(out.cost_usd, expected);
-        assert!(out.cost_usd > 0.0, "spend survives a trailing compaction");
-        // Window read off disk becomes the hard limit.
-        assert_eq!(out.limit, 258400);
-        assert_eq!(out.cwd.as_deref(), Some("C:\\x\\proj"));
-        assert_eq!(out.model_version, "Luna");
+    fn parse_ctx(lines: &[&str]) -> (Option<u64>, bool) {
+        let raw = lines.join("
+") + "
+";
+        let out = ledger_parse(raw.as_bytes(), 0, None, "id");
+        (out.ctx, out.ctx_reset)
     }
 
     #[test]
-    fn enrich_meta_ctx_self_heals_when_a_turn_follows_compaction() {
-        let model_line = r#"{"type":"turn_context","payload":{"model":"gpt-5.6-luna","cwd":"C:\\x\\proj"}}"#;
-        let u1 = r#"{"timestamp":"2026-09-10T01:20:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":9000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100},"thread_token_usage":{"input_tokens":9000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
+    fn ledger_parse_ctx_is_the_newest_input_and_unknown_after_a_trailing_compaction() {
+        let u1 = r#"{"timestamp":"2026-09-10T01:20:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":1000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
+        let u2 = r#"{"timestamp":"2026-09-10T01:21:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":2000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
         let compacted = r#"{"type":"compacted","payload":{"message":""}}"#;
-        let u2 = r#"{"timestamp":"2026-09-10T01:22:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":1500,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100},"thread_token_usage":{"input_tokens":10500,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":200}}}"#;
-        let content = format!("{model_line}\n{u1}\n{compacted}\n{u2}\n");
-        let path = tmp_write(&content);
-        let out = enrich_meta(&path);
-        let _ = std::fs::remove_file(&path);
-        assert_eq!(out.ctx, Some(1500), "a turn after the compaction restores ctx");
+        assert_eq!(parse_ctx(&[u1, u2]), (Some(2000), false));
+        assert_eq!(parse_ctx(&[u1, u2, compacted]), (None, true));
+    }
+
+    #[test]
+    fn ledger_parse_ctx_self_heals_when_a_turn_follows_compaction() {
+        let u1 = r#"{"timestamp":"2026-09-10T01:20:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":9000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
+        let compacted = r#"{"type":"compacted","payload":{"message":""}}"#;
+        let u2 = r#"{"timestamp":"2026-09-10T01:22:24.698Z","type":"token_usage_record","payload":{"usage":{"input_tokens":1500,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100}}}"#;
+        assert_eq!(parse_ctx(&[u1, compacted, u2]), (Some(1500), false));
     }
 
     // --- read_chat_doc ---
@@ -1197,21 +1055,5 @@ mod tests {
         // Dash in the wrong place / non-hex where hex is required.
         assert!(!is_uuid("01a088e4xd77f-72e1-b87f-f1460ccdbe2e"));
         assert!(!is_uuid("g1a088e4-d77f-72e1-b87f-f1460ccdbe2e"));
-    }
-
-    // --- cwd_of (temp fixture file) ---
-
-    #[test]
-    fn cwd_of_returns_cwd_from_tail_and_none_when_absent() {
-        let with_cwd = r#"{"type":"turn_context","payload":{"model":"gpt-5.6-luna","cwd":"C:\\x\\proj"}}"#;
-        let path = tmp_write(&format!("{with_cwd}\n"));
-        assert_eq!(cwd_of(&path).as_deref(), Some("C:\\x\\proj"));
-        let _ = std::fs::remove_file(&path);
-
-        // A transcript with no cwd anywhere yields None.
-        let no_cwd = r#"{"type":"event_msg","payload":{"type":"task_started"}}"#;
-        let path2 = tmp_write(&format!("{no_cwd}\n"));
-        assert_eq!(cwd_of(&path2), None);
-        let _ = std::fs::remove_file(&path2);
     }
 }

@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/kjustinkeener/Greedout/actions/workflows/ci.yml/badge.svg)](https://github.com/kjustinkeener/Greedout/actions/workflows/ci.yml)
 
+<img src="docs/img/greedout-overview.png" alt="Greedout showing context usage and spend for a coding session" width="420">
+
 A dashboard showing your most recently active AI coding sessions as live
 gauges: how full each one's context window is, what it has cost so far, and how that has
 moved over the session. **Claude Code** is the harness it supports today.

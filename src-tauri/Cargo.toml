@@ -56,6 +56,4 @@ debug = "line-tables-only"
 opt-level = 3
 
 [profile.release]
-opt-level = "s"
-lto = true
 strip = true

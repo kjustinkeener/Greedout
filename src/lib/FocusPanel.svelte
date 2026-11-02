@@ -173,10 +173,10 @@
       </div>
       {#if limits}
         <button type="button" class="dials" bind:this={dialsEl} onclick={calibrate}>
-          <div class="dial" title={limitTip("5h", limits.fiveHour)}>
+          <div class="dial" class:dim={dialHov && dialHov.label !== "5h"} title={limitTip("5h", limits.fiveHour)}>
             <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} onHover={hoverDial("5h")} />
           </div>
-          <div class="dial" title={limitTip("week", limits.weekly)}>
+          <div class="dial" class:dim={dialHov && dialHov.label !== "7d"} title={limitTip("week", limits.weekly)}>
             <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} onHover={hoverDial("7d")} />
           </div>
         </button>
@@ -424,7 +424,11 @@
     font: inherit;
     cursor: pointer;
   }
+  .dials .dial.dim {
+    opacity: 0.45;
+  }
   .dials .dial {
+    transition: opacity 0.12s;
     flex: 0 1 76px;
     min-width: 0;
   }

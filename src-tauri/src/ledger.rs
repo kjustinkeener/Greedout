@@ -290,7 +290,6 @@ fn is_user_prompt(line: &[u8]) -> bool {
 struct Needles {
     rate_limit: memmem::Finder<'static>,
     cwd: memmem::Finder<'static>,
-    custom_title: memmem::Finder<'static>,
     compact_boundary: memmem::Finder<'static>,
     usage: memmem::Finder<'static>,
     assistant: memmem::Finder<'static>,
@@ -306,6 +305,7 @@ struct Needles {
     local_stdout: memmem::Finder<'static>,
     local_stderr: memmem::Finder<'static>,
     msg_id: memmem::Finder<'static>,
+    assistant_head: memmem::Finder<'static>,
     task_call: memmem::Finder<'static>,
     agent_call: memmem::Finder<'static>,
 }
@@ -351,7 +351,6 @@ static NEEDLES: LazyLock<Needles> = LazyLock::new(|| {
     Needles {
         rate_limit: f("\"rate_limit_info\""),
         cwd: f("\"cwd\":\""),
-        custom_title: f("\"custom-title\""),
         compact_boundary: f("\"subtype\":\"compact_boundary\""),
         usage: f("\"usage\""),
         assistant: f("\"assistant\""),
@@ -367,6 +366,7 @@ static NEEDLES: LazyLock<Needles> = LazyLock::new(|| {
         local_stdout: f("<local-command-stdout>"),
         local_stderr: f("<local-command-stderr>"),
         msg_id: f("\"id\":\"msg_"),
+        assistant_head: f("\"message\":{\"model\""),
         task_call: f("\"name\":\"Task\""),
         agent_call: f("\"name\":\"Agent\""),
     }
@@ -434,40 +434,49 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
     let mut out = Parsed::default();
     let mut pos = base;
     let whole = Instant::now();
-    let (mut utf8, mut asst, mut other) = (0u64, 0u64, 0u64);
+    let (utf8, mut asst, mut other) = (0u64, 0u64, 0u64);
     let mut lines = 0u64;
-    for raw in buf.split(|b| *b == b'\n') {
+    // `memchr` finds line ends far faster than a per-byte closure, which dev builds
+    // compile unoptimized.
+    let mut rest = buf;
+    while !rest.is_empty() {
+        let cut = memchr::memchr(b'\n', rest).unwrap_or(rest.len());
+        let raw = &rest[..cut];
+        rest = rest.get(cut + 1..).unwrap_or(&[]);
         let start = pos;
         pos += raw.len() as u64 + 1;
         if raw.is_empty() {
             continue;
         }
         lines += 1;
-        let t = Instant::now();
-        let line = String::from_utf8_lossy(raw);
-        utf8 += t.elapsed().as_nanos() as u64;
+        let line = || String::from_utf8_lossy(raw);
         let n = &*NEEDLES;
-        if has(&n.rate_limit, raw) {
-            rate_limit_resets(&line, &mut out.resets);
+        // User lines state their type up front and assistant lines open their message
+        // with the model; either way the searches for other kinds are skipped.
+        let head = &raw[..raw.len().min(256)];
+        let user = has(&n.user, head);
+        let assistant = !user && has(&n.assistant_head, head);
+        if !user && has(&n.rate_limit, raw) {
+            rate_limit_resets(&line(), &mut out.resets);
         }
         if out.cwd.is_none() && has(&n.cwd, raw) {
-            out.cwd = serde_json::from_str::<Value>(&line)
+            out.cwd = serde_json::from_str::<Value>(&line())
                 .ok()
                 .and_then(|v| v.get("cwd").and_then(Value::as_str).map(str::to_string));
         }
-        if has(&n.custom_title, raw) {
-            let title = serde_json::from_str::<Value>(&line)
+        if raw.starts_with(b"{\"type\":\"custom-title\"") {
+            let title = serde_json::from_str::<Value>(&line())
                 .ok()
                 .and_then(|v| v.get("customTitle").and_then(Value::as_str).map(str::to_string));
             if title.is_some() {
                 out.title = title;
             }
         }
-        if has(&n.compact_boundary, raw) {
+        if !user && !assistant && has(&n.compact_boundary, raw) {
             out.evs.push(Ev::Compact);
             continue;
         }
-        if has(&n.usage, raw) && has(&n.assistant, raw) {
+        if !user && (assistant || (has(&n.usage, raw) && has(&n.assistant, raw))) {
             if extends_turn(raw, pos, &mut out.evs) {
                 continue;
             }
@@ -510,16 +519,16 @@ fn parse_claude(buf: &[u8], base: u64, sidechain: bool) -> Parsed {
         }
         if has(&n.tool_use_result, raw) && has(&n.agent_id, raw) {
             let t = Instant::now();
-            if let Some(link) = serde_json::from_str::<Value>(&line).ok().as_ref().and_then(agent_result) {
+            if let Some(link) = serde_json::from_str::<Value>(&line()).ok().as_ref().and_then(agent_result) {
                 out.agents.push(link);
             }
             other += t.elapsed().as_nanos() as u64;
             continue;
         }
-        let prompt = if sidechain { is_sidechain_prompt(raw) } else { is_user_prompt(raw) };
+        let prompt = if sidechain { user && is_sidechain_prompt(raw) } else { user && is_user_prompt(raw) };
         if prompt {
             let t = Instant::now();
-            let ts = serde_json::from_str::<Value>(&line)
+            let ts = serde_json::from_str::<Value>(&line())
                 .ok()
                 .and_then(|v| v.get("timestamp").and_then(Value::as_str).and_then(scan::iso_to_millis))
                 .unwrap_or(0);
@@ -751,7 +760,7 @@ fn read_parse(path: &Path, work: &Work, parse: ParseFn) -> Option<(Parsed, usize
     let mut buf = Vec::new();
     f.read_to_end(&mut buf).ok()?;
     // Stop at the last full line: a transcript still being written ends mid-line.
-    let end = buf.iter().rposition(|b| *b == b'\n').map_or(0, |i| i + 1);
+    let end = memchr::memrchr(b'\n', &buf).map_or(0, |i| i + 1);
     let t1 = Instant::now();
     let parsed = parse(&buf[..end], work.from, work.model.as_deref());
     FILE_READ_NS.fetch_add((t1 - t0).as_nanos() as u64, Ordering::Relaxed);

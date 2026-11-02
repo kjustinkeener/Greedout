@@ -84,7 +84,7 @@
 
   // Hovering a limit dial also takes over the big number: its usage share over the
   // share of its window elapsed, in the dial's own colour.
-  let dialHov = $state<{ label: string; usage: number; window: number | null; color: string } | null>(null);
+  let dialHov = $state<{ label: string; usage: number | null; window: number | null; color: string } | null>(null);
   const pctText = (n: number | null) => (n == null ? "-" : `${Math.round(n * 100)}%`);
   // The usage share takes the inner bar's colour; the window share takes the colour
   // at the end of the outer bar.
@@ -97,7 +97,7 @@
     if (dialHov?.window == null) return "var(--muted)";
     return spendOverride() || gaugeColor(Math.max(0, Math.min(1, dialHov.window)));
   });
-  const hoverDial = (label: string) => (h: { usage: number; window: number | null; color: string } | null) =>
+  const hoverDial = (label: string) => (h: { usage: number | null; window: number | null; color: string } | null) =>
     (dialHov = h && { label, ...h });
 
   // Clicking the dials reads a copied /usage report off the clipboard to calibrate
@@ -175,9 +175,12 @@
     <div class="speedo"><Speedo pct={session.pct} ctx={session.ctx} target={session.target} {fmtK} /></div>
     <div class="spend">
       <div class="figure" title={hov ? moneyTip() : spendTip(session.costUsd)}>
-        {#if dialHov}<span class="lbl below"><span class="who">{dialHov.label}</span> <span style:color={dialColor}>{t("main.limitUsage")}</span> / <span style:color={windowColor}>{t("main.limitWindow")}</span></span>
+        {#if dialHov && dialHov.usage != null}<span class="lbl below"><span class="who">{dialHov.label}</span> <span style:color={dialColor}>{t("main.limitUsage")}</span> / <span style:color={windowColor}>{t("main.limitWindow")}</span></span>
         {:else if hov}<span class="lbl below">{hov.label}<span class="at">{hov.time}</span></span>{/if}
-        {#if dialHov}
+        {#if dialHov && dialHov.usage == null}
+          <span class="val pair hide">0</span>
+          <span class="note">{t("main.limitNote")}</span>
+        {:else if dialHov}
           <span class="val pair"
             ><span style:color={dialColor}>{pctText(dialHov.usage)}</span> / <span style:color={windowColor}>{pctText(dialHov.window)}</span></span
           >
@@ -517,11 +520,26 @@
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;
   }
-  /* Two shares side by side ("47% / 40%"), scaled rather than resized so the
-     figure keeps its height and the dials below do not move. */
+  .spend .val.hide {
+    visibility: hidden;
+  }
+  /* Calibration hint over the dials, in the space of the figure it replaces. */
+  .spend .note {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 150px;
+    transform: translate(-50%, -5px);
+    text-align: center;
+    color: var(--fg);
+    font-size: calc(10px * var(--size-ui));
+    line-height: 1.25;
+  }
   .spend .val.lift {
     transform: translateY(-5px) scale(0.68);
   }
+  /* Two shares side by side ("47% / 40%"), scaled rather than resized so the
+     figure keeps its height and the dials below do not move. */
   .spend .val.pair {
     transform: translateY(-5px) scale(0.68);
     color: var(--muted);

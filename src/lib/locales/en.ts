@@ -78,6 +78,7 @@ export const en = {
   "tip.gauge": "context fill gauge",
   "main.limitDone": "Calibrated from /usage",
   "main.limitHint": "/usage",
+  "main.limitNote": "Run /usage in Claude Code, press its copy button, then click a dial.",
   "main.clearUsage": "Clear usage data",
   "main.limitUsage": "usage",
   "main.limitWindow": "window",

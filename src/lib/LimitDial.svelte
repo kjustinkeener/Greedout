@@ -16,8 +16,8 @@
     elapsed: number | null;
     /** Shown in place of the percentage until the dial is calibrated. */
     hint: string;
-    /** Called with the usage and window shares while the pointer is over the dial, null after. */
-    onHover: (h: { usage: number; window: number | null; color: string } | null) => void;
+    /** Called with the usage and window shares while the pointer is over the dial (usage is null before calibration), null after. */
+    onHover: (h: { usage: number | null; window: number | null; color: string } | null) => void;
   } = $props();
 
   const CX = 60,
@@ -73,7 +73,7 @@
   class="dial"
   role="img"
   aria-label={label}
-  onmouseenter={() => pct != null && onHover({ usage: pct, window: elapsed, color: useColor })}
+  onmouseenter={() => onHover({ usage: pct, window: elapsed, color: useColor })}
   onmouseleave={() => onHover(null)}
 >
   <path d={arc(R_TIME, 0, 1)} fill="none" stroke="var(--track)" stroke-width={W} stroke-linecap="round" />

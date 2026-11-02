@@ -86,10 +86,16 @@
   // share of its window elapsed, in the dial's own colour.
   let dialHov = $state<{ label: string; usage: number; window: number | null; color: string } | null>(null);
   const pctText = (n: number | null) => (n == null ? "-" : `${Math.round(n * 100)}%`);
-  let dialValue = $derived(dialHov ? `${pctText(dialHov.usage)} / ${pctText(dialHov.window)}` : "");
+  // The usage share takes the inner bar's colour; the window share takes the colour
+  // at the end of the outer bar.
   let dialColor = $derived.by(() => {
     void $themeTick;
     return spendOverride() ?? dialHov?.color ?? "var(--yellow)";
+  });
+  let windowColor = $derived.by(() => {
+    void $themeTick;
+    if (dialHov?.window == null) return "var(--muted)";
+    return spendOverride() ?? gaugeColor(Math.max(0, Math.min(1, dialHov.window)));
   });
   const hoverDial = (label: string) => (h: { usage: number; window: number | null; color: string } | null) =>
     (dialHov = h && { label, ...h });
@@ -155,9 +161,15 @@
       <div class="figure" title={hov ? moneyTip() : spendTip(session.costUsd)}>
         {#if dialHov}<span class="lbl">{dialHov.label} {t("main.limitUsage")} / {t("main.limitWindow")}</span>
         {:else if hov}<span class="lbl">{hov.label}<span class="at">{hov.time}</span></span>{/if}
-        <span class="val" class:pair={dialHov} style:color={dialHov ? dialColor : hov ? hovColor : spendColor}
-          >{dialHov ? dialValue : hov ? hov.value : fmtUsd(session.costUsd)}</span
-        >
+        {#if dialHov}
+          <span class="val pair"
+            ><span style:color={dialColor}>{pctText(dialHov.usage)}</span> / <span style:color={windowColor}>{pctText(dialHov.window)}</span></span
+          >
+        {:else}
+          <span class="val" style:color={hov ? hovColor : spendColor}
+            >{hov ? hov.value : fmtUsd(session.costUsd)}</span
+          >
+        {/if}
       </div>
       {#if limits}
         <button type="button" class="dials" bind:this={dialsEl} onclick={calibrate}>
@@ -440,6 +452,7 @@
      figure keeps its height and the dials below do not move. */
   .spend .val.pair {
     transform: scale(0.68);
+    color: var(--muted);
     white-space: nowrap;
   }
   .spend .val {

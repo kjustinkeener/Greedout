@@ -326,19 +326,30 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
     // `lastFocusedAt`, Codex's desktop-log mtime, both ms), then keep only the more
     // recent -- that's the session the user is actually looking at right now. The
     // loser is dropped so with n=1 the single gauge tracks true focus across apps.
+    // Per-lookup cost of the focus phase, for the "scan phases:" debug line.
+    let mut t_claude = std::time::Duration::ZERO;
+    let mut t_codex = std::time::Duration::ZERO;
+    let mut t_cursor = std::time::Duration::ZERO;
+    let mut t_fg = std::time::Duration::ZERO;
+    fn timed<T>(slot: &mut std::time::Duration, f: impl FnOnce() -> T) -> T {
+        let t = std::time::Instant::now();
+        let out = f();
+        *slot = t.elapsed();
+        out
+    }
     let (focused, codex_focused, cursor_focused) = if cfg.follow_focus && cfg.gauge_per_harness {
         // One gauge PER HARNESS: pin each harness's own focused session to the top
         // independently, so a Claude, a Codex and a Cursor panel can show at once. No
         // cross-harness tiebreak -- every winner is kept.
         (
-            focused_session_id().map(|(id, _)| id),
-            crate::codex::focused_session_id().map(|(id, _)| id),
-            crate::cursor::focused_session_id().map(|(id, _)| id),
+            timed(&mut t_claude, focused_session_id).map(|(id, _)| id),
+            timed(&mut t_codex, crate::codex::focused_session_id).map(|(id, _)| id),
+            timed(&mut t_cursor, crate::cursor::focused_session_id).map(|(id, _)| id),
         )
     } else if cfg.follow_focus {
-        let claude = focused_session_id();
-        let codex = crate::codex::focused_session_id();
-        let cursor = crate::cursor::focused_session_id();
+        let claude = timed(&mut t_claude, focused_session_id);
+        let codex = timed(&mut t_codex, crate::codex::focused_session_id);
+        let cursor = timed(&mut t_cursor, crate::cursor::focused_session_id);
         // A bare alt-tab between the apps writes nothing to any of their logs (Claude
         // rewrites `lastFocusedAt` only on a within-Claude thread switch; Codex logs a
         // route line only when a DIFFERENT thread is selected; Cursor logs nothing on
@@ -352,7 +363,7 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
         // actually in rather than flipping by stale timestamps.
         use std::sync::atomic::{AtomicU8, Ordering};
         static LAST_FG: AtomicU8 = AtomicU8::new(0); // 0 unknown, 1 claude, 2 codex, 3 cursor
-        let fg = foreground_exe();
+        let fg = timed(&mut t_fg, foreground_exe);
         let app = match fg.as_deref() {
             Some("chatgpt.exe") => 2,
             Some("claude.exe") => 1,
@@ -514,7 +525,7 @@ pub fn scan(cfg: &Config, labels: &HashMap<String, String>) -> Vec<Session> {
         crate::config::debug_log(
             cfg,
             &format!(
-                "scan phases: focus {t_focus:?}, glob {:?}, codex+cursor {:?}, sort {:?}, build {:?} (slowest: {}), group {:?}, total {:?}",
+                "scan phases: focus {t_focus:?} (claude {t_claude:?}, codex {t_codex:?}, cursor {t_cursor:?}, fg {t_fg:?}), glob {:?}, codex+cursor {:?}, sort {:?}, build {:?} (slowest: {}), group {:?}, total {:?}",
                 t_glob - t_focus,
                 t_cands - t_glob,
                 t_sorted - t_cands,

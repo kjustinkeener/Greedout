@@ -304,9 +304,9 @@ fn pick_focus(app: u8, claude_ts: Option<u64>, codex_ts: Option<u64>, cursor_ts:
     }
 }
 
-/// How many sessions each scan builds. Starts at one (the main dials) so startup
-/// builds nothing else; the window then measures its free space and asks for more.
-static POOL: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
+/// How many sessions each scan builds. Starts at two: the main dials plus one row
+/// below, which the window measures to work out how many more rows fit and asks for.
+static POOL: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(2);
 const POOL_MIN: usize = 1;
 const POOL_MAX: usize = 50;
 

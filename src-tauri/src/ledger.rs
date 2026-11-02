@@ -842,50 +842,38 @@ fn sync_file(
     Ok(true)
 }
 
-/// Every `.jsonl` file under `dir`, at any depth. A plain directory read is far
-/// quicker than a `**` glob, and this runs on every poll.
-fn collect_jsonl(dir: &Path, out: &mut Vec<(PathBuf, std::fs::Metadata)>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
-    for e in entries.flatten() {
-        let path = e.path();
-        match e.file_type() {
-            // Saved tool output, about half of all directories, never holds a transcript.
-            Ok(t) if t.is_dir() && e.file_name() != "tool-results" => collect_jsonl(&path, out),
-            Ok(t) if t.is_file() && path.extension().is_some_and(|x| x == "jsonl") => {
-                if let Ok(md) = e.metadata() {
-                    out.push((path, md));
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-/// `collect_jsonl` over a whole projects folder, with the per-session folders
-/// (thousands of them) read by several threads: listing a directory is a system
-/// call, so the work spreads well.
+/// Every `.jsonl` file under `root`. Threads share one stack of folders still to
+/// read: listing a folder is a system call that mostly waits, so many can be in
+/// flight at once, and folders found by one thread are picked up by any.
 fn collect_parallel(root: &Path) -> Vec<(PathBuf, std::fs::Metadata)> {
+    let stack = Mutex::new(vec![root.to_path_buf()]);
+    // Folders on the stack plus those being read; zero means the walk is over.
+    let pending = AtomicUsize::new(1);
+    let threads = std::thread::available_parallelism().map_or(4, |n| n.get() * 2).min(32);
     let mut found = Vec::new();
-    let mut units: Vec<PathBuf> = Vec::new();
-    // Project folders hold transcripts directly, plus one folder per session.
-    let mut projects = Vec::new();
-    collect_level(root, &mut found, &mut projects);
-    for project in &projects {
-        collect_level(project, &mut found, &mut units);
-    }
-    let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(8);
-    let next = AtomicUsize::new(0);
     std::thread::scope(|s| {
         let workers: Vec<_> = (0..threads)
             .map(|_| {
                 s.spawn(|| {
-                    let mut local = Vec::new();
+                    let (mut files, mut dirs) = (Vec::new(), Vec::new());
                     loop {
-                        let i = next.fetch_add(1, Ordering::Relaxed);
-                        let Some(dir) = units.get(i) else { break };
-                        collect_jsonl(dir, &mut local);
+                        let next = stack.lock().ok().and_then(|mut s| s.pop());
+                        let Some(dir) = next else {
+                            if pending.load(Ordering::Acquire) == 0 {
+                                break;
+                            }
+                            std::thread::yield_now();
+                            continue;
+                        };
+                        dirs.clear();
+                        collect_level(&dir, &mut files, &mut dirs);
+                        pending.fetch_add(dirs.len(), Ordering::AcqRel);
+                        if let Ok(mut s) = stack.lock() {
+                            s.append(&mut dirs);
+                        }
+                        pending.fetch_sub(1, Ordering::AcqRel);
                     }
-                    local
+                    files
                 })
             })
             .collect();
@@ -896,7 +884,8 @@ fn collect_parallel(root: &Path) -> Vec<(PathBuf, std::fs::Metadata)> {
     found
 }
 
-/// One directory's transcripts into `files`, its subfolders into `dirs`.
+/// One folder's transcripts into `files`, its subfolders into `dirs`. Saved tool output,
+/// about half of all folders, never holds a transcript.
 fn collect_level(dir: &Path, files: &mut Vec<(PathBuf, std::fs::Metadata)>, dirs: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     for e in entries.flatten() {

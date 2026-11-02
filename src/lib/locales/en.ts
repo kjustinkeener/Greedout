@@ -80,7 +80,7 @@ export const en = {
   "main.limitHint": "/usage",
   "main.limitStep1": "Run /usage in Claude Code",
   "main.limitStep2": "Press its copy button",
-  "main.limitStep3": "Click a dial",
+  "main.limitStep3": "Click either dial",
   "main.clearUsage": "Clear usage data",
   "main.limitUsage": "usage",
   "main.limitWindow": "window",

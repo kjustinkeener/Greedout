@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from "./i18n.svelte";
-  import { gaugeColor, themeTick } from "./theme";
+  import { gaugeColor, spendFor, themeTick } from "./theme";
   // Context-fill gauge, styled after the logo mark's dial (cyan->yellow->red
   // arc + needle + hub), without the shield behind it. 270-degree sweep with
   // the gap at the bottom; needle maps 0..100% of the context budget.
@@ -64,7 +64,11 @@
   let clamped = $derived(pct == null ? 0 : Math.max(0, Math.min(1, pct)));
   let needleAngle = $derived(START + SWEEP * clamped);
   let pctText = $derived(pct == null ? "--" : Math.round(pct * 100) + "%");
-  let over = $derived(pct != null && pct >= 1);
+  // Same color as the spend figure, so the readouts and the dollar amount agree.
+  let readColor = $derived.by(() => {
+    void $themeTick;
+    return spendFor(pct);
+  });
 </script>
 
 <svg viewBox="0 0 120 100" class="speedo" role="img" aria-label={t("tip.gauge")}>
@@ -98,8 +102,8 @@
   </g>
 
   <!-- readouts in the bottom gap -->
-  <text x={CX} y="82" text-anchor="middle" class="pct" class:over>{pctText}</text>
-  <text x={CX} y="95" text-anchor="middle" class="sub">{fmtK(ctx)}/{fmtK(target)}</text>
+  <text x={CX} y="82" text-anchor="middle" class="pct" style:fill={readColor}>{pctText}</text>
+  <text x={CX} y="95" text-anchor="middle" class="sub" style:fill={readColor}>{fmtK(ctx)}/{fmtK(target)}</text>
 </svg>
 
 <style>
@@ -111,17 +115,12 @@
   .pct {
     font-size: calc(15px * var(--size-num));
     font-weight: var(--w-bold);
-    fill: var(--fg);
     font-family: var(--font-num);
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;
   }
-  .pct.over {
-    fill: var(--red);
-  }
   .sub {
     font-size: calc(8.5px * var(--size-num));
-    fill: var(--muted);
     font-family: var(--font-num);
     font-size-adjust: var(--font-num-adj);
     font-variant-numeric: tabular-nums;

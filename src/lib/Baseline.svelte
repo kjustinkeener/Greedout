@@ -1656,12 +1656,6 @@
               title="Size tiles by measured spend">{fmtUsd(displayUsd)}</button
             >
           </span>
-          <button class="crumb back rescan" onclick={() => startScan()} disabled={scanning}
-          >
-            {#if !scanning}<Icon name="refresh" size={11} />{/if}{scanning
-              ? "scanning…"
-              : "rescan"}</button
-          >
         </span>
       </div>
 
@@ -1672,7 +1666,7 @@
         <div class="msg">Loading…</div>
       {:else if !current.length}
         {#if !scanning}
-          <div class="msg">Nothing indexed yet. Try ↻ rescan.</div>
+          <div class="msg">Nothing indexed yet.</div>
         {/if}
       {:else}
         {@render mapArea()}
@@ -2725,18 +2719,10 @@
     line-height: 1.5;
     color: var(--fg);
   }
-  .rescan {
-    margin-left: 8px;
-    font-size: calc(11px * var(--size-ui));
-  }
   .px {
     display: flex;
     align-items: center;
     color: var(--muted);
-  }
-  .rescan:disabled {
-    opacity: 0.5;
-    cursor: default;
   }
   .scanwrap {
     padding: 4px 10px 0;

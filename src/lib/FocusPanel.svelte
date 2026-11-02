@@ -5,7 +5,7 @@
   import History from "./History.svelte";
   import Icon from "./Icon.svelte";
   import { gaugeColor, spendFor, spendOverride, themeTick } from "./theme";
-  import { agoTip, ctxTip, limitsTip, limitTip, modelTip, sizeTip, moneyTip, spendTip } from "./tips";
+  import { agoTip, ctxTip, limitsTip, modelTip, sizeTip, moneyTip, spendTip } from "./tips";
   import { t } from "./i18n.svelte";
   import { invoke } from "@tauri-apps/api/core";
 
@@ -173,10 +173,10 @@
       </div>
       {#if limits}
         <button type="button" class="dials" bind:this={dialsEl} onclick={calibrate}>
-          <div class="dial" class:dim={dialHov && dialHov.label !== "5h"} title={limitTip("5h", limits.fiveHour)}>
+          <div class="dial" class:dim={dialHov && dialHov.label !== "5h"}>
             <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} onHover={hoverDial("5h")} />
           </div>
-          <div class="dial" class:dim={dialHov && dialHov.label !== "7d"} title={limitTip("week", limits.weekly)}>
+          <div class="dial" class:dim={dialHov && dialHov.label !== "7d"}>
             <LimitDial label="7d" pct={limits.weekly.pct} elapsed={limits.weekly.elapsed} hint={t("main.limitHint")} onHover={hoverDial("7d")} />
           </div>
         </button>

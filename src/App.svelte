@@ -434,6 +434,8 @@
       if (sessions.length > 0 && want !== lastPool) {
         lastPool = want;
         poolChanged = true;
+        // Dev only: slow the pull so the rows can be watched loading in.
+        if (import.meta.env.DEV) await new Promise((r) => setTimeout(r, 2000));
         await invoke("set_pool", { n: want }).catch(() => {});
       }
     } finally {

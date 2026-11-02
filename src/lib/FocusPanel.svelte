@@ -190,7 +190,7 @@
         {/if}
       </div>
       {#if limits}
-        <button type="button" class="dials" class:ghost={dialHov && dialHov.usage == null} bind:this={dialsEl} onclick={calibrate}>
+        <button type="button" class="dials" bind:this={dialsEl} onclick={calibrate}>
           <div class="dial" class:dim={dialHov && dialHov.label !== "5h"} oncontextmenu={(e) => openMenu(e)} role="presentation">
             <LimitDial label="5h" pct={limits.fiveHour.pct} elapsed={limits.fiveHour.elapsed} hint={t("main.limitHint")} onHover={hoverDial("5h")} />
           </div>
@@ -531,25 +531,26 @@
     visibility: hidden;
   }
   /* Calibration hint over the dials, in the space of the figure it replaces. */
-  /* Calibration hint over the whole column; the dials fade out beneath it (but keep
-     catching the pointer, so the hover holds). */
+  /* Calibration steps, shown as a tooltip over the top of the dial column while an
+     uncalibrated dial is hovered. It ignores the pointer so the hover holds. */
   .spend .note {
     position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: flex-start;
+    z-index: 5;
+    left: 0;
+    right: 0;
+    top: -6px;
     margin: 0;
+    padding: 6px 8px 6px 1.9em;
     list-style: decimal;
-    padding: 0 0 0 1.6em;
+    background: var(--bg);
+    border: 1px solid var(--track);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     pointer-events: none;
     color: var(--fg);
-    font-size: calc(12px * var(--size-ui));
-    line-height: 1.3;
-  }
-  .dials.ghost {
-    opacity: 0;
+    font-size: calc(11px * var(--size-ui));
+    line-height: 1.35;
+    white-space: nowrap;
   }
   .spend .val.lift {
     transform: translateY(-5px) scale(0.68);

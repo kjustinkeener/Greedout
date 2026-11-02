@@ -1818,6 +1818,37 @@ pub fn windows(now: i64, reset5: i64, anchor7: i64) -> Option<Windows> {
     })
 }
 
+/// What the ledger has already read of one Claude transcript: the byte offset it
+/// stopped at (a line end), the spend of its turns, and their message ids. Lets a
+/// session's running cost resume from there instead of re-reading the whole file.
+/// Every copy of a message counts here, whichever session the ledger credits it to.
+pub fn session_seed(sid: &str) -> Option<(u64, f64, Vec<String>)> {
+    with_db(|conn| {
+        let row: Option<(i64, i64, i64)> = conn
+            .query_row(
+                "SELECT id, COALESCE(offset, 0), COALESCE(len, 0) FROM sessions
+                 WHERE harness = 1 AND agent_id IS NULL AND sid = ?1",
+                [sid],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()?;
+        let Some((id, offset, _len)) = row else { return Ok(None) };
+        let mut cost = 0.0;
+        let mut ids = Vec::new();
+        let mut st = conn.prepare("SELECT msg_id, cost FROM turns WHERE session = ?1")?;
+        let rows = st.query_map([id], |r| Ok((r.get::<_, Option<String>>(0)?, r.get::<_, f64>(1)?)))?;
+        for r in rows {
+            let (m, c) = r?;
+            cost += c;
+            if let Some(m) = m {
+                ids.push(m);
+            }
+        }
+        Ok(Some((offset as u64, cost, ids)))
+    })
+    .flatten()
+}
+
 /// Spend of the counted turns in `[lo, hi)` epoch ms, for calibration against a
 /// `/usage` report's window.
 pub fn spent(lo: i64, hi: i64) -> f64 {

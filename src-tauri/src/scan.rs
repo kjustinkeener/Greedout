@@ -714,9 +714,20 @@ fn cumulative_cost(id: &str, path: &Path) -> f64 {
         Ok(c) => c,
         Err(_) => return 0.0,
     };
-    let state = cache
-        .entry(id.to_string())
-        .or_insert(CostState { offset: 0, cost: 0.0, seen: HashSet::new() });
+    // On first sight resume from what the ledger has already read of this transcript
+    // (its offset, spend and message ids) rather than tallying the whole file again;
+    // the two agree turn for turn.
+    if !cache.contains_key(id) {
+        let seed = crate::ledger::session_seed(id).filter(|(off, ..)| {
+            std::fs::metadata(path).map(|m| *off <= m.len()).unwrap_or(false)
+        });
+        let state = match seed {
+            Some((offset, cost, ids)) => CostState { offset, cost, seen: ids.into_iter().collect() },
+            None => CostState { offset: 0, cost: 0.0, seen: HashSet::new() },
+        };
+        cache.insert(id.to_string(), state);
+    }
+    let Some(state) = cache.get_mut(id) else { return 0.0 };
 
     let Ok(mut file) = std::fs::File::open(path) else { return state.cost };
     let len = file.metadata().map(|m| m.len()).unwrap_or(0);

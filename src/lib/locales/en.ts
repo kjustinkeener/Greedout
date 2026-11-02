@@ -77,7 +77,7 @@ export const en = {
   "tip.limits": "Limits: target is where the gauge redlines; max is the model's hard context window",
   "tip.gauge": "context fill gauge",
   "main.limitDone": "Calibrated from /usage",
-  "main.limitHint": "/usage",
+  "main.limitHint": "?",
   "main.limitStep1": "Run /usage in Claude Code",
   "main.limitStep2": "Press its copy button",
   "main.limitStep3": "Click either dial",

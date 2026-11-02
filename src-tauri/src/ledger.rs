@@ -764,13 +764,16 @@ fn plan_file(
 
 /// Read what was appended to a conversation file and parse it. Touches no database,
 /// so several files can be done at once. Returns the parse and the bytes consumed.
-fn read_parse(path: &Path, work: &Work, parse: ParseFn) -> Option<(Parsed, usize)> {
+fn read_parse(path: &Path, work: &Work, parse: ParseFn, buf: &mut Vec<u8>) -> Option<(Parsed, usize)> {
     let t0 = Instant::now();
     let mut f = std::fs::File::open(path).ok()?;
     f.seek(SeekFrom::Start(work.from)).ok()?;
     let t_open = Instant::now();
-    let mut buf = Vec::new();
-    f.read_to_end(&mut buf).ok()?;
+    // Each worker reuses one buffer: fresh memory for every large file costs a page
+    // fault per 4 KB.
+    buf.clear();
+    buf.reserve((work.len as u64).saturating_sub(work.from) as usize + 1);
+    f.read_to_end(buf).ok()?;
     READ_OPEN_NS.fetch_add((t_open - t0).as_nanos() as u64, Ordering::Relaxed);
     READ_BYTES_NS.fetch_add(t_open.elapsed().as_nanos() as u64, Ordering::Relaxed);
     // Stop at the last full line: a transcript still being written ends mid-line.
@@ -851,7 +854,7 @@ fn sync_file(
     parse: ParseFn,
 ) -> rusqlite::Result<bool> {
     let Some(work) = plan_file(tx, harness, path, md, key)? else { return Ok(false) };
-    let Some((parsed, end)) = read_parse(path, &work, parse) else { return Ok(false) };
+    let Some((parsed, end)) = read_parse(path, &work, parse, &mut Vec::new()) else { return Ok(false) };
     finish_file(tx, harness, path, &work, key, &parsed, end, sid, agent, fallback_dir)?;
     Ok(true)
 }
@@ -965,11 +968,12 @@ fn sync_claude(tx: &Connection, root: &Path) -> rusqlite::Result<usize> {
                 .map(|_| {
                     s.spawn(|| {
                         let mut local = Vec::new();
+                        let mut buf = Vec::new();
                         loop {
                             let i = next.fetch_add(1, Ordering::Relaxed);
                             let Some(job) = batch.get(i) else { break };
                             let parse = |buf: &[u8], base: u64, _m: Option<&str>| parse_claude(buf, base, job.sidechain);
-                            local.push((i, read_parse(&job.path, &job.work, &parse)));
+                            local.push((i, read_parse(&job.path, &job.work, &parse, &mut buf)));
                         }
                         local
                     })

@@ -176,6 +176,11 @@ export interface SessionMeta {
 }
 
 // How much the Explorer has to show, and whether a sync is being followed.
+export interface IndexProgress {
+  done: number;
+  total: number;
+}
+
 export interface BrowseStatus {
   indexed: number;
   scanning: boolean;

@@ -278,6 +278,12 @@ fn browse_status() -> browse::BrowseStatus {
     browse::status()
 }
 
+/// How many sessions the chat search index has covered so far.
+#[tauri::command]
+fn browse_index_progress() -> browse::IndexProgress {
+    browse::index_progress()
+}
+
 /// Bring the ledger up to date and report progress on "browse-progress".
 #[tauri::command]
 fn browse_scan(app: tauri::AppHandle) {
@@ -505,6 +511,7 @@ pub fn run() {
             themes::get_user_themes,
             themes::set_user_themes,
             browse_status,
+            browse_index_progress,
             browse_scan,
             clear_cache,
             browse_cancel,

@@ -16,6 +16,7 @@
     ProjectAgg,
     SessionMeta,
     BrowseStatus,
+    IndexProgress,
     SearchHit,
     SearchProgress,
   } from "../types";
@@ -88,6 +89,24 @@
   let sessionRows = $state<SessionMeta[]>([]);
   let loadingBrowse = $state(false);
   let scanning = $state(false);
+
+  // Chat search index coverage, polled until complete and again after each sync.
+  let idx = $state<IndexProgress>({ done: 0, total: 0 });
+  let idxTimer: ReturnType<typeof setTimeout> | undefined;
+  function pollIndex() {
+    clearTimeout(idxTimer);
+    invoke<IndexProgress>("browse_index_progress")
+      .then((p) => {
+        if (typeof p?.total !== "number") return;
+        idx = p;
+        if (p.done < p.total) idxTimer = setTimeout(pollIndex, 1500);
+      })
+      .catch((e) => dbg("browse_index_progress failed", e));
+  }
+  $effect(() => {
+    pollIndex();
+    return () => clearTimeout(idxTimer);
+  });
 
   // --- Full-text search (chat text only) ---
   let searchQuery = $state("");
@@ -444,6 +463,7 @@
     const unDone = onScanDone(() => {
       scanning = false;
       loadBrowseStatus();
+      pollIndex();
       // Refresh the current level read-only; re-opening a project would reset the view.
       if (zoom === "project" && selProject) refreshSessions(selProject);
       else if (zoom === "harness") openHarness();
@@ -1435,6 +1455,12 @@
             }
           }}
         />
+        {#if idx.done < idx.total}
+          <span class="sidx" title="Chat text indexed: {idx.done} of {idx.total} conversations. Search covers the rest from disk, more slowly.">
+            <span class="sidxbar"><span class="sidxfill" style:width="{(idx.done / idx.total) * 100}%"></span></span>
+            {Math.floor((idx.done / idx.total) * 100)}%
+          </span>
+        {/if}
         {#if searchActive && !searching}
           <button class="sx" aria-label="Search again" title="Search again" onclick={runSearch}
             ><Icon name="refresh" size={11} /></button
@@ -1888,6 +1914,27 @@
     font: inherit;
     font-size-adjust: var(--font-ui-adj);
     font-size: calc(12px * var(--size-ui));
+  }
+  .sidx {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+    font-size: calc(10px * var(--size-ui));
+    font-variant-numeric: tabular-nums;
+  }
+  .sidxbar {
+    width: 34px;
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+  .sidxfill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(to right, var(--g0), var(--g1), var(--g2));
   }
   .sinput::placeholder {
     color: var(--muted);

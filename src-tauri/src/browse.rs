@@ -128,6 +128,28 @@ pub fn status() -> BrowseStatus {
     BrowseStatus { indexed, scanning: running().load(Ordering::Relaxed) }
 }
 
+/// How much of the transcript text the chat index has covered.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexProgress {
+    pub done: u64,
+    pub total: u64,
+}
+
+/// Sessions whose text is fully indexed, out of all file-backed main sessions.
+pub fn index_progress() -> IndexProgress {
+    let (done, total) = ledger::with_db(|c| {
+        c.query_row(
+            "SELECT COALESCE(SUM(fts_off >= COALESCE(offset, 0)), 0), COUNT(*) FROM sessions
+             WHERE path IS NOT NULL AND agent_id IS NULL",
+            [],
+            |r| Ok((r.get::<_, u64>(0)?, r.get::<_, u64>(1)?)),
+        )
+    })
+    .unwrap_or((0, 0));
+    IndexProgress { done, total }
+}
+
 /// Follow a ledger sync on a background thread, emitting "browse-progress" with how
 /// many conversation files it has stored, then "done". A no-op while one is followed.
 pub fn run_scan(app: tauri::AppHandle) {

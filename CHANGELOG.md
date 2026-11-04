@@ -6,6 +6,14 @@ documented in the GitHub Releases notes and the `v*` git tags.
 
 ## [Unreleased]
 
+## [0.4.12] - 2026-11-04
+
+### Added
+- The star thank-you card has a close button.
+
+### Fixed
+- The star card no longer counts time the window spends hidden in the tray or minimized.
+
 ## [0.4.11] - 2026-11-04
 
 ### Changed

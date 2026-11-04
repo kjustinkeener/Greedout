@@ -240,7 +240,7 @@
     border: 1px solid var(--edge);
     border-radius: 7px;
     font-size: 11.5px;
-    color: var(--muted);
+    color: var(--fg);
   }
   .star-card.thanks {
     background: linear-gradient(160deg, #fff1a8, #ffd23f 55%, #f5a31c);

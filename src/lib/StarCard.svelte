@@ -146,6 +146,9 @@
   <!-- update card is showing -->
 {:else if shown && thanks}
   <div class="star-card thanks" role="region" aria-label={t("star.label")}>
+    <button class="x" onclick={() => (shown = false)} title={t("common.close")} aria-label={t("common.close")}>
+      <Icon name="x" size={11} />
+    </button>
     <p>{t("star.thanks")}</p>
     <div class="row">
       <button onclick={browse}><Icon name="layers" size={13} />{t("star.browse")}</button>
@@ -261,6 +264,25 @@
     background: #3a2705;
     border-color: #3a2705;
     color: #ffe9a0;
+  }
+  .star-card.thanks .x {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: #3a2705;
+  }
+  .star-card.thanks .x:hover {
+    background: rgba(58, 39, 5, 0.18);
+  }
+  .star-card.thanks p {
+    padding-right: 18px;
   }
   .head {
     display: flex;

@@ -6,6 +6,11 @@ documented in the GitHub Releases notes and the `v*` git tags.
 
 ## [Unreleased]
 
+## [0.4.11] - 2026-11-04
+
+### Changed
+- The star card waits 10 minutes of use per launch before appearing, and stays hidden while an update is offered.
+
 ## [0.4.10] - 2026-11-04
 
 ### Changed

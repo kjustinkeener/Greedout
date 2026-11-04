@@ -15,7 +15,7 @@
   const REPO ="https://github.com/kjustinkeener/Greedout";
   const KEY = "greedout:starPrompt";
   // Short in `tauri dev` so the card can be tested; release builds use the real values.
-  const NEEDED_MS = import.meta.env.DEV ? 2_000 : 2 * 60_000;
+  const NEEDED_MS = import.meta.env.DEV ? 2_000 : 10 * 60_000;
   const QUIET_MS = 30_000;
   const GAVE_MS = 30 * 60_000;
   const SNOOZE_MS = import.meta.env.DEV ? 5_000 : 24 * 3_600_000;

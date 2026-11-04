@@ -20,18 +20,20 @@
   const GAVE_MS = 30 * 60_000;
   const SNOOZE_MS = import.meta.env.DEV ? 5_000 : 24 * 3_600_000;
 
-  type Saved = { usedMs: number; snoozeUntil: number; done: boolean };
+  type Saved = { snoozeUntil: number; done: boolean };
 
   function load(): Saved {
     try {
       const s = JSON.parse(localStorage.getItem(KEY) ?? "{}");
-      return { usedMs: +s.usedMs || 0, snoozeUntil: +s.snoozeUntil || 0, done: !!s.done };
+      return { snoozeUntil: +s.snoozeUntil || 0, done: !!s.done };
     } catch {
-      return { usedMs: 0, snoozeUntil: 0, done: false };
+      return { snoozeUntil: 0, done: false };
     }
   }
 
   let saved = load();
+  // Visible time since this launch; deliberately not persisted.
+  let usedMs = 0;
   let shown = $state(false);
   let starHot = $state(false);
   // "I gave it a star" only appears once the repo page has been opened.
@@ -55,7 +57,7 @@
 
   /** Window-visible time, so a tray app that stays open counts only while shown. */
   function usedNow() {
-    return saved.usedMs + (visibleSince === null ? 0 : Date.now() - visibleSince);
+    return usedMs + (visibleSince === null ? 0 : Date.now() - visibleSince);
   }
 
   function check() {
@@ -79,9 +81,8 @@
   function hide() {
     clearTimeout(timer);
     if (visibleSince === null) return;
-    saved.usedMs += Date.now() - visibleSince;
+    usedMs += Date.now() - visibleSince;
     visibleSince = null;
-    save();
   }
 
   function sync() {

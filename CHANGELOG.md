@@ -6,6 +6,12 @@ documented in the GitHub Releases notes and the `v*` git tags.
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-11-03
+
+### Added
+- A card above the dials asks once for a GitHub star. Saying you gave one unlocks
+  nine Star Supporter themes in the theme browser. It can be snoozed or silenced.
+
 ## [0.4.8] - 2026-11-01
 
 ### Added

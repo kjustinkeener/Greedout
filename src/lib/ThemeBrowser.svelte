@@ -4,16 +4,42 @@
   import { emit, listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import type { Config } from "../types";
+  import { tick } from "svelte";
   import {
     applyTheme,
     previewTheme,
     applyUserThemes,
+    isLocked,
     THEMES,
     GROUP_ORDER,
     type Theme,
   } from "./theme";
   import type { ThemeData, ThemeColors } from "./themeCss";
   import Brand from "./Brand.svelte";
+  import { t } from "./i18n.svelte";
+
+  // The unlock is written by the main window's star card into shared storage, so
+  // this window re-reads it when it regains focus or storage changes.
+  let unlockRev = $state(0);
+  const locked = (id: string) => (void unlockRev, isLocked(id));
+
+  /** Scroll so a group's label is at the top. Wanted after "Browse Themes" on the
+   *  star card, which opens this window at the Supporter group. */
+  async function goto(group: string) {
+    await tick();
+    document
+      .querySelector(`[data-group="${CSS.escape(group)}"]`)
+      ?.scrollIntoView({ block: "start" });
+  }
+  // A freshly created window cannot be sent an event yet (its listener is not
+  // registered), so the group rides in the URL hash.
+  const hashGroup = decodeURIComponent(location.hash.slice(1));
+  if (hashGroup) void goto(hashGroup);
+  $effect(() => {
+    let un: (() => void) | undefined;
+    listen<string>("themes:goto", (e) => void goto(e.payload)).then((f) => (un = f));
+    return () => un?.();
+  });
 
   let cfg = $state<Config | null>(null);
   let current = $state<string>("dark");
@@ -105,7 +131,7 @@
   // Apply live to this window + the main window, and persist to config so the
   // choice sticks. Picking keeps the window open so themes can be compared.
   async function pick(id: string) {
-    if (!cfg) return;
+    if (!cfg || isLocked(id)) return;
     current = id;
     cfg.theme = id;
     applyTheme(id as Theme);
@@ -322,7 +348,11 @@
   }
 </script>
 
-<svelte:window onkeydown={onKey} />
+<svelte:window
+  onkeydown={onKey}
+  onfocus={() => unlockRev++}
+  onstorage={() => unlockRev++}
+/>
 
 {#snippet cardBody(label: string, p: Palette, active: boolean)}
   <div class="name" style="color:{p.fg};">{label}</div>
@@ -382,23 +412,29 @@
     {#each GROUP_ORDER as g}
       {@const builtins = THEMES.filter((t) => t.group === g)}
       {#if builtins.length}
-        <div class="grouplabel">{g}</div>
+        <div class="grouplabel" data-group={g}>
+          {g === "Supporter" ? t("theme.group.supporter") : g}
+        </div>
         <div class="grid">
-          {#each builtins as t}
-            {@const p = pal[t.id]}
+          {#each builtins as th}
+            {@const p = pal[th.id]}
+            {@const off = locked(th.id)}
             <div class="cardwrap">
               <button
                 class="card"
-                class:active={t.id === current}
+                class:active={th.id === current}
+                class:locked={off}
+                disabled={off}
                 style="background:{p.bg}; border-color:{p.edge};"
-                onclick={() => pick(t.id)}
-                title={t.label}
+                onclick={() => pick(th.id)}
+                title={off ? t("theme.starLocked") : th.label}
               >
-                {@render cardBody(t.label, p, t.id === current)}
+                {@render cardBody(th.label, p, th.id === current)}
               </button>
               <div class="tools">
                 <button class="mini" title="Duplicate & edit" aria-label="Duplicate and edit"
-                  onclick={() => duplicate(t.id, t.label)}>
+                  disabled={off}
+                  onclick={() => duplicate(th.id, th.label)}>
                   <Icon name="copy" size={12} />
                 </button>
               </div>
@@ -581,9 +617,17 @@
       transform 0.08s ease,
       box-shadow 0.08s ease;
   }
-  .card:hover {
+  .card:hover:not(.locked) {
     transform: translateY(-1px);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+  .card.locked {
+    opacity: 0.45;
+    filter: grayscale(0.6);
+    cursor: not-allowed;
+  }
+  .mini:disabled {
+    display: none;
   }
   .card.active {
     outline: 2px solid var(--fg);

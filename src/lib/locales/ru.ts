@@ -160,4 +160,15 @@ export const ru: PartialDict = {
   "compact.loading": "Загрузка сводки…",
   "compact.none": "Для этой сессии нет сводки сжатия.",
   "compact.tokens": "токенов",
+
+  "star.label": "Поставить звезду на GitHub",
+  "star.message": "Нравится Greedout?\nПоставьте ему звезду на GitHub!",
+  "star.action": "Поставить звезду на GitHub",
+  "star.later": "Напомнить позже",
+  "star.gave": "Я поставил звезду",
+  "star.thanks": "Спасибо за поддержку!\nТемы Star Supporter разблокированы!",
+  "star.browse": "Открыть темы",
+  "star.never": "Больше не показывать",
+  "theme.group.supporter": "Поддержавшие",
+  "theme.starLocked": "Заблокировано. Нажмите «Я поставил звезду» на карточке со звездой, чтобы открыть.",
 };

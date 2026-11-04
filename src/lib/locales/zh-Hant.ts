@@ -160,4 +160,15 @@ export const zhHant: PartialDict = {
   "compact.loading": "正在載入摘要…",
   "compact.none": "此工作階段沒有可用的壓縮摘要。",
   "compact.tokens": "權杖",
+
+  "star.label": "在 GitHub 上加星",
+  "star.message": "喜歡 Greedout 嗎？\n請在 GitHub 上給它加星！",
+  "star.action": "在 GitHub 上加星",
+  "star.later": "稍後提醒",
+  "star.gave": "我已加星",
+  "star.thanks": "感謝你的支持！\nStar Supporter 主題已解鎖！",
+  "star.browse": "瀏覽主題",
+  "star.never": "不再顯示",
+  "theme.group.supporter": "支持者",
+  "theme.starLocked": "已鎖定。在加星卡片上點擊「我已加星」即可解鎖。",
 };

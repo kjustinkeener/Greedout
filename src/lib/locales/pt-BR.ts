@@ -160,4 +160,15 @@ export const ptBR: PartialDict = {
   "compact.loading": "Carregando resumo…",
   "compact.none": "Nenhum resumo de compactação disponível para esta sessão.",
   "compact.tokens": "tokens",
+
+  "star.label": "Dar uma estrela no GitHub",
+  "star.message": "Você gosta do Greedout?\nDê uma estrela no GitHub, por favor!",
+  "star.action": "Dar uma estrela no GitHub",
+  "star.later": "Lembrar mais tarde",
+  "star.gave": "Já dei uma estrela",
+  "star.thanks": "Obrigado pelo apoio!\nOs temas Star Supporter foram desbloqueados!",
+  "star.browse": "Ver temas",
+  "star.never": "Não mostrar novamente",
+  "theme.group.supporter": "Apoiador",
+  "theme.starLocked": "Bloqueado. Clique em \"Já dei uma estrela\" no cartão da estrela para desbloquear.",
 };

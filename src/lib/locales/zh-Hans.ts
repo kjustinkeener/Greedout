@@ -159,4 +159,15 @@ export const zhHans: PartialDict = {
   "compact.loading": "正在加载摘要…",
   "compact.none": "此会话没有可用的压缩摘要。",
   "compact.tokens": "token",
+
+  "star.label": "在 GitHub 上加星",
+  "star.message": "喜欢 Greedout 吗？\n请在 GitHub 上给它加星！",
+  "star.action": "在 GitHub 上加星",
+  "star.later": "稍后提醒",
+  "star.gave": "我已加星",
+  "star.thanks": "感谢你的支持！\nStar Supporter 主题已解锁！",
+  "star.browse": "浏览主题",
+  "star.never": "不再显示",
+  "theme.group.supporter": "支持者",
+  "theme.starLocked": "已锁定。在加星卡片上点击“我已加星”即可解锁。",
 };

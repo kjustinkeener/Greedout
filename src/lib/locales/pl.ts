@@ -160,4 +160,15 @@ export const pl: PartialDict = {
   "compact.loading": "Wczytywanie podsumowania…",
   "compact.none": "Brak podsumowania kompaktowania dla tej sesji.",
   "compact.tokens": "tokenów",
+
+  "star.label": "Daj gwiazdkę na GitHubie",
+  "star.message": "Podoba Ci się Greedout?\nDaj mu gwiazdkę na GitHubie!",
+  "star.action": "Daj gwiazdkę na GitHubie",
+  "star.later": "Przypomnij później",
+  "star.gave": "Dałem gwiazdkę",
+  "star.thanks": "Dziękujemy za wsparcie!\nMotywy Star Supporter zostały odblokowane!",
+  "star.browse": "Przeglądaj motywy",
+  "star.never": "Nie pokazuj więcej",
+  "theme.group.supporter": "Wspierający",
+  "theme.starLocked": "Zablokowane. Kliknij \"Dałem gwiazdkę\" na karcie z gwiazdką, aby odblokować.",
 };

@@ -31,7 +31,11 @@
     | "trash"
     | "plus"
     | "maximize"
-    | "restore";
+    | "restore"
+    | "star"
+    | "clock"
+    | "eye-off"
+    | "layers";
 
   const PATHS: Record<IconName, string[]> = {
     x: ["M18 6 6 18", "M6 6l12 12"],
@@ -70,6 +74,15 @@
     // for maximize, two offset squares for restore-down.
     maximize: ["M5 5h14v14H5z"],
     restore: ["M7 7V5h12v12h-2", "M5 9h12v12H5z"],
+    star: ["M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"],
+    clock: ["M22 12a10 10 0 1 1-20 0 10 10 0 1 1 20 0", "M12 6v6l4 2"],
+    "eye-off": [
+      "M9.88 9.88a3 3 0 1 0 4.24 4.24",
+      "M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68",
+      "M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61",
+      "M2 2l20 20",
+    ],
+    layers: ["M12 2 2 7l10 5 10-5-10-5z", "M2 17l10 5 10-5", "M2 12l10 5 10-5"],
   };
 </script>
 

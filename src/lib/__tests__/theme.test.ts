@@ -9,6 +9,8 @@ import {
   previewTheme,
   themeTick,
   THEMES,
+  isLocked,
+  unlockSupporterThemes,
 } from "../theme";
 
 // In jsdom getComputedStyle returns "" for the --g0/--g1/--g2 custom properties,
@@ -22,8 +24,19 @@ describe("resolveTheme", () => {
   it("keeps a known theme id unchanged", () => {
     expect(resolveTheme("dark")).toBe("dark");
     expect(resolveTheme("dracula")).toBe("dracula");
-    // Every id in the registry must resolve to itself.
+    // Every id in the registry must resolve to itself (Supporter ids once unlocked).
+    unlockSupporterThemes();
     for (const t of THEMES) expect(resolveTheme(t.id)).toBe(t.id);
+  });
+
+  it("refuses a Supporter theme until it is unlocked", () => {
+    localStorage.removeItem("greedout:starSupporter");
+    expect(isLocked("star")).toBe(true);
+    expect(isLocked("dark")).toBe(false);
+    expect(resolveTheme("star-nova")).toBe("auto");
+    unlockSupporterThemes();
+    expect(isLocked("star")).toBe(false);
+    expect(resolveTheme("star-nova")).toBe("star-nova");
   });
 
   it("falls back to 'auto' for unknown / empty / nullish ids", () => {

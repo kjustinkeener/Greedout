@@ -160,4 +160,15 @@ export const nl: PartialDict = {
   "compact.loading": "Samenvatting laden…",
   "compact.none": "Geen compactiesamenvatting beschikbaar voor deze sessie.",
   "compact.tokens": "tokens",
+
+  "star.label": "Geef een ster op GitHub",
+  "star.message": "Vind je Greedout leuk?\nGeef het een ster op GitHub!",
+  "star.action": "Geef een ster op GitHub",
+  "star.later": "Herinner me later",
+  "star.gave": "Ik heb een ster gegeven",
+  "star.thanks": "Bedankt voor je steun!\nDe Star Supporter-thema's zijn ontgrendeld!",
+  "star.browse": "Thema's bekijken",
+  "star.never": "Nooit meer tonen",
+  "theme.group.supporter": "Supporter",
+  "theme.starLocked": "Vergrendeld. Klik op \"Ik heb een ster gegeven\" op de sterkaart om te ontgrendelen.",
 };

@@ -160,4 +160,15 @@ export const de: PartialDict = {
   "compact.loading": "Zusammenfassung wird geladen…",
   "compact.none": "Für diese Sitzung ist keine Zusammenfassung der Komprimierung verfügbar.",
   "compact.tokens": "Tokens",
+
+  "star.label": "Auf GitHub einen Stern geben",
+  "star.message": "Gefällt dir Greedout?\nBitte gib ihm einen Stern auf GitHub!",
+  "star.action": "Auf GitHub einen Stern geben",
+  "star.later": "Später erinnern",
+  "star.gave": "Ich habe einen Stern gegeben",
+  "star.thanks": "Danke für deine Unterstützung!\nDie Star-Supporter-Themes sind freigeschaltet!",
+  "star.browse": "Themes ansehen",
+  "star.never": "Nie wieder anzeigen",
+  "theme.group.supporter": "Unterstützer",
+  "theme.starLocked": "Gesperrt. Klicke auf der Sternkarte auf \"Ich habe einen Stern gegeben\", um es freizuschalten.",
 };

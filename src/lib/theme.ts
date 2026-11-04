@@ -89,6 +89,7 @@ export const GROUP_ORDER = [
   "Bright",
   "Light Pastel",
   "Pastel",
+  "Supporter",
 ] as const;
 
 export const THEMES: { id: string; label: string; group: string }[] = [
@@ -172,7 +173,40 @@ export const THEMES: { id: string; label: string; group: string }[] = [
   { id: "dracula", label: "Nocturne", group: "Pastel" },
   { id: "tokyonight", label: "Skyline", group: "Pastel" },
   { id: "mauve", label: "Mauve", group: "Pastel" },
+  // Supporter: locked until the star card's "I gave it a star" is clicked.
+  { id: "star", label: "Star Supporter", group: "Supporter" },
+  { id: "star-nova", label: "Supernova", group: "Supporter" },
+  { id: "star-dust", label: "Stardust", group: "Supporter" },
+  { id: "star-comet", label: "Comet", group: "Supporter" },
+  { id: "star-nebula", label: "Nebula", group: "Supporter" },
+  { id: "star-aurora", label: "Aurora", group: "Supporter" },
+  { id: "star-eclipse", label: "Eclipse", group: "Supporter" },
+  { id: "star-light", label: "Starlight", group: "Supporter" },
+  { id: "star-constellation", label: "Constellation", group: "Supporter" },
 ];
+
+// The honor-system unlock for the Supporter themes. Windows share one WebView
+// profile, so the browser window sees what the main window writes here.
+const UNLOCK_KEY = "greedout:starSupporter";
+
+const SUPPORTER = new Set(THEMES.filter((t) => t.group === "Supporter").map((t) => t.id));
+
+export function isLocked(id: string): boolean {
+  if (!SUPPORTER.has(id)) return false;
+  try {
+    return localStorage.getItem(UNLOCK_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+
+export function unlockSupporterThemes(): void {
+  try {
+    localStorage.setItem(UNLOCK_KEY, "1");
+  } catch {
+    // storage unavailable: the themes stay locked
+  }
+}
 
 import { writable } from "svelte/store";
 
@@ -193,7 +227,7 @@ const KNOWN = new Set(THEMES.map((t) => t.id));
 const userThemeIds = new Set<string>();
 
 export function resolveTheme(t: string | null | undefined): Theme {
-  return t && (KNOWN.has(t) || userThemeIds.has(t)) ? t : "auto";
+  return t && (KNOWN.has(t) || userThemeIds.has(t)) && !isLocked(t) ? t : "auto";
 }
 
 // The chosen theme lives in the backend config, which is an async read, so the

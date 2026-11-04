@@ -8,6 +8,7 @@
   import StatusBar from "./lib/StatusBar.svelte";
   import Brand from "./lib/Brand.svelte";
   import Icon from "./lib/Icon.svelte";
+  import StarCard from "./lib/StarCard.svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { LogicalSize } from "@tauri-apps/api/dpi";
@@ -677,6 +678,7 @@
       {/if}
     </div>
   {/if}
+  <StarCard />
   {#if error}
     <div class="msg err">{error}</div>
   {:else if sessions.length === 0}

@@ -160,4 +160,15 @@ export const fr: PartialDict = {
   "compact.loading": "Chargement du résumé…",
   "compact.none": "Aucun résumé de compactage n'est disponible pour cette session.",
   "compact.tokens": "jetons",
+
+  "star.label": "Mettre une étoile sur GitHub",
+  "star.message": "Vous aimez Greedout ?\nMettez-lui une étoile sur GitHub !",
+  "star.action": "Mettre une étoile sur GitHub",
+  "star.later": "Me le rappeler plus tard",
+  "star.gave": "J'ai mis une étoile",
+  "star.thanks": "Merci pour votre soutien !\nLes thèmes Star Supporter sont débloqués !",
+  "star.browse": "Parcourir les thèmes",
+  "star.never": "Ne plus afficher",
+  "theme.group.supporter": "Soutien",
+  "theme.starLocked": "Verrouillé. Cliquez sur \"J'ai mis une étoile\" sur la carte étoile pour le débloquer.",
 };

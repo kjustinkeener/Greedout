@@ -2150,5 +2150,293 @@
     ],
     "spendFg": "#3a3f47",
     "spendShadow": "transparent"
+  },
+  {
+    "id": "star",
+    "label": "Star Supporter",
+    "group": "Supporter",
+    "scheme": "dark",
+    "note": "Star Supporter: night sky navy; pale gold->gold->amber gauge. Unlocked by starring the repo.",
+    "colors": {
+      "bg": [
+        12,
+        14,
+        30
+      ],
+      "fg": "#f3ecd2",
+      "muted": "#9a97a8",
+      "track": "#23264a",
+      "green": "#8fd18a",
+      "yellow": "#ffd23f",
+      "red": "#ff6b6b",
+      "live": "#ffd23f",
+      "edge": "rgba(255, 214, 90, 0.16)",
+      "edgeSoft": "rgba(255, 214, 90, 0.09)",
+      "hover": "rgba(255, 214, 90, 0.13)",
+      "panel": "rgba(255, 214, 90, 0.06)"
+    },
+    "gradient": [
+      "#fff3b0",
+      "#ffc42e",
+      "#f59a1c"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "star-nova",
+    "label": "Supernova",
+    "group": "Supporter",
+    "scheme": "dark",
+    "note": "Supernova: Star Supporter palette. Unlocked by starring the repo.",
+    "colors": {
+      "bg": [
+        24,
+        10,
+        10
+      ],
+      "fg": "#f6dccf",
+      "muted": "#927e76",
+      "track": "#332322",
+      "green": "#9ccc65",
+      "yellow": "#ffb300",
+      "red": "#ff5252",
+      "live": "#ff7a3d",
+      "edge": "rgba(246, 220, 207, 0.1)",
+      "edgeSoft": "rgba(246, 220, 207, 0.06)",
+      "hover": "rgba(246, 220, 207, 0.1)",
+      "panel": "rgba(246, 220, 207, 0.05)"
+    },
+    "gradient": [
+      "#fff0a8",
+      "#ff7a3d",
+      "#d62828"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "star-dust",
+    "label": "Stardust",
+    "group": "Supporter",
+    "scheme": "dark",
+    "note": "Stardust: Star Supporter palette. Unlocked by starring the repo.",
+    "colors": {
+      "bg": [
+        20,
+        18,
+        31
+      ],
+      "fg": "#e6e0f2",
+      "muted": "#888393",
+      "track": "#2d2b38",
+      "green": "#8fd1a4",
+      "yellow": "#e6c15a",
+      "red": "#f0707a",
+      "live": "#b7a6f0",
+      "edge": "rgba(230, 224, 242, 0.1)",
+      "edgeSoft": "rgba(230, 224, 242, 0.06)",
+      "hover": "rgba(230, 224, 242, 0.1)",
+      "panel": "rgba(230, 224, 242, 0.05)"
+    },
+    "gradient": [
+      "#e8e0ff",
+      "#b7a6f0",
+      "#7a5fd0"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "star-comet",
+    "label": "Comet",
+    "group": "Supporter",
+    "scheme": "dark",
+    "note": "Comet: Star Supporter palette. Unlocked by starring the repo.",
+    "colors": {
+      "bg": [
+        10,
+        20,
+        28
+      ],
+      "fg": "#d6ecf5",
+      "muted": "#7a8b93",
+      "track": "#222e36",
+      "green": "#7fd8a0",
+      "yellow": "#f0cf5a",
+      "red": "#f2706a",
+      "live": "#5cc8f0",
+      "edge": "rgba(214, 236, 245, 0.1)",
+      "edgeSoft": "rgba(214, 236, 245, 0.06)",
+      "hover": "rgba(214, 236, 245, 0.1)",
+      "panel": "rgba(214, 236, 245, 0.05)"
+    },
+    "gradient": [
+      "#d6f6ff",
+      "#5cc8f0",
+      "#2b7fc2"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "star-nebula",
+    "label": "Nebula",
+    "group": "Supporter",
+    "scheme": "dark",
+    "note": "Nebula: Star Supporter palette. Unlocked by starring the repo.",
+    "colors": {
+      "bg": [
+        26,
+        11,
+        28
+      ],
+      "fg": "#f3d9f0",
+      "muted": "#917c91",
+      "track": "#342435",
+      "green": "#8fd8a8",
+      "yellow": "#f0c86a",
+      "red": "#ff6a8a",
+      "live": "#e060d0",
+      "edge": "rgba(243, 217, 240, 0.1)",
+      "edgeSoft": "rgba(243, 217, 240, 0.06)",
+      "hover": "rgba(243, 217, 240, 0.1)",
+      "panel": "rgba(243, 217, 240, 0.05)"
+    },
+    "gradient": [
+      "#ffd6f8",
+      "#e060d0",
+      "#8a2fc0"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "star-aurora",
+    "label": "Aurora",
+    "group": "Supporter",
+    "scheme": "dark",
+    "note": "Aurora: Star Supporter palette. Unlocked by starring the repo.",
+    "colors": {
+      "bg": [
+        8,
+        22,
+        26
+      ],
+      "fg": "#d4f2e4",
+      "muted": "#788f89",
+      "track": "#203032",
+      "green": "#6ee09a",
+      "yellow": "#e8d25a",
+      "red": "#f27070",
+      "live": "#3de0a8",
+      "edge": "rgba(212, 242, 228, 0.1)",
+      "edgeSoft": "rgba(212, 242, 228, 0.06)",
+      "hover": "rgba(212, 242, 228, 0.1)",
+      "panel": "rgba(212, 242, 228, 0.05)"
+    },
+    "gradient": [
+      "#c8ffe8",
+      "#3de0a8",
+      "#1f9ac0"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "star-eclipse",
+    "label": "Eclipse",
+    "group": "Supporter",
+    "scheme": "dark",
+    "note": "Eclipse: Star Supporter palette. Unlocked by starring the repo.",
+    "colors": {
+      "bg": [
+        7,
+        7,
+        10
+      ],
+      "fg": "#e8e2d6",
+      "muted": "#837f7a",
+      "track": "#222122",
+      "green": "#8cc68a",
+      "yellow": "#e8a020",
+      "red": "#e86060",
+      "live": "#e8a020",
+      "edge": "rgba(232, 226, 214, 0.1)",
+      "edgeSoft": "rgba(232, 226, 214, 0.06)",
+      "hover": "rgba(232, 226, 214, 0.1)",
+      "panel": "rgba(232, 226, 214, 0.05)"
+    },
+    "gradient": [
+      "#ffe9b0",
+      "#e8a020",
+      "#a85a00"
+    ],
+    "spendFg": null,
+    "spendShadow": null
+  },
+  {
+    "id": "star-light",
+    "label": "Starlight",
+    "group": "Supporter",
+    "scheme": "light",
+    "note": "Starlight: Star Supporter palette. Unlocked by starring the repo.",
+    "colors": {
+      "bg": [
+        251,
+        246,
+        230
+      ],
+      "fg": "#2b2410",
+      "muted": "#898270",
+      "track": "#e2ddcc",
+      "green": "#3f8f4a",
+      "yellow": "#b87a00",
+      "red": "#c8392f",
+      "live": "#c98a00",
+      "edge": "rgba(43, 36, 16, 0.14)",
+      "edgeSoft": "rgba(43, 36, 16, 0.08)",
+      "hover": "rgba(43, 36, 16, 0.08)",
+      "panel": "rgba(43, 36, 16, 0.04)"
+    },
+    "gradient": [
+      "#ffd866",
+      "#e8a020",
+      "#c26a00"
+    ],
+    "spendFg": "#3a3f47",
+    "spendShadow": "transparent"
+  },
+  {
+    "id": "star-constellation",
+    "label": "Constellation",
+    "group": "Supporter",
+    "scheme": "dark",
+    "note": "Constellation: Star Supporter palette. Unlocked by starring the repo.",
+    "colors": {
+      "bg": [
+        11,
+        16,
+        48
+      ],
+      "fg": "#dfe6ff",
+      "muted": "#8086a2",
+      "track": "#242a49",
+      "green": "#7fd8a0",
+      "yellow": "#ffd23f",
+      "red": "#ff6b7a",
+      "live": "#ffd23f",
+      "edge": "rgba(223, 230, 255, 0.1)",
+      "edgeSoft": "rgba(223, 230, 255, 0.06)",
+      "hover": "rgba(223, 230, 255, 0.1)",
+      "panel": "rgba(223, 230, 255, 0.05)"
+    },
+    "gradient": [
+      "#fff3b0",
+      "#ffd23f",
+      "#5b7be0"
+    ],
+    "spendFg": null,
+    "spendShadow": null
   }
 ]

@@ -159,4 +159,15 @@ export const ja: PartialDict = {
   "compact.loading": "要約を読み込み中…",
   "compact.none": "このセッションにはコンパクト化の要約がありません。",
   "compact.tokens": "トークン",
+
+  "star.label": "GitHub でスターを付ける",
+  "star.message": "Greedout は気に入りましたか？\nGitHub でスターを付けてください！",
+  "star.action": "GitHub でスターを付ける",
+  "star.later": "後で通知",
+  "star.gave": "スターを付けました",
+  "star.thanks": "ご支援ありがとうございます！\nStar Supporter テーマが解除されました！",
+  "star.browse": "テーマを見る",
+  "star.never": "今後表示しない",
+  "theme.group.supporter": "サポーター",
+  "theme.starLocked": "ロック中。スターのカードで「スターを付けました」をクリックすると解除されます。",
 };

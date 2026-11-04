@@ -324,6 +324,12 @@ function verify() {
 
   const mapA = canonMap(original);
   const mapB = canonMap(generated);
+  // The Supporter themes were added after the baseline was frozen, so they have
+  // no counterpart in it; they are compared against nothing rather than flagged.
+  const added = JSON.parse(readFileSync(P.json, "utf8"))
+    .filter((e) => e.group === "Supporter")
+    .map((e) => `:root[data-theme="${e.id}"]`);
+  for (const ctx of added) delete mapB[ctx];
 
   const contexts = new Set([...Object.keys(mapA), ...Object.keys(mapB)]);
   const diffs = [];

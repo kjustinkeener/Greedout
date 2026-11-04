@@ -211,6 +211,17 @@ export const en = {
   "compact.loading": "Loading summary…",
   "compact.none": "No compaction summary available for this session.",
   "compact.tokens": "tokens",
+
+  "star.label": "Star on GitHub",
+  "star.message": "Do you like Greedout?\nPlease star it on GitHub!",
+  "star.action": "Star on GitHub",
+  "star.later": "Remind me later",
+  "star.gave": "I gave it a star",
+  "star.thanks": "Thanks for your support!\nStar Supporter themes have been unlocked!",
+  "star.browse": "Browse Themes",
+  "star.never": "Never show this again",
+  "theme.group.supporter": "Supporter",
+  "theme.starLocked": "Locked. Click \"I gave it a star\" on the star card to unlock.",
 } as const;
 
 // `Record<keyof typeof en, Msg>` rather than `typeof en`: `as const` makes the

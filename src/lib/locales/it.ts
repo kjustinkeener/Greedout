@@ -160,4 +160,15 @@ export const it: PartialDict = {
   "compact.loading": "Caricamento del riepilogo…",
   "compact.none": "Nessun riepilogo della compattazione disponibile per questa sessione.",
   "compact.tokens": "token",
+
+  "star.label": "Metti una stella su GitHub",
+  "star.message": "Ti piace Greedout?\nMetti una stella su GitHub, per favore!",
+  "star.action": "Metti una stella su GitHub",
+  "star.later": "Ricordamelo più tardi",
+  "star.gave": "Ho messo una stella",
+  "star.thanks": "Grazie per il tuo supporto!\nI temi Star Supporter sono stati sbloccati!",
+  "star.browse": "Sfoglia i temi",
+  "star.never": "Non mostrare più",
+  "theme.group.supporter": "Sostenitore",
+  "theme.starLocked": "Bloccato. Fai clic su \"Ho messo una stella\" nella scheda della stella per sbloccarlo.",
 };

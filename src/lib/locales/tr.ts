@@ -160,4 +160,15 @@ export const tr: PartialDict = {
   "compact.loading": "Özet yükleniyor…",
   "compact.none": "Bu oturum için sıkıştırma özeti yok.",
   "compact.tokens": "token",
+
+  "star.label": "GitHub'da yıldız ver",
+  "star.message": "Greedout'u beğendiniz mi?\nLütfen GitHub'da yıldız verin!",
+  "star.action": "GitHub'da yıldız ver",
+  "star.later": "Sonra hatırlat",
+  "star.gave": "Yıldız verdim",
+  "star.thanks": "Desteğiniz için teşekkürler!\nStar Supporter temaları açıldı!",
+  "star.browse": "Temalara göz at",
+  "star.never": "Bir daha gösterme",
+  "theme.group.supporter": "Destekçi",
+  "theme.starLocked": "Kilitli. Açmak için yıldız kartındaki \"Yıldız verdim\" düğmesine tıklayın.",
 };

@@ -159,4 +159,15 @@ export const ko: PartialDict = {
   "compact.loading": "요약 로드 중…",
   "compact.none": "이 세션에 대한 압축 요약이 없습니다.",
   "compact.tokens": "토큰",
+
+  "star.label": "GitHub에서 별 주기",
+  "star.message": "Greedout이 마음에 드시나요?\nGitHub에서 별을 눌러 주세요!",
+  "star.action": "GitHub에서 별 주기",
+  "star.later": "나중에 알림",
+  "star.gave": "별을 눌렀어요",
+  "star.thanks": "응원해 주셔서 감사합니다!\nStar Supporter 테마가 잠금 해제되었습니다!",
+  "star.browse": "테마 둘러보기",
+  "star.never": "다시 표시 안 함",
+  "theme.group.supporter": "서포터",
+  "theme.starLocked": "잠겨 있습니다. 별 카드에서 \"별을 눌렀어요\"를 클릭하면 해제됩니다.",
 };

@@ -6,6 +6,11 @@ documented in the GitHub Releases notes and the `v*` git tags.
 
 ## [Unreleased]
 
+## [0.4.10] - 2026-11-04
+
+### Changed
+- The star card text is brighter.
+
 ## [0.4.9] - 2026-11-03
 
 ### Added

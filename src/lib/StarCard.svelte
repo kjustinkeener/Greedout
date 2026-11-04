@@ -9,7 +9,10 @@
   import { t } from "./i18n.svelte";
   import { unlockSupporterThemes } from "./theme";
 
-  const REPO = "https://github.com/kjustinkeener/Greedout";
+  // The update card takes precedence: while true, nothing renders and the timers keep running.
+  let { suppress = false }: { suppress?: boolean } = $props();
+
+  const REPO ="https://github.com/kjustinkeener/Greedout";
   const KEY = "greedout:starPrompt";
   // Short in `tauri dev` so the card can be tested; release builds use the real values.
   const NEEDED_MS = import.meta.env.DEV ? 2_000 : 2 * 60_000;
@@ -138,7 +141,9 @@
   }
 </script>
 
-{#if shown && thanks}
+{#if suppress}
+  <!-- update card is showing -->
+{:else if shown && thanks}
   <div class="star-card thanks" role="region" aria-label={t("star.label")}>
     <p>{t("star.thanks")}</p>
     <div class="row">

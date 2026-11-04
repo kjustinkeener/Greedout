@@ -678,7 +678,7 @@
       {/if}
     </div>
   {/if}
-  <StarCard />
+  <StarCard suppress={!!update} />
   {#if error}
     <div class="msg err">{error}</div>
   {:else if sessions.length === 0}

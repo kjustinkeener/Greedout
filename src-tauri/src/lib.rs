@@ -66,6 +66,12 @@ fn log_line(cfg: &config::Config, msg: &str) {
     config::debug_log(cfg, msg);
 }
 
+/// Tell the main window it was hidden to or shown from the tray, so the star card
+/// counts only visible time. A page cannot always see a tray hide on its own.
+fn announce_visibility(app: &tauri::AppHandle) {
+    let _ = app.emit("hub:visibility", ());
+}
+
 /// Bring the window back from the tray.
 fn reveal(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
@@ -82,6 +88,7 @@ fn reveal(app: &tauri::AppHandle) {
             }
         }
         let _ = w.set_focus();
+        announce_visibility(app);
     }
 }
 
@@ -676,6 +683,7 @@ pub fn run() {
                     if config::load_config().close_to_tray {
                         api.prevent_close();
                         let _ = window.hide();
+                        announce_visibility(window.app_handle());
                     }
                 }
                 // The shared transcript scan (Context Explorer + Daily Spend) exists
@@ -706,6 +714,7 @@ pub fn run() {
                             // the first one makes the window animate back to full size and
                             // then disappear, so wait and only hide if it really stayed down.
                             let w = window.clone();
+                            let app = window.app_handle().clone();
                             std::thread::spawn(move || {
                                 std::thread::sleep(Duration::from_millis(200));
                                 if w.is_minimized().unwrap_or(false) {
@@ -714,6 +723,7 @@ pub fn run() {
                                     // before it vanishes.
                                     let _ = w.hide();
                                     let _ = w.unminimize();
+                                    announce_visibility(&app);
                                 }
                             });
                         }

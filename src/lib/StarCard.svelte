@@ -3,6 +3,8 @@
   // moment the card could next be due, and it re-checks when it fires, when
   // the window is shown again, and when it gains focus.
   import { onMount } from "svelte";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { invoke } from "@tauri-apps/api/core";
   import Icon from "./Icon.svelte";
   import { openThemesWindow } from "./themeWindow";
@@ -85,9 +87,21 @@
     visibleSince = null;
   }
 
-  function sync() {
-    if (document.hidden) hide();
-    else show();
+  // "Visible" means the window is shown on screen: not hidden to the tray and not
+  // minimized. The page's own visibility flag does not always follow a tray hide, so
+  // the window is asked directly, and the backend announces hides and shows.
+  async function sync() {
+    let visible = !document.hidden;
+    if (visible) {
+      try {
+        const w = getCurrentWindow();
+        visible = (await w.isVisible()) && !(await w.isMinimized());
+      } catch {
+        /* no window API (plain browser): trust the page flag */
+      }
+    }
+    if (visible) show();
+    else hide();
   }
 
   function onPointerDown(e: PointerEvent) {
@@ -97,6 +111,13 @@
 
   onMount(() => {
     sync();
+    const unlisten: Promise<UnlistenFn>[] = [];
+    try {
+      unlisten.push(listen("hub:visibility", () => sync()));
+      unlisten.push(getCurrentWindow().onResized(() => sync()));
+    } catch {
+      /* no window API (plain browser) */
+    }
     document.addEventListener("visibilitychange", sync);
     window.addEventListener("focus", check);
     window.addEventListener("pagehide", hide);
@@ -104,6 +125,7 @@
     return () => {
       hide();
       clearTimeout(gaveTimer);
+      for (const u of unlisten) u.then((f) => f()).catch(() => {});
       document.removeEventListener("visibilitychange", sync);
       window.removeEventListener("focus", check);
       window.removeEventListener("pagehide", hide);
@@ -129,6 +151,10 @@
     thanks = false;
     shown = false;
   }
+  function closeThanks() {
+    thanks = false;
+    shown = false;
+  }
   function never() {
     saved.done = true;
     shown = false;
@@ -146,9 +172,7 @@
   <!-- update card is showing -->
 {:else if shown && thanks}
   <div class="star-card thanks" role="region" aria-label={t("star.label")}>
-    <button class="x" onclick={() => (shown = false)} title={t("common.close")} aria-label={t("common.close")}>
-      <Icon name="x" size={11} />
-    </button>
+    <button class="x" title={t("common.close")} aria-label={t("common.close")} onclick={closeThanks}>&times;</button>
     <p>{t("star.thanks")}</p>
     <div class="row">
       <button onclick={browse}><Icon name="layers" size={13} />{t("star.browse")}</button>
@@ -268,18 +292,18 @@
   .star-card.thanks .x {
     position: absolute;
     top: 4px;
-    right: 4px;
-    display: grid;
-    place-items: center;
-    width: 18px;
-    height: 18px;
-    padding: 0;
+    right: 6px;
     background: none;
-    border: none;
+    border: 0;
+    padding: 0 4px;
+    font-size: 16px;
+    line-height: 1;
     color: #3a2705;
+    cursor: pointer;
+    opacity: 0.7;
   }
   .star-card.thanks .x:hover {
-    background: rgba(58, 39, 5, 0.18);
+    opacity: 1;
   }
   .star-card.thanks p {
     padding-right: 18px;

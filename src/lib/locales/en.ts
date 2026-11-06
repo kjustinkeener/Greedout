@@ -202,6 +202,8 @@ export const en = {
   "tips.clearBody": "Type /clear when the next task has nothing to do with the last. It drops everything, which is the cheapest start but keeps no context.",
   "tips.hookHead": "Get reminded automatically",
   "tips.hookBody": "Your agent cannot see its own context size, so it never says when to compact. Paste this prompt into it to add a reminder hook. It only reminds you; it never compacts for you.",
+  "tips.noteOpt": "Also keep a compaction note.",
+  "tips.noteHint": "Your agent writes down what to do next before you compact, and it is handed back right after. Adds a second small hook.",
   "tips.copy": "Copy prompt",
   "tips.copied": "Copied",
 

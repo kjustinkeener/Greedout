@@ -13,32 +13,85 @@
   // Agents read English, so the prompt is not localized. It spells out the one
   // detail that is easy to get wrong: context size comes from the last assistant
   // usage record, and a compact_boundary resets it.
-  const PROMPT = `Set up a Claude Code hook that reminds me to run /compact when a session gets long.
+  let withNote = $state(false);
 
-1. Save this as ~/.claude/hooks/context-reminder.py:
+  type Part = { code: boolean; text: string };
+  const prose = (text: string): Part => ({ code: false, text });
+  const code = (text: string): Part => ({ code: true, text });
 
-import json, sys
-TARGET = 200_000
-data = json.load(sys.stdin)
-ctx = 0
-for line in open(data["transcript_path"], encoding="utf-8"):
-    if '"compact_boundary"' in line:
-        j = json.loads(line)
-        if j.get("subtype") == "compact_boundary":
-            ctx = (j.get("compactMetadata") or {}).get("postTokens") or 0
-        continue
-    if '"usage"' in line:
-        j = json.loads(line)
-        if j.get("type") == "assistant":
-            u = (j.get("message") or {}).get("usage") or {}
-            ctx = sum(u.get(k, 0) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")) or ctx
-if ctx >= TARGET:
-    msg = f"Context is about {ctx // 1000}k tokens, past the {TARGET // 1000}k budget. Finish the current step properly, then at the next natural stopping point end your reply with these two lines: Session size at {ctx // 1000}k, then Please type /compact. Repeat at each later stopping point until the user compacts."
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))
+  const promptParts = $derived.by((): Part[] => {
+    const n = withNote;
+    const reminder = [
+      n ? "import json, os, sys" : "import json, sys",
+      "TARGET = 200_000",
+      "data = json.load(sys.stdin)",
+      "ctx = 0",
+      'for line in open(data["transcript_path"], encoding="utf-8"):',
+      "    if '\"compact_boundary\"' in line:",
+      "        j = json.loads(line)",
+      '        if j.get("subtype") == "compact_boundary":',
+      '            ctx = (j.get("compactMetadata") or {}).get("postTokens") or 0',
+      "        continue",
+      "    if '\"usage\"' in line:",
+      "        j = json.loads(line)",
+      '        if j.get("type") == "assistant":',
+      '            u = (j.get("message") or {}).get("usage") or {}',
+      '            ctx = sum(u.get(k, 0) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")) or ctx',
+      "if ctx >= TARGET:",
+      '    msg = f"Context is about {ctx // 1000}k tokens, past the {TARGET // 1000}k budget. Finish the current step properly, then at the next natural stopping point end your reply with these two lines: Session size at {ctx // 1000}k, then Please type /compact. Repeat at each later stopping point until the user compacts."',
+      ...(n
+        ? [
+            '    msg += " Also write or refresh your compaction note at " + os.path.join(os.path.expanduser("~"), ".claude", "compaction-notes", data["session_id"] + ".md") + ". Start it with one line, NEXT ACTION: the first thing to do after the compaction, then the current task, key files, decisions and open bugs. It is handed back to you right after /compact."',
+          ]
+        : []),
+      '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))',
+    ].join("\n");
 
-2. Register it in ~/.claude/settings.json as a UserPromptSubmit hook that runs: python ~/.claude/hooks/context-reminder.py (use the full path, and python3 if that is what this machine has).
+    const restore = [
+      "import json, os, sys",
+      "data = json.load(sys.stdin)",
+      "if data.get(\"source\") != \"compact\":",
+      "    sys.exit(0)",
+      "path = os.path.join(os.path.expanduser(\"~\"), \".claude\", \"compaction-notes\", data[\"session_id\"] + \".md\")",
+      "if not os.path.exists(path):",
+      "    sys.exit(0)",
+      "note = open(path, encoding=\"utf-8\").read().strip()",
+      "os.remove(path)",
+      "if note:",
+      "    msg = \"Your own note from before the compaction. Use it to reorient; if it starts with NEXT ACTION:, do that first. Verify against the repo before acting.\\n\\n\" + note",
+      "    print(json.dumps({\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": msg}}))",
+    ].join("\n");
 
-3. Tell me when it is in place. It only reminds me; it must never compact or clear on its own.`;
+    const parts: Part[] = [
+      prose("Set up a Claude Code hook that reminds me to run /compact when a session gets long."),
+      prose(""),
+      prose("1. Save this as ~/.claude/hooks/context-reminder.py:"),
+      prose(""),
+      code(reminder),
+      prose(""),
+      prose(
+        "2. Register it in ~/.claude/settings.json as a UserPromptSubmit hook that runs: python ~/.claude/hooks/context-reminder.py (use the full path, and python3 if that is what this machine has).",
+      ),
+      prose(""),
+    ];
+    if (n) {
+      parts.push(
+        prose("3. Save this as ~/.claude/hooks/restore-note.py:"),
+        prose(""),
+        code(restore),
+        prose(""),
+        prose(
+          "4. Register it in ~/.claude/settings.json as a SessionStart hook with matcher \"compact\" that runs: python ~/.claude/hooks/restore-note.py (same path and python rules).",
+        ),
+        prose(""),
+        prose("5. Tell me when both are in place. They only remind me and restore my note; they must never compact or clear on their own."),
+      );
+    } else {
+      parts.push(prose("3. Tell me when it is in place. It only reminds me; it must never compact or clear on its own."));
+    }
+    return parts;
+  });
+  const promptText = $derived(promptParts.map((p) => p.text).join("\n"));
 
   // The same dial as the main window, at three context sizes. 200k is the gauge target.
   const TARGET = 200_000;
@@ -75,20 +128,14 @@ if ctx >= TARGET:
     if (last < line.length) out.push({ k: "", x: line.slice(last) });
     return out;
   }
-  const promptLines = (() => {
-    let inCode = false;
-    return PROMPT.split("\n").map((line) => {
-      if (line.startsWith("2. ")) inCode = false;
-      const toks = inCode ? tokenize(line) : [{ k: "", x: line }];
-      if (line.startsWith("1. ")) inCode = true;
-      return toks;
-    });
-  })();
+  const promptLines = $derived(
+    promptParts.flatMap((p) => p.text.split("\n").map((line) => (p.code ? tokenize(line) : [{ k: "", x: line }]))),
+  );
 
   let copied = $state(false);
   async function copyPrompt() {
     try {
-      await navigator.clipboard.writeText(PROMPT);
+      await navigator.clipboard.writeText(promptText);
       copied = true;
       setTimeout(() => (copied = false), 2000);
     } catch {
@@ -201,6 +248,10 @@ if ctx >= TARGET:
     <section>
       <h2>{t("tips.hookHead")}</h2>
       <p>{t("tips.hookBody")}</p>
+      <label class="opt">
+        <input type="checkbox" bind:checked={withNote} />
+        <span><b>{t("tips.noteOpt")}</b> {t("tips.noteHint")}</span>
+      </label>
       <div class="pbox">
         <pre class="prompt">{#each promptLines as toks, i}{#each toks as tk}{#if tk.k}<span class={tk.k}>{tk.x}</span>{:else}{tk.x}{/if}{/each}{i < promptLines.length - 1 ? "\n" : ""}{/each}</pre>
         <button class="btn primary copy" onclick={copyPrompt}>
@@ -432,6 +483,17 @@ if ctx >= TARGET:
   }
 
   /* Prompt */
+  .opt {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 0 0 8px;
+    cursor: pointer;
+  }
+  .opt input {
+    margin-top: 3px;
+    accent-color: var(--green);
+  }
   .pbox {
     position: relative;
   }

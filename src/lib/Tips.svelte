@@ -4,6 +4,7 @@
   import { onDestroy } from "svelte";
   import type { Config } from "../types";
   import { applyTheme, type Theme } from "./theme";
+  import Brand from "./Brand.svelte";
   import Icon from "./Icon.svelte";
   import Speedo from "./Speedo.svelte";
   import { t, watchLocale } from "./i18n.svelte";
@@ -155,7 +156,9 @@
 
 <div class="panel">
   <header class="bar" data-tauri-drag-region>
+    <Brand size={16} font={15} />
     <span class="title" data-tauri-drag-region>{t("tips.title")}</span>
+    <span class="spacer" data-tauri-drag-region></span>
     <button class="x" onclick={onClose} title={t("win.close")} aria-label={t("win.close")}>
       <Icon name="x" size={13} width={1.5} />
     </button>
@@ -260,13 +263,17 @@
   .bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
     padding: 8px 8px 8px 16px;
     border-bottom: 1px solid var(--edge);
   }
   .title {
+    color: var(--muted);
     font-weight: var(--w-semibold);
-    font-size: calc(13px * var(--size-ui));
+    font-size: calc(14px * var(--size-ui));
+  }
+  .spacer {
+    flex: 1;
   }
   .x {
     display: grid;

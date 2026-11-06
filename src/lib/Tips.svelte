@@ -199,7 +199,7 @@
         {#each dials as d (d.id)}
           <div class="dcol">
             <Speedo pct={d.ctx / TARGET} ctx={d.ctx} target={TARGET} {fmtK} />
-            <span class="note n-{d.id}">{t(d.note)}</span>
+            <span class="note n-{d.id}">{@render rich(t(d.note))}</span>
           </div>
         {/each}
       </div>

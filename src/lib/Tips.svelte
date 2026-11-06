@@ -405,7 +405,7 @@
     align-items: stretch;
     gap: 4px;
     color: var(--muted);
-    font-size: calc(10.5px * var(--size-ui));
+    font-size: calc(12.5px * var(--size-ui));
     text-align: center;
   }
   .win {
@@ -426,7 +426,7 @@
     border-radius: 3px;
     background: var(--g1);
     color: #1a1a00;
-    font-size: calc(10.5px * var(--size-ui));
+    font-size: calc(12.5px * var(--size-ui));
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -457,7 +457,7 @@
     align-self: center;
     font-family: ui-monospace, monospace;
     color: var(--fg);
-    font-size: calc(11px * var(--size-ui));
+    font-size: calc(12.5px * var(--size-ui));
     white-space: nowrap;
   }
   .arrow::after {

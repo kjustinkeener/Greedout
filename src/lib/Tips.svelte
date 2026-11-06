@@ -408,6 +408,9 @@
     font-size: calc(12.5px * var(--size-ui));
     text-align: center;
   }
+  .col > span {
+    font-size: calc(14.5px * var(--size-ui));
+  }
   .win {
     height: 210px;
     display: flex;

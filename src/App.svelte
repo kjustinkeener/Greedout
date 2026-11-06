@@ -342,6 +342,60 @@
     }
   }
 
+  // Open the usage-tips window (how /compact and /clear keep spend down). Reuse if open.
+  async function openTips() {
+    menuOpen = false;
+    const existing = await WebviewWindow.getByLabel("tips");
+    if (existing) {
+      try {
+        await existing.unminimize();
+        await existing.show();
+        await existing.setFocus();
+        return;
+      } catch {
+        try {
+          await existing.close();
+        } catch {
+          // already gone
+        }
+      }
+    }
+    let pos: { x: number; y: number } | undefined;
+    try {
+      const sf = await appWindow.scaleFactor();
+      const p = (await appWindow.outerPosition()).toLogical(sf);
+      pos = { x: Math.round(p.x + 24), y: Math.round(p.y + 24) };
+    } catch {
+      // Position unavailable; let the OS place it.
+    }
+    const aot = (await invoke<Config>("get_config").catch(() => null))?.always_on_top ?? true;
+    const w = new WebviewWindow("tips", {
+      url: "tips.html",
+      title: "Stretch Your Usage",
+      width: 460,
+      height: 640,
+      minWidth: 360,
+      minHeight: 360,
+      decorations: false,
+      transparent: true,
+      resizable: true,
+      alwaysOnTop: aot,
+      focus: true,
+      ...(pos ? { x: pos.x, y: pos.y } : {}),
+    });
+    placeWindow(w, "tips");
+    void w.once("tauri://error", async () => {
+      const stale = await WebviewWindow.getByLabel("tips");
+      if (stale) {
+        try {
+          await stale.close();
+        } catch {
+          // already gone
+        }
+      }
+    });
+  }
+
   const openSession = (s: Session) =>
     openExplorer({ id: s.id, title: `${s.title} · ${s.project}`, project: s.project, view: "session" });
   const openProject = (s: Session) =>
@@ -595,6 +649,7 @@
           if (w === "settings") return void openSettings();
           if (w === "about") return void openAbout();
           if (w === "dailyspend") return void openDailySpend();
+          if (w === "tips") return void openTips();
           if (!id) return;
           const live = sessions.find((x) => x.id === id);
           if (w === "compact") return live ? void openCompact(live) : undefined;
@@ -647,6 +702,10 @@
         <button class="item" onclick={openDailySpend}>
           <span class="mi"><Icon name="bar-chart" size={14} /></span>
           {t("menu.dailySpend")}
+        </button>
+        <button class="item" onclick={openTips}>
+          <span class="mi"><Icon name="compact" size={14} /></span>
+          {t("menu.tips")}
         </button>
         <button class="item" onclick={openSettings}>
           <span class="mi"><Icon name="sliders" size={14} /></span>

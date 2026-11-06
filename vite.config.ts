@@ -19,6 +19,7 @@ export default defineConfig({
         themes: resolve(__dirname, "themes.html"),
         fonts: resolve(__dirname, "fonts.html"),
         compact: resolve(__dirname, "compact.html"),
+        tips: resolve(__dirname, "tips.html"),
       },
     },
   },

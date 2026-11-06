@@ -376,7 +376,7 @@ fn set_config(app: tauri::AppHandle, config: config::Config) -> Result<(), Strin
     // "always on top" on would sink them behind the gauge window (which you are
     // usually editing from right then), making them hard to move or close.
     // One list, so a new window cannot be forgotten here.
-    for label in ["settings", "about", "baseline", "themes", "fonts"] {
+    for label in ["settings", "about", "baseline", "themes", "fonts", "tips"] {
         if let Some(w) = app.get_webview_window(label) {
             let _ = w.set_always_on_top(config.always_on_top);
         }

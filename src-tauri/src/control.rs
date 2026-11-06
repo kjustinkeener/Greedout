@@ -41,8 +41,8 @@ pub const PIPE_NAME: &str = r"\\.\pipe\greedout";
 
 /// Every window Greedout can own. `screenshot` and `window` accept only these labels, checked
 /// before any window lookup, so neither can be pointed at another application's window.
-pub const ALL_WINDOWS: [&str; 8] =
-    ["main", "settings", "about", "baseline", "dailyspend", "themes", "fonts", "compact"];
+pub const ALL_WINDOWS: [&str; 9] =
+    ["main", "settings", "about", "baseline", "dailyspend", "themes", "fonts", "compact", "tips"];
 
 /// Settings an agent may not change: turning the surface on is the user's decision, saved font
 /// sets are edited in their own window, and `locale_resolved` is a cache the webview owns.
@@ -396,7 +396,7 @@ async fn dispatch(app: &AppHandle, req: Request) -> Value {
         }
         "open_window" => {
             let which: String = arg!(req, "window");
-            if !["settings", "about", "dailyspend", "explorer", "compact"].contains(&which.as_str()) {
+            if !["settings", "about", "dailyspend", "tips", "explorer", "compact"].contains(&which.as_str()) {
                 return err(format!("unknown window '{which}'"));
             }
             let mut payload = json!({ "window": which });

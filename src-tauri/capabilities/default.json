@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for the main, settings, about, baseline, dailyspend, themes, fonts and compact windows",
-  "windows": ["main", "settings", "about", "baseline", "dailyspend", "themes", "fonts", "compact"],
+  "description": "Default capabilities for the main, settings, about, baseline, dailyspend, themes, fonts, compact and tips windows",
+  "windows": ["main", "settings", "about", "baseline", "dailyspend", "themes", "fonts", "compact", "tips"],
   "permissions": [
     "core:default",
     "core:event:default",

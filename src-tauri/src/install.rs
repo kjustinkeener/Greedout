@@ -201,9 +201,12 @@ pub fn perform_install(desktop_shortcut: bool) -> Result<String, String> {
         if let Some(sm) = start_menu_dir() {
             let _ = create_shortcut(&sm.join(format!("{APP_NAME}.lnk")), &target);
         }
-        if desktop_shortcut {
-            if let Some(d) = desktop_dir() {
-                let _ = create_shortcut(&d.join(format!("{APP_NAME}.lnk")), &target);
+        // An existing desktop shortcut is repointed even if the box is unticked, or it
+        // would keep launching the old install.
+        if let Some(d) = desktop_dir() {
+            let lnk = d.join(format!("{APP_NAME}.lnk"));
+            if desktop_shortcut || lnk.exists() {
+                let _ = create_shortcut(&lnk, &target);
             }
         }
         register_uninstall(&dir, &target);
@@ -232,6 +235,20 @@ fn replace_exe(src: &Path, target: &Path) -> Result<(), String> {
         return Err(format!("copy exe: {e}"));
     }
     Ok(())
+}
+
+/// Delete the pre-0.5 install in `%LOCALAPPDATA%\Greedout`. Runs from the installed copy
+/// only, after `config::migrate_legacy_data` has moved the data out. By then the install
+/// card has repointed the shortcuts and the Add/Remove entry, and the old exe has exited
+/// (the hand-off waits for it); if it is somehow still running the delete fails and the
+/// next launch tries again.
+#[cfg(windows)]
+pub fn remove_legacy_install() {
+    let Some(old) = dirs::data_local_dir().map(|d| d.join(APP_NAME)) else { return };
+    if !is_installed() || !old.join(EXE_NAME).exists() || Some(&old) == install_dir().as_ref() {
+        return;
+    }
+    let _ = std::fs::remove_dir_all(&old);
 }
 
 /// Hand off to the installed copy and quit.

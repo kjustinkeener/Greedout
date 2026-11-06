@@ -302,7 +302,7 @@ pub fn migrate_sidecars() {
 /// Versions up to 0.4.12 kept settings and the history cache in `%LOCALAPPDATA%\Greedout`;
 /// they now live in `app_dir()`. On the first run with nothing in the new place, bring the
 /// old data across so an update keeps the user's settings, labels and indexed history.
-/// Data only: the old exe, shortcuts and registry entry are left alone. Windows only.
+/// Data only: `install::remove_legacy_install` then deletes the old folder. Windows only.
 #[cfg(windows)]
 pub fn migrate_legacy_data() {
     let Some(old) = dirs::data_local_dir().map(|d| d.join("Greedout")) else { return };

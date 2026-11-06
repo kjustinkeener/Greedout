@@ -506,6 +506,8 @@ pub fn run() {
     config::migrate_sidecars();
     #[cfg(windows)]
     config::migrate_legacy_data();
+    #[cfg(windows)]
+    install::remove_legacy_install();
     // Fresh log each run so it can't grow without bound when debug logging is left on.
     config::truncate_log();
 

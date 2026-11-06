@@ -49,6 +49,16 @@ if ctx >= TARGET:
     { ctx: 260_000, id: "c", note: "tips.dialNow" },
   ];
 
+  // What fills a long session. Heights are illustrative; "noise" is what a summary drops.
+  const segs: { h: number; noise: boolean; label: "tips.segTools" | "tips.segFiles" | "tips.segOutput" | "tips.segDead" | "tips.segReplies" | "tips.segYou" }[] = [
+    { h: 27, noise: true, label: "tips.segTools" },
+    { h: 20, noise: true, label: "tips.segFiles" },
+    { h: 16, noise: true, label: "tips.segOutput" },
+    { h: 11, noise: true, label: "tips.segDead" },
+    { h: 14, noise: false, label: "tips.segReplies" },
+    { h: 12, noise: false, label: "tips.segYou" },
+  ];
+
   let copied = $state(false);
   async function copyPrompt() {
     try {
@@ -137,17 +147,23 @@ if ctx >= TARGET:
       <p>{t("tips.compactBody")}</p>
       <div class="ba" aria-hidden="true">
         <div class="col">
-          <div class="stack before">
-            <i style="height:34%"></i><i style="height:30%"></i><i style="height:36%"></i>
+          <div class="win before">
+            {#each segs as g (g.label)}
+              <div class="seg" class:noise={g.noise} style="flex:{g.h}">{t(g.label)}</div>
+            {/each}
           </div>
           <span>{t("tips.before")}</span>
         </div>
         <div class="arrow">/compact</div>
         <div class="col">
-          <div class="stack after"><i style="height:100%"></i></div>
+          <div class="win after">
+            <div class="seg keep" style="flex:12">{t("tips.segSummary")}</div>
+            <div class="free" style="flex:88">{t("tips.segFree")}</div>
+          </div>
           <span>{t("tips.after")}</span>
         </div>
       </div>
+      <p class="cap"><span class="sw noise"></span>{t("tips.legendNoise")} <span class="sw"></span>{t("tips.legendKeep")}</p>
     </section>
 
     <section>
@@ -307,54 +323,84 @@ if ctx >= TARGET:
   /* Before / after */
   .ba {
     display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 18px;
+    align-items: stretch;
+    gap: 12px;
     margin: 6px 0 2px;
   }
   .col {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     gap: 4px;
     color: var(--muted);
     font-size: calc(10.5px * var(--size-ui));
+    text-align: center;
   }
-  .stack {
-    width: 54px;
+  .win {
+    height: 210px;
     display: flex;
     flex-direction: column;
     gap: 2px;
     border: 1px solid var(--edge);
-    border-radius: 4px;
-    padding: 2px;
+    border-radius: 6px;
+    padding: 3px;
     background: var(--track);
   }
-  .stack i {
-    display: block;
-    border-radius: 2px;
+  .seg {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    min-height: 0;
+    border-radius: 3px;
     background: var(--g1);
-    opacity: 0.8;
+    color: #1a1a00;
+    font-size: calc(10.5px * var(--size-ui));
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
-  .stack.before {
-    height: 90px;
+  .seg.noise {
+    background: repeating-linear-gradient(135deg, #7a3b3e, #7a3b3e 6px, #6a3235 6px, #6a3235 12px);
+    color: #f3d3d4;
   }
-  .stack.after {
-    height: 14px;
-  }
-  .stack.after i {
+  .seg.keep {
     background: var(--green);
-    opacity: 1;
+    color: #06210c;
+    font-weight: var(--w-semibold);
+  }
+  .free {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    border: 1px dashed var(--edge);
+    border-radius: 3px;
+    min-height: 0;
   }
   .arrow {
     align-self: center;
     font-family: ui-monospace, monospace;
     color: var(--fg);
     font-size: calc(11px * var(--size-ui));
-    padding-bottom: 14px;
+    white-space: nowrap;
   }
   .arrow::after {
     content: " \2192";
+  }
+  .sw {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin: 0 4px 0 8px;
+    vertical-align: -1px;
+    border-radius: 2px;
+    background: var(--g1);
+  }
+  .sw.noise {
+    margin-left: 0;
+    background: #7a3b3e;
   }
 
   /* Prompt */

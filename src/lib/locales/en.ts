@@ -169,7 +169,7 @@ export const en = {
   // About window
   // Usage tips window
   "tips.title": "Stretch Your Usage",
-  "tips.lead": "Shorter sessions cost less, so the same subscription goes further. Two commands keep sessions short: /compact and /clear.",
+  "tips.lead": "Shorter sessions cost less, so the same subscription goes further. Two commands stop that cost from piling up: /compact and /clear.",
   "tips.whyHead": "Why long sessions get expensive",
   "tips.whyBody": "Every message re-reads the whole conversation. The longer a session runs, the more each turn costs and the sooner you hit your plan limit.",
   "tips.chartAlt": "Context size over turns: it climbs forever without compacting, and resets near 200k when you compact.",

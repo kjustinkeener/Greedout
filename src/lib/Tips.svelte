@@ -59,6 +59,32 @@ if ctx >= TARGET:
     { h: 11, noise: true, label: "tips.segDead" },
   ];
 
+  // Highlighting for the Python block inside the prompt (everything between step 1 and
+  // step 2); the rest is prose. Small hand-written tokenizer: no library for ~25 lines.
+  type Tok = { k: string; x: string };
+  const TOKEN =
+    /(f?"(?:[^"\\]|\\.)*"|f?'(?:[^'\\]|\\.)*')|(#.*)|\b(import|from|for|in|if|else|and|or|not|continue|return|def|True|False|None)\b|\b(\d[\d_]*)\b|\b(open|sum|print)\b/g;
+  function tokenize(line: string): Tok[] {
+    const out: Tok[] = [];
+    let last = 0;
+    for (const m of line.matchAll(TOKEN)) {
+      if (m.index > last) out.push({ k: "", x: line.slice(last, m.index) });
+      out.push({ k: m[1] ? "str" : m[2] ? "com" : m[3] ? "kw" : m[4] ? "num" : "fn", x: m[0] });
+      last = m.index + m[0].length;
+    }
+    if (last < line.length) out.push({ k: "", x: line.slice(last) });
+    return out;
+  }
+  const promptLines = (() => {
+    let inCode = false;
+    return PROMPT.split("\n").map((line) => {
+      if (line.startsWith("2. ")) inCode = false;
+      const toks = inCode ? tokenize(line) : [{ k: "", x: line }];
+      if (line.startsWith("1. ")) inCode = true;
+      return toks;
+    });
+  })();
+
   let copied = $state(false);
   async function copyPrompt() {
     try {
@@ -176,7 +202,7 @@ if ctx >= TARGET:
       <h2>{t("tips.hookHead")}</h2>
       <p>{t("tips.hookBody")}</p>
       <div class="pbox">
-        <pre class="prompt">{PROMPT}</pre>
+        <pre class="prompt">{#each promptLines as toks, i}{#each toks as tk}{#if tk.k}<span class={tk.k}>{tk.x}</span>{:else}{tk.x}{/if}{/each}{i < promptLines.length - 1 ? "\n" : ""}{/each}</pre>
         <button class="btn primary copy" onclick={copyPrompt}>
           <Icon name={copied ? "check" : "copy"} size={12} />
           {copied ? t("tips.copied") : t("tips.copy")}
@@ -421,6 +447,22 @@ if ctx >= TARGET:
   .prompt::-webkit-scrollbar-thumb {
     background: var(--muted);
   }
+  .prompt .kw {
+    color: var(--g0);
+  }
+  .prompt .str {
+    color: var(--green);
+  }
+  .prompt .num {
+    color: #ff9f43;
+  }
+  .prompt .fn {
+    color: var(--g1);
+  }
+  .prompt .com {
+    color: var(--muted);
+    font-style: italic;
+  }
   .prompt::before {
     content: "";
     float: right;
@@ -430,7 +472,7 @@ if ctx >= TARGET:
   .prompt {
     margin: 0;
     padding: 8px 10px;
-    max-height: 150px;
+    max-height: 225px;
     overflow: auto;
     white-space: pre-wrap;
     overflow-wrap: anywhere;

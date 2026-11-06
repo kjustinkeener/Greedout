@@ -37,10 +37,10 @@
       '            u = (j.get("message") or {}).get("usage") or {}',
       '            ctx = sum(u.get(k, 0) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")) or ctx',
       "if ctx >= TARGET:",
-      '    msg = f"Context is about {ctx // 1000}k tokens, past the {TARGET // 1000}k budget. Finish the current step properly, then at the next natural stopping point end your reply with these two lines: Session size at {ctx // 1000}k, then Please type /compact. Repeat at each later stopping point until the user compacts."',
+      '    msg = f"Context is about {ctx // 1000}k tokens, past the {TARGET // 1000}k budget. Finish the current step properly and do not open new threads, then at the next natural stopping point end your reply with these two lines: Session size at {ctx // 1000}k, then Please type /compact. Repeat at each later stopping point until the user compacts."',
       ...(n
         ? [
-            '    msg += " Also write or refresh your compaction note at " + os.path.join(os.path.expanduser("~"), ".claude", "compaction-notes", data["session_id"] + ".md") + ". Start it with one line, NEXT ACTION: the first thing to do after the compaction, then the current task, key files, decisions and open bugs. It is handed back to you right after /compact."',
+            '    msg += " Also write or refresh your compaction note at " + os.path.join(os.path.expanduser("~"), ".claude", "compaction-notes", data["session_id"] + ".md") + ". Start it with one line, NEXT ACTION: the first thing to do after the compaction, then the current task, key files, decisions and open bugs. Keep it current each turn until I compact. It is handed back to you right after /compact."',
           ]
         : []),
       '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))',
@@ -57,17 +57,18 @@
 
     const restore = [
       "import json, os, sys",
-      "data = json.load(sys.stdin)",
-      "if data.get(\"source\") != \"compact\":",
-      "    sys.exit(0)",
-      "path = os.path.join(os.path.expanduser(\"~\"), \".claude\", \"compaction-notes\", data[\"session_id\"] + \".md\")",
-      "if not os.path.exists(path):",
-      "    sys.exit(0)",
-      "note = open(path, encoding=\"utf-8\").read().strip()",
-      "os.remove(path)",
-      "if note:",
-      "    msg = \"Your own note from before the compaction. Use it to reorient; if it starts with NEXT ACTION:, do that first. Verify against the repo before acting.\\n\\n\" + note",
-      "    print(json.dumps({\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": msg}}))",
+      "try:",
+      "    data = json.load(sys.stdin)",
+      "    if data.get(\"source\") == \"compact\":",
+      "        path = os.path.join(os.path.expanduser(\"~\"), \".claude\", \"compaction-notes\", data[\"session_id\"] + \".md\")",
+      "        if os.path.exists(path):",
+      "            note = open(path, encoding=\"utf-8\").read().strip()",
+      "            if note:",
+      "                msg = \"Your own note from before the compaction. Use it to reorient; if it starts with NEXT ACTION:, do that first. Verify against the repo before acting.\\n\\n\" + note",
+      "                print(json.dumps({\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": msg}}))",
+      "            os.remove(path)",
+      "except Exception:",
+      "    pass",
     ].join("\n");
 
     const parts: Part[] = [

@@ -109,20 +109,20 @@ if ctx >= TARGET:
     <section>
       <h2>{t("tips.whyHead")}</h2>
       <p>{t("tips.whyBody")}</p>
-      <svg class="chart" viewBox="0 0 320 150" role="img" aria-label={t("tips.chartAlt")}>
-        <line class="axis" x1="10" y1="124" x2="310" y2="124" />
-        <line class="axis" x1="10" y1="10" x2="10" y2="124" />
+      <svg class="chart" viewBox="0 0 640 112" role="img" aria-label={t("tips.chartAlt")}>
+        <line class="axis" x1="10" y1="96" x2="630" y2="96" />
+        <line class="axis" x1="10" y1="8" x2="10" y2="96" />
         <!-- Budget line -->
-        <line class="target" x1="10" y1="64" x2="310" y2="64" />
-        <text class="lbl" x="14" y="58">{t("tips.chartTarget")}</text>
+        <line class="target" x1="10" y1="50" x2="630" y2="50" />
+        <text class="lbl" x="16" y="45">{t("tips.chartTarget")}</text>
         <!-- Extra cost: the gap between never compacting and compacting -->
-        <path class="gap" d="M147 64 L300 14 L286 64 Z" />
-        <polyline class="never" points="10,116 300,14" />
-        <polyline class="comp" points="10,116 147,64 149,116 286,64 288,116 300,111" />
-        <text class="lbl never-l" x="206" y="30" text-anchor="end">{t("tips.chartNever")}</text>
-        <text class="lbl comp-l" x="212" y="140">{t("tips.chartCompact")}</text>
-        <text class="lbl" x="310" y="138" text-anchor="end">{t("tips.chartX")}</text>
-        <text class="lbl" x="14" y="20">{t("tips.chartY")}</text>
+        <path class="gap" d="M318 49.6 L620 10 L620 51 L318 90 Z" />
+        <polyline class="never" points="10,90 620,10" />
+        <polyline class="comp" points="10,90 315,50 318,90 620,51" />
+        <text class="lbl never-l" x="400" y="24" text-anchor="middle">{t("tips.chartNever")}</text>
+        <text class="lbl comp-l" x="470" y="108" text-anchor="middle">{t("tips.chartCompact")}</text>
+        <text class="lbl" x="630" y="108" text-anchor="end">{t("tips.chartX")}</text>
+        <text class="lbl" x="16" y="18">{t("tips.chartY")}</text>
       </svg>
       <p class="cap">{t("tips.chartCap")}</p>
     </section>
@@ -282,7 +282,7 @@ if ctx >= TARGET:
   }
   .lbl {
     fill: var(--muted);
-    font-size: 8.5px;
+    font-size: 11px;
   }
   .never-l {
     fill: #e5484d;

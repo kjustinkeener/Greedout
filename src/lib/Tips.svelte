@@ -21,9 +21,17 @@
 
   const promptParts = $derived.by((): Part[] => {
     const n = withNote;
+    const PRINT =
+      '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))';
     const body = [
       "TARGET = 200_000",
       "data = json.load(sys.stdin)",
+      ...(n
+        ? [
+            'note = os.path.join(os.path.expanduser("~"), ".claude", "compaction-notes", data["session_id"] + ".md")',
+            'state = os.path.join(tempfile.gettempdir(), "context-reminder-" + data["session_id"] + ".state")',
+          ]
+        : []),
       "ctx = 0",
       "fresh = False",
       'for line in open(data["transcript_path"], encoding="utf-8"):',
@@ -41,20 +49,32 @@
       '            ctx = sum(u.get(k, 0) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")) or ctx',
       "if fresh:",
       '    msg = f"The user just compacted, so context is now about {ctx // 1000}k tokens. Do not end replies with Session size or Please type /compact until told again."',
-      '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))',
+      ...(n ? ['    open(state, "w").write("0")'] : []),
+      PRINT,
       "elif ctx >= TARGET:",
       '    msg = f"Context is about {ctx // 1000}k tokens, past the {TARGET // 1000}k budget. Finish the current step properly and do not open new threads, then at the next natural stopping point end your reply with these two lines: Session size at {ctx // 1000}k, then Please type /compact. Repeat at each later stopping point until the user compacts."',
       ...(n
         ? [
-            '    msg += " Also write or refresh your compaction note at " + os.path.join(os.path.expanduser("~"), ".claude", "compaction-notes", data["session_id"] + ".md") + ". Start it with one line, NEXT ACTION: the first thing to do after the compaction, then the current task, key files, decisions and open bugs. Keep it current each turn until I compact. It is handed back to you right after /compact."',
+            '    msg += " Also keep your compaction note current at " + note + ". Keep it current each turn until I compact. It is handed back to you right after /compact."',
           ]
         : []),
-      '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))',
+      PRINT,
+      ...(n
+        ? [
+            "elif ctx >= TARGET // 2:",
+            "    band = 2 if ctx >= TARGET * 9 // 10 else 1",
+            '    prev = int(open(state).read() or 0) if os.path.exists(state) else 0',
+            "    if band > prev:",
+            '        open(state, "w").write(str(band))',
+            '        msg = f"Context is about {ctx // 1000}k tokens. Keep working normally: do not shorten answers, skip steps or steer toward stopping. " + ("Start" if band == 1 else "Refresh") + " your compaction note at " + note + ". It must open with one line, NEXT ACTION: the first thing to do after a compaction, then the current task, key files, decisions and open bugs. It is handed back to you right after /compact."',
+            "    " + PRINT,
+          ]
+        : []),
     ];
     // Any failure (transcript not written yet, a half-written line, a missing field) must
     // end quietly: a crash would show the user a hook error on that turn.
     const reminder = [
-      n ? "import json, os, sys" : "import json, sys",
+      n ? "import json, os, sys, tempfile" : "import json, sys",
       "try:",
       ...body.map((l) => "    " + l),
       "except Exception:",

@@ -7,7 +7,7 @@ export const pl: PartialDict = {
   "menu.dailySpend": "Dzienne wydatki…",
   "menu.settings": "Ustawienia…",
   "menu.about": "O programie…",
-  "menu.tips": "Wydłuż swój limit…",
+  "menu.tips": "Oszczędzaj na kosztach tokenów…",
   "win.minimize": "Minimalizuj",
   "win.close": "Zamknij",
 
@@ -174,7 +174,7 @@ export const pl: PartialDict = {
   "theme.starLocked": "Zablokowane. Kliknij \"Dałem gwiazdkę\" na karcie z gwiazdką, aby odblokować.",
   "settings.agentControl": "Włącz sterowanie przez agenta (MCP Server)",
   "settings.agentControlTip": "Pozwala agentowi AI na tym komputerze (przez serwer MCP Greedout) czytać Twoje sesje, wydatki i dawne rozmowy, zmieniać te ustawienia i otwierać okna. Połączyć może się tylko Twoje konto Windows. Zostaw wyłączone, jeśli z tego nie korzystasz.",
-  "tips.title": "Wydłuż swój limit",
+  "tips.title": "Oszczędzaj na kosztach tokenów",
   "tips.lead": "Krótsze sesje kosztują mniej, więc ta sama subskrypcja starcza na dłużej. Dwa polecenia zapobiegają narastaniu tych kosztów: /compact i /clear.",
   "tips.whyHead": "Dlaczego długie sesje są drogie",
   "tips.whyBody": "Przy każdej wysłanej wiadomości cała dotychczasowa rozmowa jest ponownie wysyłana do modelu. Im dłużej trwa sesja, tym więcej kosztuje każda tura i tym szybciej osiągasz limit planu.",

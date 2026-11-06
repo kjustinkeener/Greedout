@@ -7,7 +7,7 @@ export const nl: PartialDict = {
   "menu.dailySpend": "Dagelijkse uitgaven…",
   "menu.settings": "Instellingen…",
   "menu.about": "Over…",
-  "menu.tips": "Je gebruik rekken…",
+  "menu.tips": "Bespaar op tokenkosten…",
   "win.minimize": "Minimaliseren",
   "win.close": "Sluiten",
 
@@ -174,7 +174,7 @@ export const nl: PartialDict = {
   "theme.starLocked": "Vergrendeld. Klik op \"Ik heb een ster gegeven\" op de sterkaart om te ontgrendelen.",
   "settings.agentControl": "Agentbesturing inschakelen (MCP Server)",
   "settings.agentControlTip": "Laat een AI-agent op deze pc (via de Greedout MCP-server) je sessies, uitgaven en eerdere gesprekken lezen, deze instellingen wijzigen en vensters openen. Alleen je Windows-account kan verbinden. Laat uit als je het niet gebruikt.",
-  "tips.title": "Rek je gebruik",
+  "tips.title": "Bespaar op tokenkosten",
   "tips.lead": "Kortere sessies kosten minder, dus hetzelfde abonnement gaat verder. Twee commando's voorkomen dat die kosten zich opstapelen: /compact en /clear.",
   "tips.whyHead": "Waarom lange sessies duur worden",
   "tips.whyBody": "Telkens als je een bericht stuurt, wordt het hele gesprek tot dan toe opnieuw naar het model gestuurd. Hoe langer een sessie duurt, hoe meer elke beurt kost en hoe sneller je je abonnementslimiet bereikt.",

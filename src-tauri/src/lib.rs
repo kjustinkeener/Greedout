@@ -362,7 +362,7 @@ fn get_config() -> config::Config {
     config::load_config()
 }
 
-/// Record that the Stretch Your Usage page was shown, so it never opens itself again.
+/// Record that the Save on Token Costs page was shown, so it never opens itself again.
 #[tauri::command]
 fn mark_tips_shown() {
     let mut cfg = config::load_config();

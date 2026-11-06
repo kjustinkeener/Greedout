@@ -7,7 +7,7 @@ export const ko: PartialDict = {
   "menu.dailySpend": "일일 지출…",
   "menu.settings": "설정…",
   "menu.about": "정보…",
-  "menu.tips": "사용량 늘리기…",
+  "menu.tips": "토큰 비용 절약하기…",
   "win.minimize": "최소화",
   "win.close": "닫기",
 
@@ -173,7 +173,7 @@ export const ko: PartialDict = {
   "theme.starLocked": "잠겨 있습니다. 별 카드에서 \"별을 눌렀어요\"를 클릭하면 해제됩니다.",
   "settings.agentControl": "에이전트 제어 사용 (MCP Server)",
   "settings.agentControlTip": "이 PC의 AI 에이전트가 (Greedout MCP 서버를 통해) 세션, 지출, 지난 대화를 읽고, 이 설정을 변경하고, 창을 열 수 있게 합니다. 내 Windows 계정만 연결할 수 있습니다. 사용하지 않으면 꺼 두세요.",
-  "tips.title": "사용량 늘리기",
+  "tips.title": "토큰 비용 절약하기",
   "tips.lead": "세션이 짧을수록 비용이 줄어 같은 구독으로 더 오래 쓸 수 있습니다. 비용이 쌓이지 않게 막아 주는 명령은 두 가지입니다: /compact 와 /clear.",
   "tips.whyHead": "긴 세션이 비싸지는 이유",
   "tips.whyBody": "메시지를 보낼 때마다 지금까지의 대화 전체가 모델에 다시 전송됩니다. 세션이 길어질수록 각 턴의 비용이 늘고 요금제 한도에도 더 빨리 도달합니다.",

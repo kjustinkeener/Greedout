@@ -7,7 +7,7 @@ export const ptBR: PartialDict = {
   "menu.dailySpend": "Gasto diário…",
   "menu.settings": "Configurações…",
   "menu.about": "Sobre…",
-  "menu.tips": "Estique seu uso…",
+  "menu.tips": "Economize nos custos de tokens…",
   "win.minimize": "Minimizar",
   "win.close": "Fechar",
 
@@ -174,7 +174,7 @@ export const ptBR: PartialDict = {
   "theme.starLocked": "Bloqueado. Clique em \"Já dei uma estrela\" no cartão da estrela para desbloquear.",
   "settings.agentControl": "Ativar controle por agente (MCP Server)",
   "settings.agentControlTip": "Permite que um agente de IA neste PC (pelo servidor MCP do Greedout) leia suas sessões, gastos e conversas anteriores, altere estas configurações e abra janelas. Somente sua conta do Windows pode se conectar. Deixe desativado se você não usa.",
-  "tips.title": "Estique seu uso",
+  "tips.title": "Economize nos custos de tokens",
   "tips.lead": "Sessões mais curtas custam menos, então a mesma assinatura rende mais. Dois comandos evitam que esse custo se acumule: /compact e /clear.",
   "tips.whyHead": "Por que sessões longas ficam caras",
   "tips.whyBody": "Toda vez que você envia uma mensagem, a conversa inteira até ali é enviada de novo ao modelo. Quanto mais longa a sessão, mais cada turno custa e mais cedo você atinge o limite do seu plano.",

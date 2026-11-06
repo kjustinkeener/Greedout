@@ -7,7 +7,7 @@ export const zhHant: PartialDict = {
   "menu.dailySpend": "每日花費…",
   "menu.settings": "設定…",
   "menu.about": "關於…",
-  "menu.tips": "延長你的用量…",
+  "menu.tips": "節省 Token 費用…",
   "win.minimize": "最小化",
   "win.close": "關閉",
 
@@ -174,7 +174,7 @@ export const zhHant: PartialDict = {
   "theme.starLocked": "已鎖定。在加星卡片上點擊「我已加星」即可解鎖。",
   "settings.agentControl": "啟用代理控制 (MCP Server)",
   "settings.agentControlTip": "允許這台電腦上的 AI 代理（透過 Greedout MCP 伺服器）讀取你的工作階段、花費和過往對話，變更這些設定並開啟視窗。只有你的 Windows 帳戶可以連線。不使用時請保持關閉。",
-  "tips.title": "延長你的用量",
+  "tips.title": "節省 Token 費用",
   "tips.lead": "工作階段越短花費越少，同一個訂閱就能用得更久。兩個指令可以避免這些花費不斷累積：/compact 和 /clear。",
   "tips.whyHead": "為什麼長工作階段會變貴",
   "tips.whyBody": "每次傳送訊息時，到目前為止的整段對話都會再次傳送給模型。工作階段越長，每一輪花費越多，也越早觸及方案上限。",

@@ -7,7 +7,7 @@ export const de: PartialDict = {
   "menu.dailySpend": "Tägliche Ausgaben…",
   "menu.settings": "Einstellungen…",
   "menu.about": "Über…",
-  "menu.tips": "Nutzung strecken…",
+  "menu.tips": "Token-Kosten sparen…",
   "win.minimize": "Minimieren",
   "win.close": "Schließen",
 
@@ -174,7 +174,7 @@ export const de: PartialDict = {
   "theme.starLocked": "Gesperrt. Klicke auf der Sternkarte auf \"Ich habe einen Stern gegeben\", um es freizuschalten.",
   "settings.agentControl": "Agentensteuerung aktivieren (MCP Server)",
   "settings.agentControlTip": "Erlaubt einem KI-Agenten auf diesem PC (über den Greedout-MCP-Server), deine Sitzungen, Ausgaben und früheren Unterhaltungen zu lesen, diese Einstellungen zu ändern und Fenster zu öffnen. Nur dein Windows-Konto kann sich verbinden. Lass es aus, wenn du es nicht nutzt.",
-  "tips.title": "Nutzung strecken",
+  "tips.title": "Token-Kosten sparen",
   "tips.lead": "Kürzere Sitzungen kosten weniger, damit reicht dasselbe Abo weiter. Zwei Befehle verhindern, dass sich diese Kosten aufsummieren: /compact und /clear.",
   "tips.whyHead": "Warum lange Sitzungen teuer werden",
   "tips.whyBody": "Bei jeder Nachricht wird die gesamte bisherige Unterhaltung erneut an das Modell gesendet. Je länger eine Sitzung läuft, desto mehr kostet jeder Zug und desto früher erreichst du dein Plan-Limit.",

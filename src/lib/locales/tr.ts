@@ -7,7 +7,7 @@ export const tr: PartialDict = {
   "menu.dailySpend": "Günlük Harcama…",
   "menu.settings": "Ayarlar…",
   "menu.about": "Hakkında…",
-  "menu.tips": "Kullanımını Uzat…",
+  "menu.tips": "Token Maliyetlerinden Tasarruf Edin…",
   "win.minimize": "Küçült",
   "win.close": "Kapat",
 
@@ -174,7 +174,7 @@ export const tr: PartialDict = {
   "theme.starLocked": "Kilitli. Açmak için yıldız kartındaki \"Yıldız verdim\" düğmesine tıklayın.",
   "settings.agentControl": "Ajan kontrolünü etkinleştir (MCP Server)",
   "settings.agentControlTip": "Bu bilgisayardaki bir yapay zekâ ajanının (Greedout MCP sunucusu aracılığıyla) oturumlarınızı, harcamanızı ve geçmiş konuşmalarınızı okumasına, bu ayarları değiştirmesine ve pencereleri açmasına izin verir. Yalnızca Windows hesabınız bağlanabilir. Kullanmıyorsanız kapalı bırakın.",
-  "tips.title": "Kullanımınızı Uzatın",
+  "tips.title": "Token Maliyetlerinden Tasarruf Edin",
   "tips.lead": "Kısa oturumlar daha az maliyetlidir, böylece aynı abonelik daha uzun gider. İki komut bu maliyetin birikmesini önler: /compact ve /clear.",
   "tips.whyHead": "Uzun oturumlar neden pahalılaşır",
   "tips.whyBody": "Her mesaj gönderdiğinizde, o ana kadarki tüm konuşma modele yeniden gönderilir. Oturum uzadıkça her tur daha çok maliyetlenir ve plan sınırınıza daha erken ulaşırsınız.",

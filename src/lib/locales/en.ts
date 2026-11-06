@@ -29,7 +29,7 @@ export const en = {
   "menu.closeMenu": "Close menu",
   "menu.explorer": "Context Explorer…",
   "menu.dailySpend": "Daily Spend…",
-  "menu.tips": "Stretch Your Usage…",
+  "menu.tips": "Save on Token Costs…",
   "menu.settings": "Settings…",
   "menu.about": "About…",
   "win.minimize": "Minimize",
@@ -168,7 +168,7 @@ export const en = {
 
   // About window
   // Usage tips window
-  "tips.title": "Stretch Your Usage",
+  "tips.title": "Save on Token Costs",
   "tips.lead": "Shorter sessions cost less, so the same subscription goes further. Two commands stop that cost from piling up: /compact and /clear.",
   "tips.whyHead": "Why long sessions get expensive",
   "tips.whyBody": "Every time you send a message, the whole conversation so far is sent to the model again. The longer a session runs, the more each turn costs and the sooner you hit your plan limit.",

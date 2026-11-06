@@ -7,7 +7,7 @@ export const zhHans: PartialDict = {
   "menu.dailySpend": "每日花费…",
   "menu.settings": "设置…",
   "menu.about": "关于…",
-  "menu.tips": "延长你的用量…",
+  "menu.tips": "节省 Token 费用…",
   "win.minimize": "最小化",
   "win.close": "关闭",
 
@@ -173,7 +173,7 @@ export const zhHans: PartialDict = {
   "theme.starLocked": "已锁定。在加星卡片上点击“我已加星”即可解锁。",
   "settings.agentControl": "启用代理控制 (MCP Server)",
   "settings.agentControlTip": "允许这台电脑上的 AI 代理（通过 Greedout MCP 服务器）读取你的会话、花费和过往对话，更改这些设置并打开窗口。只有你的 Windows 账户可以连接。不使用时请保持关闭。",
-  "tips.title": "延长你的用量",
+  "tips.title": "节省 Token 费用",
   "tips.lead": "会话越短花费越少，同一个订阅就能用得更久。两个命令可以避免这些花费不断累积：/compact 和 /clear。",
   "tips.whyHead": "为什么长会话会变贵",
   "tips.whyBody": "每次发送消息时，到目前为止的整段对话都会再次发送给模型。会话越长，每一轮花费越多，也越早触及套餐上限。",

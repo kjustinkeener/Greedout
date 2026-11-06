@@ -7,7 +7,7 @@ export const ja: PartialDict = {
   "menu.dailySpend": "日別コスト…",
   "menu.settings": "設定…",
   "menu.about": "バージョン情報…",
-  "menu.tips": "使用量を伸ばす…",
+  "menu.tips": "トークンコストを節約…",
   "win.minimize": "最小化",
   "win.close": "閉じる",
 
@@ -173,7 +173,7 @@ export const ja: PartialDict = {
   "theme.starLocked": "ロック中。スターのカードで「スターを付けました」をクリックすると解除されます。",
   "settings.agentControl": "エージェント制御を有効にする (MCP Server)",
   "settings.agentControlTip": "この PC 上の AI エージェントが（Greedout の MCP サーバー経由で）セッション、コスト、過去の会話を読み取り、これらの設定を変更し、ウィンドウを開けるようにします。接続できるのはあなたの Windows アカウントだけです。使わない場合はオフのままにしてください。",
-  "tips.title": "使用量を伸ばす",
+  "tips.title": "トークンコストを節約",
   "tips.lead": "セッションが短いほどコストは下がり、同じサブスクリプションをより長く使えます。コストが積み上がるのを防ぐコマンドは 2 つです: /compact と /clear。",
   "tips.whyHead": "長いセッションが高くつく理由",
   "tips.whyBody": "メッセージを送るたびに、それまでの会話全体が再びモデルに送られます。セッションが長くなるほど 1 ターンのコストが増え、プランの上限にも早く達します。",

@@ -371,7 +371,7 @@
     const aot = (await invoke<Config>("get_config").catch(() => null))?.always_on_top ?? true;
     const w = new WebviewWindow("tips", {
       url: "tips.html",
-      title: "Stretch Your Usage",
+      title: "Save on Token Costs",
       width: 690,
       height: 640,
       minWidth: 360,
@@ -626,7 +626,7 @@
             .catch(() => {});
         }
         document.documentElement.style.zoom = String(uiScale);
-        // First launch after a fresh install: show the Stretch Your Usage page once.
+        // First launch after a fresh install: show the Save on Token Costs page once.
         if (cfg0.tips_shown === false) {
           void openTips();
           void invoke("mark_tips_shown").catch(() => {});

@@ -86,7 +86,7 @@ pub struct Config {
     /// client read live state and drive the app). Off by default; Windows only.
     #[serde(default = "default_agent_control")]
     pub agent_control: bool,
-    /// The Stretch Your Usage page has been shown once automatically. A config written
+    /// The Save on Token Costs page has been shown once automatically. A config written
     /// before this field existed reads as true, so only fresh installs see the page;
     /// set it to false to see the page open again on the next launch.
     #[serde(default = "default_true")]

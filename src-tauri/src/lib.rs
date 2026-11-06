@@ -504,6 +504,8 @@ pub fn run() {
     // Move our sidecars out of `~/.claude/greedout` (pre-0.2.3 location) into our
     // own data dir, so we never write inside Claude Code's config home.
     config::migrate_sidecars();
+    #[cfg(windows)]
+    config::migrate_legacy_data();
     // Fresh log each run so it can't grow without bound when debug logging is left on.
     config::truncate_log();
 

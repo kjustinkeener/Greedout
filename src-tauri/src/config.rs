@@ -299,6 +299,88 @@ pub fn migrate_sidecars() {
     let _ = std::fs::remove_dir(&old);
 }
 
+/// Versions up to 0.4.12 kept settings and the history cache in `%LOCALAPPDATA%\Greedout`;
+/// they now live in `app_dir()`. On the first run with nothing in the new place, bring the
+/// old data across so an update keeps the user's settings, labels and indexed history.
+/// Data only: the old exe, shortcuts and registry entry are left alone. Windows only.
+#[cfg(windows)]
+pub fn migrate_legacy_data() {
+    let Some(old) = dirs::data_local_dir().map(|d| d.join("Greedout")) else { return };
+    move_legacy_data(&old, &app_dir());
+}
+
+/// Move the data files from `old` to `new` unless `new` already has settings. Best-effort.
+/// Small files are copied, then the original removed; the history cache is moved as one
+/// group (database, WAL, shared-memory) or left where it is, since a split group would be
+/// corrupt. The cache is rebuildable from the transcripts, so a failed move costs time only.
+pub(crate) fn move_legacy_data(old: &std::path::Path, new: &std::path::Path) {
+    if old == new || !old.join("config.json").exists() || new.join("config.json").exists() {
+        return;
+    }
+    if std::fs::create_dir_all(new).is_err() {
+        return;
+    }
+    for name in [
+        "config.json",
+        "labels.json",
+        "window-state.json",
+        "themes.json",
+        "limit_calibration.json",
+    ] {
+        let (src, dst) = (old.join(name), new.join(name));
+        if src.exists() && !dst.exists() && std::fs::copy(&src, &dst).is_ok() {
+            let _ = std::fs::remove_file(&src);
+        }
+    }
+    let group = ["cache.sqlite", "cache.sqlite-wal", "cache.sqlite-shm"];
+    let main = (old.join(group[0]), new.join(group[0]));
+    if main.0.exists() && !main.1.exists() && std::fs::rename(&main.0, &main.1).is_ok() {
+        for name in &group[1..] {
+            let (src, dst) = (old.join(name), new.join(name));
+            if src.exists() && std::fs::rename(&src, &dst).is_err() {
+                let _ = std::fs::copy(&src, &dst).map(|_| std::fs::remove_file(&src));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod migrate_tests {
+    use super::move_legacy_data;
+    use std::fs;
+
+    fn tmp(tag: &str) -> std::path::PathBuf {
+        let d = std::env::temp_dir().join(format!("greedout-mig-{tag}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&d);
+        fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn moves_settings_and_cache_when_new_is_empty() {
+        let (old, new) = (tmp("old1"), tmp("new1").join("sub"));
+        fs::write(old.join("config.json"), "{\"opacity\":0.5}").unwrap();
+        fs::write(old.join("cache.sqlite"), "db").unwrap();
+        fs::write(old.join("cache.sqlite-wal"), "wal").unwrap();
+        fs::write(old.join("greedout.exe"), "exe").unwrap();
+        move_legacy_data(&old, &new);
+        assert_eq!(fs::read_to_string(new.join("config.json")).unwrap(), "{\"opacity\":0.5}");
+        assert!(new.join("cache.sqlite").exists() && new.join("cache.sqlite-wal").exists());
+        assert!(!old.join("config.json").exists() && !old.join("cache.sqlite").exists());
+        assert!(old.join("greedout.exe").exists(), "the old exe is not data and stays");
+    }
+
+    #[test]
+    fn leaves_everything_when_new_already_has_settings() {
+        let (old, new) = (tmp("old2"), tmp("new2"));
+        fs::write(old.join("config.json"), "old").unwrap();
+        fs::write(new.join("config.json"), "new").unwrap();
+        move_legacy_data(&old, &new);
+        assert_eq!(fs::read_to_string(new.join("config.json")).unwrap(), "new");
+        assert!(old.join("config.json").exists());
+    }
+}
+
 /// Start each run with an empty log. The log is a rolling diagnostic, not a record
 /// worth keeping between runs, and it is append-only, so leaving debug logging on
 /// otherwise grows it without bound. Best-effort; a missing file is fine.

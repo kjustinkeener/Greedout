@@ -105,7 +105,7 @@ export const en = {
   "settings.showPrompt": "Show prompt text",
   "settings.clickableTitles": "Clickable links in main window",
   "settings.checkUpdates": "Check for updates at launch",
-  "settings.agentControl": "Enable agent control",
+  "settings.agentControl": "Enable agent control (MCP Server)",
   "settings.debugLogging": "Debug logging to file",
   "settings.lockoutTip":
     "Can't turn this off: it is the only way left to reach the window. Enable the other one first.",

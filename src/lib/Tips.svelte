@@ -317,7 +317,7 @@
   }
   h2 {
     margin: 0 0 4px;
-    font-size: calc(12.5px * var(--size-ui));
+    font-size: calc(15px * var(--size-ui));
     font-weight: var(--w-semibold);
     color: var(--g1);
   }

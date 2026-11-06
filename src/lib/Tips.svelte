@@ -417,6 +417,10 @@ if ctx >= TARGET:
     font-size: calc(11px * var(--size-ui));
   }
   /* Reserves the corner for the Copy button so the first lines wrap around it. */
+  /* The global thumb color is this box's own background, so it would be invisible here. */
+  .prompt::-webkit-scrollbar-thumb {
+    background: var(--muted);
+  }
   .prompt::before {
     content: "";
     float: right;

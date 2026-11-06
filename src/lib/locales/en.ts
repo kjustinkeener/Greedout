@@ -203,7 +203,7 @@ export const en = {
   "tips.hookHead": "Get reminded automatically",
   "tips.hookBody": "Your agent cannot see its own context size, so it never says when to compact. Paste this prompt into it to add a reminder hook. It only reminds you; it never compacts for you.",
   "tips.noteOpt": "Also keep a compaction note.",
-  "tips.noteHint": "Your agent writes down what to do next before you compact, and it is handed back right after. Adds a second small hook.",
+  "tips.noteHint": "Before you compact, your agent writes a short note to itself: what it is working on, the first thing to do next, the key files, decisions made and bugs still open. It starts the note when the session is half full, refreshes it at 90%, and keeps it current once you pass the budget, so a note exists even if you compact early. Right after /compact, a second small hook puts the note back into the agent's context, so it picks up where it left off instead of relying only on the automatic summary. The note is a file under ~/.claude/compaction-notes, deleted once it has been handed back.",
   "tips.copy": "Copy prompt",
   "tips.copied": "Copied",
 

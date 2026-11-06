@@ -22,31 +22,35 @@
   const promptParts = $derived.by((): Part[] => {
     const n = withNote;
     const PRINT =
-      '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))';
+      '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}, "suppressOutput": True}))';
     const body = [
       "TARGET = 200_000",
       "data = json.load(sys.stdin)",
       ...(n
         ? [
-            'note = os.path.join(os.path.expanduser("~"), ".claude", "compaction-notes", data["session_id"] + ".md")',
-            'state = os.path.join(tempfile.gettempdir(), "context-reminder-" + data["session_id"] + ".state")',
+            'sid = "".join(c for c in data["session_id"] if c.isalnum() or c in "-_")',
+            'note = os.path.join(os.path.expanduser("~"), ".claude", "compaction-notes", sid + ".md")',
+            'state = os.path.join(tempfile.gettempdir(), "context-reminder-" + sid + ".state")',
           ]
         : []),
       "ctx = 0",
       "fresh = False",
       'for line in open(data["transcript_path"], encoding="utf-8"):',
-      "    if '\"compact_boundary\"' in line:",
-      "        j = json.loads(line)",
-      '        if j.get("subtype") == "compact_boundary":',
-      '            ctx = (j.get("compactMetadata") or {}).get("postTokens") or 0',
-      "            fresh = True",
+      "    boundary = '\"compact_boundary\"' in line",
+      "    if not boundary and '\"usage\"' not in line:",
       "        continue",
-      "    if '\"usage\"' in line:",
+      "    try:",
       "        j = json.loads(line)",
-      '        if j.get("type") == "assistant":',
-      "            fresh = False",
-      '            u = (j.get("message") or {}).get("usage") or {}',
-      '            ctx = sum(u.get(k, 0) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")) or ctx',
+      "    except Exception:",
+      "        continue",
+      '    if boundary and j.get("subtype") == "compact_boundary":',
+      '        ctx = (j.get("compactMetadata") or {}).get("postTokens") or 0',
+      "        fresh = ctx > 0",
+      "        continue",
+      '    if j.get("type") == "assistant":',
+      "        fresh = False",
+      '        u = (j.get("message") or {}).get("usage") or {}',
+      '        ctx = sum(u.get(k, 0) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")) or ctx',
       "if fresh:",
       '    msg = f"The user just compacted, so context is now about {ctx // 1000}k tokens. Do not end replies with Session size or Please type /compact until told again."',
       ...(n ? ['    open(state, "w").write("0")'] : []),
@@ -86,12 +90,13 @@
       "try:",
       "    data = json.load(sys.stdin)",
       "    if data.get(\"source\") == \"compact\":",
-      "        path = os.path.join(os.path.expanduser(\"~\"), \".claude\", \"compaction-notes\", data[\"session_id\"] + \".md\")",
+      "        sid = \"\".join(c for c in data[\"session_id\"] if c.isalnum() or c in \"-_\")",
+      "        path = os.path.join(os.path.expanduser(\"~\"), \".claude\", \"compaction-notes\", sid + \".md\")",
       "        if os.path.exists(path):",
       "            note = open(path, encoding=\"utf-8\").read().strip()",
       "            if note:",
-      "                msg = \"Your own note from before the compaction. Use it to reorient; if it starts with NEXT ACTION:, do that first. Verify against the repo before acting.\\n\\n\" + note",
-      "                print(json.dumps({\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": msg}}))",
+      "                msg = \"Steering note carried across the compaction just completed. This is your own live note for THIS session. Use it to reorient: current task, file map, decisions, next steps, open bugs. If it opens with a NEXT ACTION: line, that is the one thing to do first; treat it as an imperative to yourself. It reflects state as of the last time it was refreshed; verify against the repo before acting.\\n\\n\" + note",
+      "                print(json.dumps({\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": msg}, \"suppressOutput\": True}))",
       "            os.remove(path)",
       "except Exception:",
       "    pass",
@@ -151,7 +156,7 @@
   // step 2); the rest is prose. Small hand-written tokenizer: no library for ~25 lines.
   type Tok = { k: string; x: string };
   const TOKEN =
-    /(f?"(?:[^"\\]|\\.)*"|f?'(?:[^'\\]|\\.)*')|(#.*)|\b(import|from|for|in|if|else|and|or|not|continue|return|def|True|False|None)\b|\b(\d[\d_]*)\b|\b(open|sum|print)\b/g;
+    /(f?"(?:[^"\\]|\\.)*"|f?'(?:[^'\\]|\\.)*')|(#.*)|\b(import|from|for|in|if|elif|else|and|or|not|continue|return|def|try|except|True|False|None)\b|\b(\d[\d_]*)\b|\b(open|sum|print)\b/g;
   function tokenize(line: string): Tok[] {
     const out: Tok[] = [];
     let last = 0;
@@ -285,7 +290,7 @@
       <p>{t("tips.hookBody")}</p>
       <label class="opt">
         <input type="checkbox" bind:checked={withNote} />
-        <span><b>{t("tips.noteOpt")}</b> {t("tips.noteHint")}</span>
+        <span><b>{t("tips.noteOpt")}</b><span class="hint">{t("tips.noteHint")}</span></span>
       </label>
       <div class="pbox">
         <pre class="prompt">{#each promptLines as toks, i}{#each toks as tk}{#if tk.k}<span class={tk.k}>{tk.x}</span>{:else}{tk.x}{/if}{/each}{i < promptLines.length - 1 ? "\n" : ""}{/each}</pre>
@@ -528,6 +533,11 @@
   .opt input {
     margin-top: 3px;
     accent-color: var(--green);
+  }
+  .opt .hint {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
   }
   .pbox {
     position: relative;

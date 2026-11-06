@@ -45,7 +45,7 @@
       '    msg = f"The user just compacted, so context is now about {ctx // 1000}k tokens. Do not end replies with Session size or Please type /compact until told again."',
       PRINT,
       "elif ctx >= TARGET:",
-      '    msg = f"Context is about {ctx // 1000}k tokens, past the {TARGET // 1000}k budget. Finish the current step properly and do not open new threads, then at the next natural stopping point end your reply with these two lines: Session size at {ctx // 1000}k, then Please type /compact. Repeat at each later stopping point until the user compacts."',
+      '    msg = f"Context is about {ctx // 1000}k tokens, past the {TARGET // 1000}k budget. Finish the current step properly (no rushed or skipped work, it is not a hard limit), do not open new threads, and at the next natural stopping point end your reply with these two lines: Session size at {ctx // 1000}k, then Please type /compact. Repeat at each later stopping point until the user compacts."',
       PRINT,
     ];
     // Any failure (transcript not written yet, a half-written line, a missing field) must

@@ -24,7 +24,7 @@
     const PRINT =
       '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}, "suppressOutput": True}))';
     const body = [
-      `TARGET = ${TARGET}`,
+      `TARGET = ${String(TARGET).replace(/\B(?=(\d{3})+$)/g, "_")}`,
       "data = json.load(sys.stdin)",
       "ctx = 0",
       "fresh = False",

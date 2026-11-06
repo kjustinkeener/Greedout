@@ -6,8 +6,10 @@ documented in the GitHub Releases notes and the `v*` git tags.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-06
+
 ### Changed
-- The Save on Token Costs window now also opens once for existing installs, because a config without `tips_shown` counts as not yet shown.
+- A config without `tips_shown` now counts as not yet shown, so the Save on Token Costs window also opens once for existing installs. The first config written no longer contains `tips_shown`; Greedout records it as true once the window has opened.
 
 ## [0.5.0] - 2026-11-06
 

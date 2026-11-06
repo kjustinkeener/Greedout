@@ -33,7 +33,7 @@ for line in open(data["transcript_path"], encoding="utf-8"):
             u = (j.get("message") or {}).get("usage") or {}
             ctx = sum(u.get(k, 0) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")) or ctx
 if ctx >= TARGET:
-    msg = f"Context is about {ctx // 1000}k tokens, past the {TARGET // 1000}k budget. Finish the current step, then at the next natural stopping point end your reply with: Please type /compact"
+    msg = f"Context is about {ctx // 1000}k tokens, past the {TARGET // 1000}k budget. Finish the current step properly, then at the next natural stopping point end your reply with these two lines: Session size at {ctx // 1000}k, then Please type /compact. Repeat at each later stopping point until the user compacts."
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))
 
 2. Register it in ~/.claude/settings.json as a UserPromptSubmit hook that runs: python ~/.claude/hooks/context-reminder.py (use the full path, and python3 if that is what this machine has).

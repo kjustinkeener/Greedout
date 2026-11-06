@@ -185,7 +185,7 @@ export const en = {
   "tips.dialSoon": "Getting long. Compact at your next break.",
   "tips.dialNow": "Past 200k. Type /compact now.",
   "tips.compactHead": "/compact: keep going, cheaper",
-  "tips.compactBody": "Type /compact between tasks. The history is replaced by a short summary, so the work continues but every following turn is cheap again. The model writes that summary, so compacting itself costs one turn at the current size. Compact before the session gets huge, not after.",
+  "tips.compactBody": "Type /compact between tasks. The history is replaced by a short summary, so the work continues but every following turn is cheap again. The model writes that summary, so compacting itself costs one turn at the current size.",
   "tips.segTools": "Tool call results",
   "tips.segFiles": "Whole files it read",
   "tips.segOutput": "Command output and logs",

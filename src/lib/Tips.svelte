@@ -21,8 +21,7 @@
 
   const promptParts = $derived.by((): Part[] => {
     const n = withNote;
-    const reminder = [
-      n ? "import json, os, sys" : "import json, sys",
+    const body = [
       "TARGET = 200_000",
       "data = json.load(sys.stdin)",
       "ctx = 0",
@@ -45,6 +44,15 @@
           ]
         : []),
       '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))',
+    ];
+    // Any failure (transcript not written yet, a half-written line, a missing field) must
+    // end quietly: a crash would show the user a hook error on that turn.
+    const reminder = [
+      n ? "import json, os, sys" : "import json, sys",
+      "try:",
+      ...body.map((l) => "    " + l),
+      "except Exception:",
+      "    pass",
     ].join("\n");
 
     const restore = [

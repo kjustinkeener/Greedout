@@ -34,11 +34,9 @@
   // Swap the maximize button to a restore glyph while the window is maximized.
   let maximized = $state(false);
   $effect(() => watchMaximized((m) => (maximized = m)));
-  // Trace helper for the baseline feature: to the webview console for live
-  // debugging, and to greedout.log (gated by the Debug logging setting) so the
-  // existing log-to-file switch captures the UI side too.
+  // Trace helper for the baseline feature: writes to greedout.log (gated by the
+  // Debug logging setting) so the log-to-file switch captures the UI side too.
   const dbg = (...a: unknown[]) => {
-    console.debug("[baseline]", ...a);
     const msg = a
       .map((x) => (typeof x === "string" ? x : JSON.stringify(x)))
       .join(" ");

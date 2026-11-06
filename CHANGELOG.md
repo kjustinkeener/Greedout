@@ -6,6 +6,17 @@ documented in the GitHub Releases notes and the `v*` git tags.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-06
+
+### Added
+- A "Save on Token Costs" window (in the menu) explains how /compact and /clear cut spend, with charts, the gauge dial at three sizes and a copyable prompt that sets up a context-size reminder hook. It opens by itself once, on the first launch after a fresh install (`tips_shown` in the config; set it to false to see it open again). Translated into all 13 languages.
+- An agent control surface: a per-user pipe and MCP server that let a local AI agent read live state and chat history and drive the app. Off by default; turn it on with "Enable agent control (MCP Server)" in Settings.
+
+### Changed
+- Greedout now installs into and keeps its data in `~\.greedout` instead of `%LOCALAPPDATA%\Greedout`. On the first run, existing settings, labels, themes and the indexed history move across and the old install folder is removed.
+- The menu button fills the title bar height like the minimize and close buttons, and the titles of the sub-windows are brighter and larger.
+- The Context Explorer's debug trace no longer writes to the webview console; it goes only to the debug log.
+
 ## [0.4.12] - 2026-11-04
 
 ### Added

@@ -626,6 +626,8 @@
             .catch(() => {});
         }
         document.documentElement.style.zoom = String(uiScale);
+        // First launch after a fresh install: show the Stretch Your Usage page once.
+        if (await invoke<boolean>("first_run_tips").catch(() => false)) void openTips();
         // Prime with an immediate snapshot, then stream updates.
         record(await invoke<Session[]>("get_sessions"));
         unlisten = await listen<Session[]>("sessions", (e) => record(e.payload));

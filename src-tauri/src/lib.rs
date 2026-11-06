@@ -362,6 +362,13 @@ fn get_config() -> config::Config {
     config::load_config()
 }
 
+/// True once on the first launch after a fresh install; the main window then opens
+/// the Stretch Your Usage page.
+#[tauri::command]
+fn first_run_tips() -> bool {
+    config::take_first_run_tips()
+}
+
 /// Persist edited settings. The poll loop reloads config each tick, so changes
 /// take effect on the next poll without a restart.
 #[tauri::command]
@@ -558,6 +565,7 @@ pub fn run() {
             browse_search_cancel,
             build_epoch,
             agent_control_supported,
+            first_run_tips,
             set_locale,
             install::setup_state,
             install::perform_install,

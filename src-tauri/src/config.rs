@@ -436,7 +436,20 @@ pub fn load_config() -> Config {
     if let Ok(text) = serde_json::to_string_pretty(&cfg) {
         let _ = std::fs::write(&path, text);
     }
+    // No config yet means a fresh install: leave a one-shot marker so the main window
+    // opens the Stretch Your Usage page on this first run.
+    let _ = std::fs::write(first_run_tips_path(), "");
     cfg
+}
+
+fn first_run_tips_path() -> PathBuf {
+    app_dir().join("show-tips-once")
+}
+
+/// True exactly once after a fresh install: consumes the marker `load_config` leaves
+/// when it writes the first config, so the Stretch Your Usage page never reopens itself.
+pub fn take_first_run_tips() -> bool {
+    std::fs::remove_file(first_run_tips_path()).is_ok()
 }
 
 /// Persist the config sidecar.

@@ -5,6 +5,7 @@
   import type { Config } from "../types";
   import { applyTheme, type Theme } from "./theme";
   import Icon from "./Icon.svelte";
+  import Speedo from "./Speedo.svelte";
   import { t, watchLocale } from "./i18n.svelte";
 
   let { onClose }: { onClose: () => void } = $props();
@@ -38,6 +39,15 @@ if ctx >= TARGET:
 2. Register it in ~/.claude/settings.json as a UserPromptSubmit hook that runs: python ~/.claude/hooks/context-reminder.py (use the full path, and python3 if that is what this machine has).
 
 3. Tell me when it is in place. It only reminds me; it must never compact or clear on its own.`;
+
+  // The same dial as the main window, at three context sizes. 200k is the gauge target.
+  const TARGET = 200_000;
+  const fmtK = (n: number | null) => (n == null ? "--" : `${Math.round(n / 1000)}k`);
+  const dials: { ctx: number; id: string; note: "tips.dialOk" | "tips.dialSoon" | "tips.dialNow" }[] = [
+    { ctx: 45_000, id: "a", note: "tips.dialOk" },
+    { ctx: 150_000, id: "b", note: "tips.dialSoon" },
+    { ctx: 260_000, id: "c", note: "tips.dialNow" },
+  ];
 
   let copied = $state(false);
   async function copyPrompt() {
@@ -111,12 +121,13 @@ if ctx >= TARGET:
     <section>
       <h2>{t("tips.dialHead")}</h2>
       <p>{t("tips.dialBody")}</p>
-      <div class="dial" aria-hidden="true">
-        <div class="track">
-          <div class="fill" style="width:100%"></div>
-          <span class="mark" style="left:50%"></span>
-        </div>
-        <div class="ticks"><span>0</span><span class="hot">{t("tips.dialMark")}</span><span>400k</span></div>
+      <div class="dials" aria-hidden="true">
+        {#each dials as d (d.id)}
+          <div class="dcol">
+            <Speedo pct={d.ctx / TARGET} ctx={d.ctx} target={TARGET} {fmtK} />
+            <span class="note n-{d.id}">{t(d.note)}</span>
+          </div>
+        {/each}
       </div>
     </section>
 
@@ -264,38 +275,32 @@ if ctx >= TARGET:
     fill: var(--green);
   }
 
-  /* Dial */
-  .dial {
-    margin: 4px 0 2px;
-  }
-  .track {
-    position: relative;
-    height: 12px;
-    border-radius: 6px;
-    background: var(--track);
-    border: 1px solid var(--edge);
-    overflow: hidden;
-  }
-  .fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--g0), var(--g1) 50%, #e5484d);
-  }
-  .mark {
-    position: absolute;
-    top: -2px;
-    bottom: -2px;
-    width: 2px;
-    background: var(--fg);
-  }
-  .ticks {
+  /* Dials */
+  .dials {
     display: flex;
-    justify-content: space-between;
-    color: var(--muted);
-    font-size: calc(10px * var(--size-ui));
-    margin-top: 3px;
+    gap: 8px;
+    margin-top: 6px;
   }
-  .ticks .hot {
-    color: var(--fg);
+  .dcol {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+  }
+  .dcol :global(svg) {
+    width: 100%;
+    max-width: 130px;
+    height: auto;
+  }
+  .note {
+    font-size: calc(10.5px * var(--size-ui));
+    color: var(--muted);
+  }
+  .n-c {
+    color: var(--red);
     font-weight: var(--w-semibold);
   }
 

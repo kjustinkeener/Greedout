@@ -171,7 +171,7 @@ export const en = {
   "tips.title": "Stretch Your Usage",
   "tips.lead": "Shorter sessions cost less, so the same subscription goes further. Two commands stop that cost from piling up: /compact and /clear.",
   "tips.whyHead": "Why long sessions get expensive",
-  "tips.whyBody": "Every message re-reads the whole conversation. The longer a session runs, the more each turn costs and the sooner you hit your plan limit.",
+  "tips.whyBody": "Every time you send a message, the whole conversation so far is sent to the model again. The longer a session runs, the more each turn costs and the sooner you hit your plan limit.",
   "tips.chartAlt": "Context size over turns: it climbs forever without compacting, and resets near 200k when you compact.",
   "tips.chartTarget": "200k",
   "tips.chartNever": "Never compact",

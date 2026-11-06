@@ -234,6 +234,7 @@ export interface Config {
   show_prompt: boolean; // show each session's latest prompt under its title
   clickable_titles: boolean; // main-window session/project titles open the Explorer
   check_updates: boolean; // ask GitHub for a newer version at launch
+  agent_control: boolean; // serve the local agent (MCP) control pipe
   font_ui: string;
   font_num: string;
   font_mono: string;

@@ -43,7 +43,19 @@ arboard = { version = "3", default-features = false }
 winreg = "0.52"
 # The pre-Tauri "already running" probe and its message box (install.rs). Matches
 # the `windows` version Tauri already resolves, so it adds no second copy.
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    # Agent control surface: the pipe ACL (control.rs) and self-window capture (screenshot.rs).
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Threading",
+    "Win32_Graphics_Gdi",
+] }
+# Agent control surface: pipe server (control.rs). Tauri already resolves tokio, so this adds no new crate.
+tokio = { version = "1", features = ["net", "io-util", "rt", "macros", "time", "sync"] }
+# PNG-encode the screenshot verb; the version Tauri already resolves.
+png = "0.17"
 
 # line-tables-only keeps panic backtraces/line numbers but avoids the multi-GB PDBs
 # that full debug info generates over repeated incremental builds.

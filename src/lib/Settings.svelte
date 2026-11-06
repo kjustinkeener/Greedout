@@ -128,6 +128,7 @@
   let { onClose }: { onClose: () => void } = $props();
 
   let cfg = $state<Config | null>(null);
+  let agentSupported = $state(false);
 
   // Default values (mirror `Config::default()` in src-tauri/src/config.rs). Used by
   // right-click-to-reset (per field) and the Reset all button. `ui_scale` is the
@@ -152,6 +153,7 @@
     show_prompt: true,
     clickable_titles: true,
     check_updates: true,
+    agent_control: false,
     ...DEFAULT_FONTS,
   };
 
@@ -220,6 +222,7 @@
 
   // Load current settings when the dialog opens.
   (async () => {
+    agentSupported = await invoke<boolean>("agent_control_supported").catch(() => false);
     cfg = await invoke<Config>("get_config");
     applyTheme(cfg.theme);
     applyFonts(cfg);
@@ -264,6 +267,7 @@
       show_prompt: cfg.show_prompt,
       clickable_titles: cfg.clickable_titles,
       check_updates: cfg.check_updates,
+      agent_control: cfg.agent_control,
       font_ui: cfg.font_ui,
       font_num: cfg.font_num,
       font_mono: cfg.font_mono,
@@ -365,6 +369,12 @@
       <input type="checkbox" bind:checked={cfg.check_updates} />
       {t("settings.checkUpdates")}
     </label>
+    {#if agentSupported}
+    <label class="check" title={t("settings.agentControlTip")} oncontextmenu={(e) => resetField("agent_control", e)}>
+      <input type="checkbox" bind:checked={cfg.agent_control} />
+      {t("settings.agentControl")}
+    </label>
+    {/if}
     <label class="check" title={t("settings.debugLoggingTip")} oncontextmenu={(e) => resetField("debug_logging", e)}>
       <input type="checkbox" bind:checked={cfg.debug_logging} />
       {t("settings.debugLogging")}

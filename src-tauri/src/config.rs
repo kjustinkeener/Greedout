@@ -82,6 +82,10 @@ pub struct Config {
     /// nothing here touches the network unless the user asks in About.
     #[serde(default = "default_true")]
     pub check_updates: bool,
+    /// Serve the agent control surface (a per-user named pipe that lets a local MCP
+    /// client read live state and drive the app). Off by default; Windows only.
+    #[serde(default = "default_agent_control")]
+    pub agent_control: bool,
     /// Interface font slots and the boldness preference. Frontend-applied; the
     /// values are ids from the catalog in `src/lib/fonts.ts`, not family names,
     /// so a face can be swapped or renamed without invalidating saved configs.
@@ -127,6 +131,11 @@ pub struct UserFontSet {
     pub size_num: f64,
     #[serde(default = "default_size")]
     pub size_mono: f64,
+}
+
+/// Off in releases, on in dev builds so the surface is always there while developing.
+fn default_agent_control() -> bool {
+    cfg!(debug_assertions)
 }
 
 fn default_ui_scale() -> f64 {
@@ -198,6 +207,7 @@ impl Default for Config {
             show_prompt: true,
             clickable_titles: true,
             check_updates: true,
+            agent_control: default_agent_control(),
             font_ui: default_font_ui(),
             font_num: default_font_num(),
             font_mono: default_font_mono(),

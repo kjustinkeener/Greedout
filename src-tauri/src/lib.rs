@@ -3,11 +3,17 @@ mod browse;
 mod cache;
 mod codex;
 mod config;
+#[cfg(windows)]
+mod control;
 mod cursor;
 mod grouping;
 mod i18n;
 mod install;
 mod limits;
+#[cfg(windows)]
+mod mcp;
+#[cfg(windows)]
+mod screenshot;
 mod update;
 mod scan;
 mod stats;
@@ -95,6 +101,13 @@ fn reveal(app: &tauri::AppHandle) {
 /// Return the current snapshot immediately (used to prime the UI on mount).
 /// Build timestamp (seconds since the epoch), stamped by build.rs. Shown in About
 /// beside the version.
+/// Whether this build can serve the agent control pipe (Windows only), so Settings shows the
+/// checkbox only where it does something.
+#[tauri::command]
+fn agent_control_supported() -> bool {
+    cfg!(windows)
+}
+
 #[tauri::command]
 fn build_epoch() -> u64 {
     env!("GREEDOUT_BUILD_EPOCH").parse().unwrap_or(0)
@@ -373,6 +386,8 @@ fn set_config(app: tauri::AppHandle, config: config::Config) -> Result<(), Strin
             let _ = t.set_visible(config.show_in_tray);
         }
     }
+    #[cfg(windows)]
+    control::sync(&app, config.agent_control);
     log_line(&config, "settings saved");
     Ok(())
 }
@@ -461,6 +476,14 @@ fn wait_for_relaunch_parent() {
 }
 
 pub fn run() {
+    // `greedout.exe mcp` is the agent shim: a stdio MCP server that talks to the running app
+    // over its control pipe. It must not open a window, take the single-instance lock or
+    // touch the app's data, so it runs before everything else and never returns.
+    #[cfg(windows)]
+    if std::env::args().nth(1).as_deref() == Some("mcp") {
+        mcp::serve();
+        return;
+    }
     // These happen before the Tauri builder exists, because none of them wants a
     // window. Add/Remove Programs invokes us as `greedout.exe --uninstall`, and
     // that path never returns.
@@ -530,6 +553,7 @@ pub fn run() {
             browse_search,
             browse_search_cancel,
             build_epoch,
+            agent_control_supported,
             set_locale,
             install::setup_state,
             install::perform_install,
@@ -559,6 +583,8 @@ pub fn run() {
 
             let cfg = config::load_config();
             log_line(&cfg, "greedout started");
+            #[cfg(windows)]
+            control::sync(app.handle(), cfg.agent_control);
             #[cfg(windows)]
             std::thread::spawn(install::sync_display_version);
             app.manage(LastGood(Mutex::new(None)));

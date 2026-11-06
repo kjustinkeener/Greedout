@@ -773,6 +773,113 @@ pub fn run_search(app: tauri::AppHandle, query: String) {
     });
 }
 
+/// One passage of past conversation that matched a search, with surrounding text.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Passage {
+    pub session_id: String,
+    pub title: String,
+    pub project: String,
+    pub harness: String,
+    pub last_ms: i64,
+    /// Chat text around the first match; the match is wrapped in [[ ]].
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PassageSearch {
+    pub passages: Vec<Passage>,
+    /// Sessions whose chat index has not caught up with the transcript yet, so recent
+    /// text may be missing. `browse_scan` brings them up to date.
+    pub sessions_not_fully_indexed: u64,
+}
+
+/// Passage-level search over the chat index (`chat_fts`, trigram: case-insensitive
+/// substring match on any term of 3+ characters, all terms must appear in the same
+/// stretch). Covers everything the transcript file still holds, so text a /compact
+/// removed from the live context is found too. Best match first; within one session
+/// (`session` given) oldest first. `window` is the characters kept each side of the match.
+pub fn search_passages(
+    query: &str,
+    session: Option<&str>,
+    limit: usize,
+    window: usize,
+) -> Result<PassageSearch, String> {
+    let terms: Vec<String> =
+        query.to_lowercase().split_whitespace().map(|s| s.to_string()).collect();
+    let expr = fts_match_expr(&terms)
+        .ok_or("the query needs at least one word of 3 or more characters")?;
+    let first = terms.iter().find(|t| t.chars().count() >= 3).cloned().unwrap_or_default();
+    let order = if session.is_some() { "c.id" } else { "bm25(chat_fts)" };
+    let sql = format!(
+        "SELECT s.sid, COALESCE(NULLIF(s.title, ''), NULLIF(s.intro, ''), p.label), p.label, h.name,
+                COALESCE(s.last_ms, s.mtime, 0), f.text
+         FROM chat_fts f JOIN chat_chunks c ON c.id = f.rowid JOIN sessions s ON s.id = c.session
+              JOIN directories d ON d.id = s.directory JOIN projects p ON p.id = d.project
+              JOIN harnesses h ON h.id = s.harness
+         WHERE f.text MATCH ?1 AND s.agent_id IS NULL AND (?2 IS NULL OR s.sid = ?2)
+         ORDER BY {order} LIMIT ?3"
+    );
+    let (passages, stale) = cache::with_db(|conn| {
+        let passages = conn
+            .prepare(&sql)?
+            .query_map(rusqlite::params![expr, session, limit as i64], |r| {
+                let text: String = r.get(5)?;
+                Ok(Passage {
+                    session_id: r.get(0)?,
+                    title: r.get(1)?,
+                    project: r.get(2)?,
+                    harness: r.get(3)?,
+                    last_ms: r.get(4)?,
+                    text: cut_window(&text, &first, window),
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let stale: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sessions WHERE agent_id IS NULL AND path IS NOT NULL
+             AND fts_off < COALESCE(offset, 0)",
+            [],
+            |r| r.get(0),
+        )?;
+        Ok((passages, stale))
+    })
+    .ok_or("the history cache is unavailable")?;
+    Ok(PassageSearch { passages, sessions_not_fully_indexed: stale.max(0) as u64 })
+}
+
+/// `window` characters each side of the first case-insensitive match of `term`, with the
+/// match wrapped in [[ ]]. Falls back to the start of the text if the term is not found.
+fn cut_window(text: &str, term: &str, window: usize) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let lower: Vec<char> = text.to_lowercase().chars().collect();
+    let t: Vec<char> = term.chars().collect();
+    // Lowercasing can change the char count (rare); then positions are unreliable.
+    let at = if lower.len() == chars.len() && !t.is_empty() {
+        lower.windows(t.len()).position(|w| w == t.as_slice())
+    } else {
+        None
+    };
+    let Some(at) = at else {
+        return chars.iter().take(window * 2).collect();
+    };
+    let from = at.saturating_sub(window);
+    let to = (at + t.len() + window).min(chars.len());
+    let mut out = String::new();
+    if from > 0 {
+        out.push('…');
+    }
+    out.extend(&chars[from..at]);
+    out.push_str("[[");
+    out.extend(&chars[at..at + t.len()]);
+    out.push_str("]]");
+    out.extend(&chars[at + t.len()..to]);
+    if to < chars.len() {
+        out.push('…');
+    }
+    out
+}
+
 /// Build an FTS5 MATCH expression from the query terms: each term of >=3 chars
 /// (the trigram floor) quoted (so operators/quotes in the term are literal) and
 /// AND-ed. Returns None if no term is long enough to index by trigram, in which

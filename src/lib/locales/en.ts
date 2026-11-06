@@ -105,6 +105,7 @@ export const en = {
   "settings.showPrompt": "Show prompt text",
   "settings.clickableTitles": "Clickable links in main window",
   "settings.checkUpdates": "Check for updates at launch",
+  "settings.agentControl": "Enable agent control",
   "settings.debugLogging": "Debug logging to file",
   "settings.lockoutTip":
     "Can't turn this off: it is the only way left to reach the window. Enable the other one first.",
@@ -137,6 +138,8 @@ export const en = {
     "Make session and project titles in the main window clickable links that open the Context Explorer.",
   "settings.checkUpdatesTip":
     "Check for a new version each time Greedout launches. About can always check on demand.",
+  "settings.agentControlTip":
+    "Lets an AI agent on this PC (through the Greedout MCP server) read your sessions, spend and past conversations, change these settings and open windows. Only your Windows account can connect. Leave off unless you use it.",
   "settings.debugLoggingTip":
     "Write diagnostic logs to a file for troubleshooting. Leave off for normal use.",
   "settings.languageTip": "Interface language. Auto follows your system setting.",

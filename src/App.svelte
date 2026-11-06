@@ -545,6 +545,7 @@
     let unlistenPrompt: (() => void) | undefined;
     let unlistenLinks: (() => void) | undefined;
     let unlistenLocale: (() => void) | undefined;
+    let unlistenAgent: (() => void) | undefined;
     let unlistenLimits: (() => void) | undefined;
     window.addEventListener("wheel", onWheel, { passive: false });
     (async () => {
@@ -588,6 +589,19 @@
         unlistenOpacity = await listen<number>("opacity-preview", (e) => applyOpacity(e.payload));
         // Settings (separate window) pushes a live theme preview on change.
         unlistenTheme = await listen<Theme>("theme", (e) => applyTheme(e.payload));
+        // The agent control surface asks for windows to be opened as a click would.
+        unlistenAgent = await listen<{ window: string; id?: string; view?: string }>("agent:open", async (e) => {
+          const { window: w, id, view } = e.payload;
+          if (w === "settings") return void openSettings();
+          if (w === "about") return void openAbout();
+          if (w === "dailyspend") return void openDailySpend();
+          if (!id) return;
+          const live = sessions.find((x) => x.id === id);
+          if (w === "compact") return live ? void openCompact(live) : undefined;
+          if (live) return void (view === "project" ? openProject(live) : openSession(live));
+          const m = await invoke<{ title: string; project: string } | null>("browse_session", { id });
+          if (m) openExplorer({ id, title: view === "project" ? m.project : `${m.title} · ${m.project}`, project: m.project, view: view === "project" ? "project" : "session" });
+        });
         unlistenLocale = await watchLocale();
       } catch (e) {
         error = String(e);
@@ -603,6 +617,7 @@
       unlistenPrompt?.();
       unlistenLinks?.();
       unlistenLocale?.();
+      unlistenAgent?.();
       window.removeEventListener("wheel", onWheel);
     };
   });

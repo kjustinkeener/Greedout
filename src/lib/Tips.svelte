@@ -51,12 +51,12 @@ if ctx >= TARGET:
 
   // What fills a long session. Heights are illustrative; "noise" is what a summary drops.
   const segs: { h: number; noise: boolean; label: "tips.segTools" | "tips.segFiles" | "tips.segOutput" | "tips.segDead" | "tips.segReplies" | "tips.segYou" }[] = [
+    { h: 12, noise: false, label: "tips.segYou" },
+    { h: 14, noise: false, label: "tips.segReplies" },
     { h: 27, noise: true, label: "tips.segTools" },
     { h: 20, noise: true, label: "tips.segFiles" },
     { h: 16, noise: true, label: "tips.segOutput" },
     { h: 11, noise: true, label: "tips.segDead" },
-    { h: 14, noise: false, label: "tips.segReplies" },
-    { h: 12, noise: false, label: "tips.segYou" },
   ];
 
   let copied = $state(false);

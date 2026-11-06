@@ -886,16 +886,19 @@
   .menu {
     margin-left: auto;
     position: relative;
+    display: flex;
+    align-items: stretch;
+    height: 100%;
   }
   .dots {
+    width: 30px;
     background: none;
     border: none;
     color: var(--fg);
     cursor: pointer;
     display: grid;
     place-items: center;
-    padding: 0 4px;
-    border-radius: 4px;
+    padding: 0;
   }
   /* Stay legible when the opacity slider makes the window see-through and the desktop
      shows behind the titlebar. A stroke is not text, so text-shadow does nothing to it
@@ -919,7 +922,7 @@
   .dropdown {
     position: absolute;
     right: 0;
-    top: 22px;
+    top: 24px;
     z-index: 10;
     /* max-content so a label never wraps to min-content inside this ~30px
        button wrapper, but as WIDTH not min-width: a min-width beats max-width,

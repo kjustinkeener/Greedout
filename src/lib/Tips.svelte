@@ -175,11 +175,13 @@ if ctx >= TARGET:
     <section>
       <h2>{t("tips.hookHead")}</h2>
       <p>{t("tips.hookBody")}</p>
-      <pre class="prompt">{PROMPT}</pre>
-      <button class="btn primary" onclick={copyPrompt}>
-        <Icon name={copied ? "check" : "copy"} size={12} />
-        {copied ? t("tips.copied") : t("tips.copy")}
-      </button>
+      <div class="pbox">
+        <pre class="prompt">{PROMPT}</pre>
+        <button class="btn primary copy" onclick={copyPrompt}>
+          <Icon name={copied ? "check" : "copy"} size={12} />
+          {copied ? t("tips.copied") : t("tips.copy")}
+        </button>
+      </div>
     </section>
   </div>
 </div>
@@ -404,9 +406,19 @@ if ctx >= TARGET:
   }
 
   /* Prompt */
+  .pbox {
+    position: relative;
+  }
+  .copy {
+    position: absolute;
+    top: 6px;
+    right: 16px;
+    padding: 2px 10px;
+    font-size: calc(11px * var(--size-ui));
+  }
   .prompt {
-    margin: 0 0 8px;
-    padding: 8px 10px;
+    margin: 0;
+    padding: 34px 10px 8px;
     max-height: 150px;
     overflow: auto;
     white-space: pre-wrap;

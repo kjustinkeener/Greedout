@@ -372,7 +372,7 @@
     const w = new WebviewWindow("tips", {
       url: "tips.html",
       title: "Stretch Your Usage",
-      width: 460,
+      width: 690,
       height: 640,
       minWidth: 360,
       minHeight: 360,

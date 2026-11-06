@@ -517,7 +517,8 @@
     border-bottom: 1px solid var(--edge);
   }
   .title {
-    font-size: calc(14px * var(--size-ui));
+    color: var(--fg);
+    font-size: calc(15px * var(--size-ui));
     font-weight: var(--w-bold);
   }
   .spacer {

@@ -1866,8 +1866,8 @@
     flex: 1 1 auto;
   }
   .sub {
-    font-size: calc(11px * var(--size-ui));
-    color: var(--muted);
+    font-size: calc(15px * var(--size-ui));
+    color: var(--fg);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

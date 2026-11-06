@@ -268,9 +268,9 @@
     border-bottom: 1px solid var(--edge);
   }
   .title {
-    color: var(--muted);
+    color: var(--fg);
     font-weight: var(--w-semibold);
-    font-size: calc(14px * var(--size-ui));
+    font-size: calc(15px * var(--size-ui));
   }
   .spacer {
     flex: 1;

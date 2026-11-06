@@ -691,8 +691,8 @@
     margin-left: auto;
   }
   .wtitle {
-    font-size: calc(11px * var(--size-ui));
-    color: var(--muted);
+    font-size: calc(15px * var(--size-ui));
+    color: var(--fg);
   }
   .crumbs {
     display: flex;

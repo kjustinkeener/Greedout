@@ -562,8 +562,8 @@
   }
   .title {
     font-weight: var(--w-bold);
-    font-size: calc(14px * var(--size-ui));
-    color: var(--muted);
+    font-size: calc(15px * var(--size-ui));
+    color: var(--fg);
   }
   .spacer {
     flex: 1;

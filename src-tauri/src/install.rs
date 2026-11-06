@@ -5,10 +5,13 @@
 //! from inside, and it is the app. `--uninstall` makes it the uninstaller, which
 //! is what the Add/Remove Programs entry invokes.
 //!
-//! It installs to `%LOCALAPPDATA%\Greedout` for two reasons, and the second is
-//! the one that matters later: a per-user directory needs no elevation, and it
-//! is the same directory a future updater self-replaces into, so first install
-//! and every update are the same file operation on the same target.
+//! It installs to `%USERPROFILE%\.greedout` for two reasons: a per-user directory
+//! needs no elevation, and it is the same directory the updater self-replaces
+//! into, so first install and every update are the same file operation on the
+//! same target. It is a dotfolder in the profile, not under `%LOCALAPPDATA%`,
+//! because the Claude desktop app serves its tools a frozen shadow copy of
+//! AppData: an exe there that an agent drives (see control.rs) would never pick
+//! up a rebuild or an update.
 //!
 //! Deliberately dependency-free: PowerShell for shortcuts, `reg` for the
 //! registry writes. Both ship with Windows and neither needs a crate. The one
@@ -22,6 +25,9 @@ use std::path::PathBuf;
 use std::process::Command;
 
 const APP_NAME: &str = "Greedout";
+/// The install folder under the profile; `config::app_dir` shares it, so settings,
+/// cache and the exe live and are removed together.
+const DIR_NAME: &str = ".greedout";
 const EXE_NAME: &str = "greedout.exe";
 
 /// Spawn without flashing a console window. Every helper process here is
@@ -38,9 +44,9 @@ fn hidden(cmd: &mut Command) -> &mut Command {
     cmd
 }
 
-/// `%LOCALAPPDATA%\Greedout`.
+/// `%USERPROFILE%\.greedout`.
 pub fn install_dir() -> Option<PathBuf> {
-    dirs::data_local_dir().map(|d| d.join(APP_NAME))
+    dirs::home_dir().map(|d| d.join(DIR_NAME))
 }
 
 /// Are we running from inside the install directory?
@@ -179,7 +185,7 @@ pub fn perform_install(desktop_shortcut: bool) -> Result<String, String> {
     }
     #[cfg(windows)]
     {
-        let dir = install_dir().ok_or("no LOCALAPPDATA")?;
+        let dir = install_dir().ok_or("no home directory")?;
         let src = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
         std::fs::create_dir_all(&dir).map_err(|e| format!("create install dir: {e}"))?;
         let target = dir.join(EXE_NAME);

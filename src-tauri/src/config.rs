@@ -1,4 +1,4 @@
-//! Config and custom-label sidecars, under `%LOCALAPPDATA%\Greedout`. The app
+//! Config and custom-label sidecars, under `%USERPROFILE%\.greedout` on Windows. The app
 //! reads Claude Code's home (`~/.claude`) but writes only its own data dir.
 
 use serde::{Deserialize, Serialize};
@@ -252,14 +252,16 @@ pub fn cursor_db_path() -> PathBuf {
     cursor_dir().join("User").join("globalStorage").join("state.vscdb")
 }
 
-/// `%LOCALAPPDATA%\Greedout`: Greedout's own data dir (config, labels, log, and
-/// the cache). The app reads `~/.claude` but writes only here, so
-/// nothing of ours lands inside Claude Code's config home. Falls back to the old
-/// location only if the platform has no local-data dir (not expected on Windows).
+/// Greedout's own data dir (config, labels, log, and the cache): `%USERPROFILE%\.greedout`
+/// on Windows, the same folder the app installs into, and the per-user data dir elsewhere.
+/// The app reads `~/.claude` but writes only here, so nothing of ours lands inside Claude
+/// Code's config home. Falls back to a folder in it only if the platform has no such dir.
 pub fn app_dir() -> PathBuf {
-    dirs::data_local_dir()
-        .map(|d| d.join("Greedout"))
-        .unwrap_or_else(|| claude_dir().join("greedout"))
+    #[cfg(windows)]
+    let base = dirs::home_dir().map(|d| d.join(".greedout"));
+    #[cfg(not(windows))]
+    let base = dirs::data_local_dir().map(|d| d.join("Greedout"));
+    base.unwrap_or_else(|| claude_dir().join("greedout"))
 }
 
 /// One-time move of the sidecar files out of `~/.claude/greedout` (where versions

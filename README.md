@@ -65,7 +65,7 @@ currently has focus remains Windows-only; Linux instead orders sessions by activ
 
 On Windows, Greedout ships as a single `greedout.exe` and installs itself. Run the
 downloaded exe and it shows an install card instead of the gauge window; it copies
-itself to `%LOCALAPPDATA%\Greedout`, adds a Start Menu shortcut (a desktop one if
+itself to `%USERPROFILE%\.greedout`, adds a Start Menu shortcut (a desktop one if
 you tick the box), and registers itself under Installed apps so it uninstalls the
 ordinary way.
 
@@ -160,7 +160,7 @@ cargo check --locked --manifest-path src-tauri/Cargo.toml
 
 ## Configuration
 
-Settings live in `%LOCALAPPDATA%\Greedout\config.json`, created with defaults on first run.
+Settings live in `%USERPROFILE%\.greedout\config.json`, created with defaults on first run.
 Most of it is reachable from the Settings window, so hand-editing is rarely necessary.
 
 The keys that matter most:
@@ -175,7 +175,7 @@ The keys that matter most:
 | `theme` | `auto` | Theme id, or `auto` to follow the OS |
 | `browse_enabled` | | Opt in to the disk cache the cross-session browse view uses |
 
-Custom row labels live in `%LOCALAPPDATA%\Greedout\labels.json`; double-click a row title to
+Custom row labels live in `%USERPROFILE%\.greedout\labels.json`; double-click a row title to
 rename it. Window position, size and zoom are remembered between runs. Versions up to 0.2.2
 kept these files under `~/.claude/greedout`; they move to the folder above automatically on
 first launch of a newer build.

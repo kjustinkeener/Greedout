@@ -3,7 +3,7 @@
 //! Replaces `tauri-plugin-window-state`, which lets you override the state file's
 //! name but not its directory: it always creates `%APPDATA%\<bundle-id>` through the
 //! Windows known-folder API. Greedout keeps every other sidecar in its own data dir
-//! (`%LOCALAPPDATA%\Greedout`), so the plugin's one stray folder was the only thing the
+//! (`%USERPROFILE%\.greedout`), so the plugin's one stray folder was the only thing the
 //! app left outside that dir. Writing `window-state.json` next to `config.json` removes it.
 //!
 //! Scope: physical size, position and a maximized flag, per window label. The file

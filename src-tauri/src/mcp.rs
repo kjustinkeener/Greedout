@@ -5,8 +5,9 @@
 //!
 //! Dispatched from `run()` before the Tauri builder, keyed on `argv[1] == "mcp"`, so it never
 //! opens a window or touches the app's data dir. Register it in the MCP client config as
-//! `{"command": "<path to greedout.exe>", "args": ["mcp"]}`. Point it at a copy OUTSIDE
-//! `%LOCALAPPDATA%`: the Claude desktop app's container serves a frozen shadow of that folder.
+//! `{"command": "<path to greedout.exe>", "args": ["mcp"]}`. The installed copy in
+//! `%USERPROFILE%\.greedout` is outside AppData, which the Claude desktop app's container
+//! shadows with a frozen copy, so it is safe to register.
 //!
 //! The tool catalog below is data, and `tools/list` and `tools/call` both read it, so a verb
 //! is added in one place here and one arm in `control.rs`.

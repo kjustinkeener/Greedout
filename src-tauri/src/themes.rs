@@ -1,7 +1,7 @@
 //! User-defined color themes, persisted as a sidecar in the app data dir.
 //!
 //! The analog of `winstate`: a best-effort JSON sidecar (`themes.json` next to
-//! `config.json` in `%LOCALAPPDATA%\Greedout`), loaded and saved through the
+//! `config.json` in `%USERPROFILE%\.greedout`), loaded and saved through the
 //! same tolerant pattern. A missing or corrupt file yields an empty list and
 //! never panics, so a hand-edited palette that is malformed cannot take the app
 //! down with it.

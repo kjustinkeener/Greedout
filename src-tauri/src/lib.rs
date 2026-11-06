@@ -65,7 +65,7 @@ fn track_geometry(app: &tauri::AppHandle) {
 }
 
 /// Append a diagnostic line when debug logging is on. Delegates to config so the
-/// log lands in the app data dir (`%LOCALAPPDATA%\Greedout`) like every other
+/// log lands in the app data dir (`~\.greedout`) like every other
 /// sidecar; writing it here to `~/.claude/greedout` was recreating the very dir
 /// the 0.2.3 move exists to vacate.
 fn log_line(cfg: &config::Config, msg: &str) {
@@ -502,7 +502,7 @@ pub fn run() {
     // anything else can hold a handle on this directory.
     update::cleanup_old();
     // Move our sidecars out of `~/.claude/greedout` (pre-0.2.3 location) into our
-    // own LOCALAPPDATA dir, so we never write inside Claude Code's config home.
+    // own data dir, so we never write inside Claude Code's config home.
     config::migrate_sidecars();
     // Fresh log each run so it can't grow without bound when debug logging is left on.
     config::truncate_log();

@@ -10,6 +10,9 @@
 
   let { onClose }: { onClose: () => void } = $props();
 
+  // Gauge budget from Settings (target_tokens); 200k until the config loads.
+  let TARGET = $state(200_000);
+
   // Agents read English, so the prompt is not localized. It spells out the one
   // detail that is easy to get wrong: context size comes from the last assistant
   // usage record, and a compact_boundary resets it.
@@ -21,7 +24,7 @@
     const PRINT =
       '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}, "suppressOutput": True}))';
     const body = [
-      "TARGET = 200_000",
+      `TARGET = ${TARGET}`,
       "data = json.load(sys.stdin)",
       "ctx = 0",
       "fresh = False",
@@ -75,14 +78,13 @@
   });
   const promptText = $derived(promptParts.map((p) => p.text).join("\n"));
 
-  // The same dial as the main window, at three context sizes. 200k is the gauge target.
-  const TARGET = 200_000;
+  // The same dial as the main window, at three context sizes (fractions of the gauge target).
   const fmtK = (n: number | null) => (n == null ? "--" : `${Math.round(n / 1000)}k`);
-  const dials: { ctx: number; id: string; note: "tips.dialOk" | "tips.dialSoon" | "tips.dialNow" }[] = [
-    { ctx: 45_000, id: "a", note: "tips.dialOk" },
-    { ctx: 150_000, id: "b", note: "tips.dialSoon" },
-    { ctx: 260_000, id: "c", note: "tips.dialNow" },
-  ];
+  const dials = $derived<{ ctx: number; id: string; note: "tips.dialOk" | "tips.dialSoon" | "tips.dialNow" }[]>([
+    { ctx: Math.round(TARGET * 0.225), id: "a", note: "tips.dialOk" },
+    { ctx: Math.round(TARGET * 0.75), id: "b", note: "tips.dialSoon" },
+    { ctx: Math.round(TARGET * 1.3), id: "c", note: "tips.dialNow" },
+  ]);
 
   // What fills a long session. Heights are illustrative; "noise" is what a summary drops.
   const segs: { h: number; noise: boolean; label: "tips.segTools" | "tips.segFiles" | "tips.segOutput" | "tips.segDead" | "tips.segReplies" | "tips.segYou" }[] = [
@@ -130,7 +132,9 @@
 
   (async () => {
     try {
-      applyTheme((await invoke<Config>("get_config")).theme);
+      const cfg = await invoke<Config>("get_config");
+      applyTheme(cfg.theme);
+      if (cfg.target_tokens > 0) TARGET = cfg.target_tokens;
     } catch {
       // Keep the default theme if config isn't reachable.
     }

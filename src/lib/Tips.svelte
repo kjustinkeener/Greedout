@@ -416,9 +416,16 @@ if ctx >= TARGET:
     padding: 2px 10px;
     font-size: calc(11px * var(--size-ui));
   }
+  /* Reserves the corner for the Copy button so the first lines wrap around it. */
+  .prompt::before {
+    content: "";
+    float: right;
+    width: 96px;
+    height: 24px;
+  }
   .prompt {
     margin: 0;
-    padding: 34px 10px 8px;
+    padding: 8px 10px;
     max-height: 150px;
     overflow: auto;
     white-space: pre-wrap;

@@ -450,7 +450,7 @@
     min-height: 0;
   }
   .cmd {
-    color: var(--g1);
+    color: var(--g0);
     font-weight: var(--w-semibold);
   }
   .arrow {

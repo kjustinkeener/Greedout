@@ -154,6 +154,7 @@
     clickable_titles: true,
     check_updates: true,
     agent_control: false,
+    tips_shown: true,
     ...DEFAULT_FONTS,
   };
 
@@ -268,6 +269,7 @@
       clickable_titles: cfg.clickable_titles,
       check_updates: cfg.check_updates,
       agent_control: cfg.agent_control,
+      tips_shown: cfg.tips_shown,
       font_ui: cfg.font_ui,
       font_num: cfg.font_num,
       font_mono: cfg.font_mono,

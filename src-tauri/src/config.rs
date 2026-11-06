@@ -86,6 +86,11 @@ pub struct Config {
     /// client read live state and drive the app). Off by default; Windows only.
     #[serde(default = "default_agent_control")]
     pub agent_control: bool,
+    /// The Stretch Your Usage page has been shown once automatically. A config written
+    /// before this field existed reads as true, so only fresh installs see the page;
+    /// set it to false to see the page open again on the next launch.
+    #[serde(default = "default_true")]
+    pub tips_shown: bool,
     /// Interface font slots and the boldness preference. Frontend-applied; the
     /// values are ids from the catalog in `src/lib/fonts.ts`, not family names,
     /// so a face can be swapped or renamed without invalidating saved configs.
@@ -208,6 +213,7 @@ impl Default for Config {
             clickable_titles: true,
             check_updates: true,
             agent_control: default_agent_control(),
+            tips_shown: false,
             font_ui: default_font_ui(),
             font_num: default_font_num(),
             font_mono: default_font_mono(),
@@ -436,20 +442,7 @@ pub fn load_config() -> Config {
     if let Ok(text) = serde_json::to_string_pretty(&cfg) {
         let _ = std::fs::write(&path, text);
     }
-    // No config yet means a fresh install: leave a one-shot marker so the main window
-    // opens the Stretch Your Usage page on this first run.
-    let _ = std::fs::write(first_run_tips_path(), "");
     cfg
-}
-
-fn first_run_tips_path() -> PathBuf {
-    app_dir().join("show-tips-once")
-}
-
-/// True exactly once after a fresh install: consumes the marker `load_config` leaves
-/// when it writes the first config, so the Stretch Your Usage page never reopens itself.
-pub fn take_first_run_tips() -> bool {
-    std::fs::remove_file(first_run_tips_path()).is_ok()
 }
 
 /// Persist the config sidecar.

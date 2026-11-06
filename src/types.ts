@@ -235,6 +235,7 @@ export interface Config {
   clickable_titles: boolean; // main-window session/project titles open the Explorer
   check_updates: boolean; // ask GitHub for a newer version at launch
   agent_control: boolean; // serve the local agent (MCP) control pipe
+  tips_shown: boolean; // the Stretch Your Usage page has opened itself once
   font_ui: string;
   font_num: string;
   font_mono: string;

@@ -211,20 +211,20 @@
       <p>{@render rich(t("tips.compactBody"))}</p>
       <div class="ba" aria-hidden="true">
         <div class="col">
+          <span>{t("tips.before")}</span>
           <div class="win before">
             {#each segs as g (g.label)}
               <div class="seg" class:noise={g.noise} style="flex:{g.h}">{t(g.label)}</div>
             {/each}
           </div>
-          <span>{t("tips.before")}</span>
         </div>
         <div class="arrow"><span class="cmd">/compact</span></div>
         <div class="col">
+          <span>{t("tips.after")}</span>
           <div class="win after">
             <div class="seg keep" style="flex:12">{t("tips.segSummary")}</div>
             <div class="free" style="flex:88">{t("tips.segFree")}</div>
           </div>
-          <span>{t("tips.after")}</span>
         </div>
       </div>
       <p class="cap"><span class="sw noise"></span>{t("tips.legendNoise")} <span class="sw"></span>{t("tips.legendKeep")}</p>

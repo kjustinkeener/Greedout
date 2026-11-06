@@ -86,10 +86,9 @@ pub struct Config {
     /// client read live state and drive the app). Off by default; Windows only.
     #[serde(default = "default_agent_control")]
     pub agent_control: bool,
-    /// The Save on Token Costs page has been shown once automatically. A config written
-    /// before this field existed reads as true, so only fresh installs see the page;
-    /// set it to false to see the page open again on the next launch.
-    #[serde(default = "default_true")]
+    /// The Save on Token Costs page has been shown once automatically. Missing or false
+    /// means it has not, so the page opens on the next launch (a fresh install, or an
+    /// existing config from before this field) and then sets this to true.
     pub tips_shown: bool,
     /// Interface font slots and the boldness preference. Frontend-applied; the
     /// values are ids from the catalog in `src/lib/fonts.ts`, not family names,

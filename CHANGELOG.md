@@ -6,6 +6,9 @@ documented in the GitHub Releases notes and the `v*` git tags.
 
 ## [Unreleased]
 
+### Changed
+- The Save on Token Costs window now also opens once for existing installs, because a config without `tips_shown` counts as not yet shown.
+
 ## [0.5.0] - 2026-11-06
 
 ### Added

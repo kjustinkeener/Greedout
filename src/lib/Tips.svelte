@@ -167,7 +167,7 @@
   {#snippet rich(text: string)}{#each text.split(/(\/compact|\/clear)/) as part}{#if part === "/compact" || part === "/clear"}<span class="cmd">{part}</span>{:else}{part}{/if}{/each}{/snippet}
 
   <div class="body">
-    <p class="lead">{@render rich(t("tips.lead"))}</p>
+    <p class="lead">{@render rich(t("tips.lead").replace(/([.!?。！？])\s*(?=\S)/, "$1\n"))}</p>
 
     <!-- 1. Why: context re-read every turn. Illustrative shape, not real data. -->
     <section>
@@ -300,6 +300,7 @@
     line-height: 1.5;
   }
   .lead {
+    white-space: pre-line;
     margin: 0 0 6px;
     font-size: calc(13px * var(--size-ui));
   }

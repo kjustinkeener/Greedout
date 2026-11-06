@@ -313,7 +313,7 @@
     font-size: calc(13px * var(--size-ui));
   }
   section {
-    margin-top: 18px;
+    margin-top: 32px;
   }
   h2 {
     margin: 0 0 4px;

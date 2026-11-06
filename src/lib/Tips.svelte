@@ -164,8 +164,10 @@
     </button>
   </header>
 
+  {#snippet rich(text: string)}{#each text.split(/(\/compact|\/clear)/) as part}{#if part === "/compact" || part === "/clear"}<span class="cmd">{part}</span>{:else}{part}{/if}{/each}{/snippet}
+
   <div class="body">
-    <p class="lead">{t("tips.lead")}</p>
+    <p class="lead">{@render rich(t("tips.lead"))}</p>
 
     <!-- 1. Why: context re-read every turn. Illustrative shape, not real data. -->
     <section>
@@ -205,8 +207,8 @@
 
     <!-- 3. /compact: before and after -->
     <section>
-      <h2>{t("tips.compactHead")}</h2>
-      <p>{t("tips.compactBody")}</p>
+      <h2>{@render rich(t("tips.compactHead"))}</h2>
+      <p>{@render rich(t("tips.compactBody"))}</p>
       <div class="ba" aria-hidden="true">
         <div class="col">
           <div class="win before">
@@ -216,7 +218,7 @@
           </div>
           <span>{t("tips.before")}</span>
         </div>
-        <div class="arrow">/compact</div>
+        <div class="arrow"><span class="cmd">/compact</span></div>
         <div class="col">
           <div class="win after">
             <div class="seg keep" style="flex:12">{t("tips.segSummary")}</div>
@@ -229,8 +231,8 @@
     </section>
 
     <section>
-      <h2>{t("tips.clearHead")}</h2>
-      <p>{t("tips.clearBody")}</p>
+      <h2>{@render rich(t("tips.clearHead"))}</h2>
+      <p>{@render rich(t("tips.clearBody"))}</p>
     </section>
 
     <!-- 4. The hook prompt -->
@@ -446,6 +448,10 @@
     border: 1px dashed var(--edge);
     border-radius: 3px;
     min-height: 0;
+  }
+  .cmd {
+    color: var(--g1);
+    font-weight: var(--w-semibold);
   }
   .arrow {
     align-self: center;

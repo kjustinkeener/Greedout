@@ -518,7 +518,7 @@
   .prompt {
     margin: 0;
     padding: 8px 10px;
-    max-height: 225px;
+    max-height: 338px;
     overflow: auto;
     white-space: pre-wrap;
     overflow-wrap: anywhere;

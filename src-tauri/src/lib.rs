@@ -366,7 +366,7 @@ fn get_config() -> config::Config {
 #[tauri::command]
 fn mark_tips_shown() {
     let mut cfg = config::load_config();
-    cfg.tips_shown = true;
+    cfg.tips_shown = Some(true);
     let _ = config::save_config(&cfg);
 }
 

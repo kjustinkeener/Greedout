@@ -86,10 +86,11 @@ pub struct Config {
     /// client read live state and drive the app). Off by default; Windows only.
     #[serde(default = "default_agent_control")]
     pub agent_control: bool,
-    /// The Save on Token Costs page has been shown once automatically. Missing or false
-    /// means it has not, so the page opens on the next launch (a fresh install, or an
-    /// existing config from before this field) and then sets this to true.
-    pub tips_shown: bool,
+    /// The Save on Token Costs page has been shown once automatically. Absent from the
+    /// first config written; missing or false means not yet shown, so the page opens on
+    /// the next launch and then records true here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tips_shown: Option<bool>,
     /// Interface font slots and the boldness preference. Frontend-applied; the
     /// values are ids from the catalog in `src/lib/fonts.ts`, not family names,
     /// so a face can be swapped or renamed without invalidating saved configs.
@@ -212,7 +213,7 @@ impl Default for Config {
             clickable_titles: true,
             check_updates: true,
             agent_control: default_agent_control(),
-            tips_shown: false,
+            tips_shown: None,
             font_ui: default_font_ui(),
             font_num: default_font_num(),
             font_mono: default_font_mono(),

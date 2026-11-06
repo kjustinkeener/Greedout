@@ -627,7 +627,7 @@
         }
         document.documentElement.style.zoom = String(uiScale);
         // First launch after a fresh install: show the Save on Token Costs page once.
-        if (cfg0.tips_shown === false) {
+        if (!cfg0.tips_shown) {
           void openTips();
           void invoke("mark_tips_shown").catch(() => {});
         }

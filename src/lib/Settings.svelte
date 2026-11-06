@@ -154,7 +154,6 @@
     clickable_titles: true,
     check_updates: true,
     agent_control: false,
-    tips_shown: false,
     ...DEFAULT_FONTS,
   };
 

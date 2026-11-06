@@ -13,26 +13,16 @@
   // Agents read English, so the prompt is not localized. It spells out the one
   // detail that is easy to get wrong: context size comes from the last assistant
   // usage record, and a compact_boundary resets it.
-  let withNote = $state(false);
-
   type Part = { code: boolean; text: string };
   const prose = (text: string): Part => ({ code: false, text });
   const code = (text: string): Part => ({ code: true, text });
 
   const promptParts = $derived.by((): Part[] => {
-    const n = withNote;
     const PRINT =
       '    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}, "suppressOutput": True}))';
     const body = [
       "TARGET = 200_000",
       "data = json.load(sys.stdin)",
-      ...(n
-        ? [
-            'sid = "".join(c for c in data["session_id"] if c.isalnum() or c in "-_")',
-            'note = os.path.join(os.path.expanduser("~"), ".claude", "compaction-notes", sid + ".md")',
-            'state = os.path.join(tempfile.gettempdir(), "context-reminder-" + sid + ".state")',
-          ]
-        : []),
       "ctx = 0",
       "fresh = False",
       'for line in open(data["transcript_path"], encoding="utf-8"):',
@@ -53,51 +43,17 @@
       '        ctx = sum(u.get(k, 0) or 0 for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")) or ctx',
       "if fresh:",
       '    msg = f"The user just compacted, so context is now about {ctx // 1000}k tokens. Do not end replies with Session size or Please type /compact until told again."',
-      ...(n ? ['    open(state, "w").write("0")'] : []),
       PRINT,
       "elif ctx >= TARGET:",
       '    msg = f"Context is about {ctx // 1000}k tokens, past the {TARGET // 1000}k budget. Finish the current step properly and do not open new threads, then at the next natural stopping point end your reply with these two lines: Session size at {ctx // 1000}k, then Please type /compact. Repeat at each later stopping point until the user compacts."',
-      ...(n
-        ? [
-            '    msg += " Also keep your compaction note current at " + note + ". Keep it current each turn until I compact. It is handed back to you right after /compact."',
-          ]
-        : []),
       PRINT,
-      ...(n
-        ? [
-            "elif ctx >= TARGET // 2:",
-            "    band = 2 if ctx >= TARGET * 9 // 10 else 1",
-            '    prev = int(open(state).read() or 0) if os.path.exists(state) else 0',
-            "    if band > prev:",
-            '        open(state, "w").write(str(band))',
-            '        msg = f"Context is about {ctx // 1000}k tokens. Keep working normally: do not shorten answers, skip steps or steer toward stopping. " + ("Start" if band == 1 else "Refresh") + " your compaction note at " + note + ". It must open with one line, NEXT ACTION: the first thing to do after a compaction, then the current task, key files, decisions and open bugs. It is handed back to you right after /compact."',
-            "    " + PRINT,
-          ]
-        : []),
     ];
     // Any failure (transcript not written yet, a half-written line, a missing field) must
     // end quietly: a crash would show the user a hook error on that turn.
     const reminder = [
-      n ? "import json, os, sys, tempfile" : "import json, sys",
+      "import json, sys",
       "try:",
       ...body.map((l) => "    " + l),
-      "except Exception:",
-      "    pass",
-    ].join("\n");
-
-    const restore = [
-      "import json, os, sys",
-      "try:",
-      "    data = json.load(sys.stdin)",
-      "    if data.get(\"source\") == \"compact\":",
-      "        sid = \"\".join(c for c in data[\"session_id\"] if c.isalnum() or c in \"-_\")",
-      "        path = os.path.join(os.path.expanduser(\"~\"), \".claude\", \"compaction-notes\", sid + \".md\")",
-      "        if os.path.exists(path):",
-      "            note = open(path, encoding=\"utf-8\").read().strip()",
-      "            if note:",
-      "                msg = \"Steering note carried across the compaction just completed. This is your own live note for THIS session. Use it to reorient: current task, file map, decisions, next steps, open bugs. If it opens with a NEXT ACTION: line, that is the one thing to do first; treat it as an imperative to yourself. It reflects state as of the last time it was refreshed; verify against the repo before acting.\\n\\n\" + note",
-      "                print(json.dumps({\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": msg}, \"suppressOutput\": True}))",
-      "            os.remove(path)",
       "except Exception:",
       "    pass",
     ].join("\n");
@@ -114,21 +70,7 @@
       ),
       prose(""),
     ];
-    if (n) {
-      parts.push(
-        prose("3. Save this as ~/.claude/hooks/restore-note.py:"),
-        prose(""),
-        code(restore),
-        prose(""),
-        prose(
-          "4. Register it in ~/.claude/settings.json as a SessionStart hook with matcher \"compact\" that runs: python ~/.claude/hooks/restore-note.py (same path and python rules).",
-        ),
-        prose(""),
-        prose("5. Tell me when both are in place. They only remind me and restore my note; they must never compact or clear on their own."),
-      );
-    } else {
-      parts.push(prose("3. Tell me when it is in place. It only reminds me; it must never compact or clear on its own."));
-    }
+    parts.push(prose("3. Tell me when it is in place. It only reminds me; it must never compact or clear on its own."));
     return parts;
   });
   const promptText = $derived(promptParts.map((p) => p.text).join("\n"));
@@ -288,10 +230,6 @@
     <section>
       <h2>{t("tips.hookHead")}</h2>
       <p>{t("tips.hookBody")}</p>
-      <label class="opt">
-        <input type="checkbox" bind:checked={withNote} />
-        <span><b>{t("tips.noteOpt")}</b><span class="hint">{t("tips.noteHint")}</span></span>
-      </label>
       <div class="pbox">
         <pre class="prompt">{#each promptLines as toks, i}{#each toks as tk}{#if tk.k}<span class={tk.k}>{tk.x}</span>{:else}{tk.x}{/if}{/each}{i < promptLines.length - 1 ? "\n" : ""}{/each}</pre>
         <button class="btn primary copy" onclick={copyPrompt}>
@@ -523,22 +461,6 @@
   }
 
   /* Prompt */
-  .opt {
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-    margin: 0 0 8px;
-    cursor: pointer;
-  }
-  .opt input {
-    margin-top: 3px;
-    accent-color: var(--green);
-  }
-  .opt .hint {
-    display: block;
-    margin-top: 2px;
-    color: var(--muted);
-  }
   .pbox {
     position: relative;
   }

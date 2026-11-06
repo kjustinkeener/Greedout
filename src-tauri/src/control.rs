@@ -37,7 +37,11 @@ use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
 /// Fixed pipe name. A pipe is a kernel namespace object, not a file under AppData, so the
 /// desktop app's AppData virtualization cannot shadow it.
+#[cfg(not(debug_assertions))]
 pub const PIPE_NAME: &str = r"\\.\pipe\greedout";
+/// Debug builds get their own pipe so dev never talks to, or collides with, the installed app.
+#[cfg(debug_assertions)]
+pub const PIPE_NAME: &str = r"\\.\pipe\greedout-dev";
 
 /// Every window Greedout can own. `screenshot` and `window` accept only these labels, checked
 /// before any window lookup, so neither can be pointed at another application's window.
@@ -516,7 +520,7 @@ fn screenshot(app: &AppHandle, label: Option<&str>) -> Result<String, String> {
     let window = own_window(app, label)?;
     let hwnd = window.hwnd().map_err(|e| e.to_string())?;
     let png = crate::screenshot::capture_hwnd(hwnd)?;
-    let dir = dirs::home_dir().ok_or("no home directory")?.join(".greedout").join("screenshots");
+    let dir = dirs::home_dir().ok_or("no home directory")?.join(crate::config::DIR_NAME).join("screenshots");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join(format!("{label}.png"));
     std::fs::write(&path, png).map_err(|e| e.to_string())?;

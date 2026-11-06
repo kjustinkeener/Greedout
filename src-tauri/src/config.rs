@@ -258,13 +258,17 @@ pub fn cursor_db_path() -> PathBuf {
     cursor_dir().join("User").join("globalStorage").join("state.vscdb")
 }
 
+/// Folder name under the profile for the data dir and the install. Debug builds use their
+/// own, so running dev never reads or writes the installed app's config or cache.
+pub const DIR_NAME: &str = if cfg!(debug_assertions) { ".greedout-dev" } else { ".greedout" };
+
 /// Greedout's own data dir (config, labels, log, and the cache): `%USERPROFILE%\.greedout`
 /// on Windows, the same folder the app installs into, and the per-user data dir elsewhere.
 /// The app reads `~/.claude` but writes only here, so nothing of ours lands inside Claude
 /// Code's config home. Falls back to a folder in it only if the platform has no such dir.
 pub fn app_dir() -> PathBuf {
     #[cfg(windows)]
-    let base = dirs::home_dir().map(|d| d.join(".greedout"));
+    let base = dirs::home_dir().map(|d| d.join(DIR_NAME));
     #[cfg(not(windows))]
     let base = dirs::data_local_dir().map(|d| d.join("Greedout"));
     base.unwrap_or_else(|| claude_dir().join("greedout"))
@@ -311,6 +315,10 @@ pub fn migrate_sidecars() {
 /// Data only: `install::remove_legacy_install` then deletes the old folder. Windows only.
 #[cfg(windows)]
 pub fn migrate_legacy_data() {
+    // A dev build must not take the legacy install's data before the installed app has.
+    if cfg!(debug_assertions) {
+        return;
+    }
     let Some(old) = dirs::data_local_dir().map(|d| d.join("Greedout")) else { return };
     move_legacy_data(&old, &app_dir());
 }

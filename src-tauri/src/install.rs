@@ -27,7 +27,7 @@ use std::process::Command;
 const APP_NAME: &str = "Greedout";
 /// The install folder under the profile; `config::app_dir` shares it, so settings,
 /// cache and the exe live and are removed together.
-const DIR_NAME: &str = ".greedout";
+use crate::config::DIR_NAME;
 const EXE_NAME: &str = "greedout.exe";
 
 /// Spawn without flashing a console window. Every helper process here is
